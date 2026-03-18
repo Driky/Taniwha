@@ -18,5 +18,4 @@ services:
       RTORRENT_SOCKET: /var/run/rtorrent/rpc.socket
     volumes:
       - .:/app
-      # Mount the rtorrent socket from the host — substitute the host path:
-      - /path/to/host/rpc.socket:/var/run/rtorrent/rpc.socket
+      - /var/run/driky/.rtorrent.sock:/var/run/rtorrent/rpc.socket
