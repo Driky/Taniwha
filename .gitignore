@@ -38,3 +38,7 @@ taniwha-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# Environment files — contain secrets, never commit
+*.env
+.env.*
+

@@ -1,0 +1,22 @@
+# Dev environment only — not used in production.
+# The production image is built by CI and managed by systemd on the server.
+services:
+  app:
+    build:
+      context: .
+      target: builder  # Stops before release; keeps mix tooling available
+    command: ["mix", "phx.server"]
+    ports:
+      - "4000:4000"
+    environment:
+      MIX_ENV: dev
+      PHX_SERVER: "true"
+      SECRET_KEY_BASE: dev_secret_replace_me_at_least_64_characters_long_xxxxxxxxxxxxxxxx
+      PHX_HOST: localhost
+      PORT: "4000"
+      # Substitute with the path to your rtorrent SCGI socket on the host:
+      RTORRENT_SOCKET: /var/run/rtorrent/rpc.socket
+    volumes:
+      - .:/app
+      # Mount the rtorrent socket from the host — substitute the host path:
+      - /path/to/host/rpc.socket:/var/run/rtorrent/rpc.socket

@@ -1,0 +1,52 @@
+# systemd unit for Taniwha — manages the Docker container lifecycle.
+#
+# Before installing, substitute the image owner:
+#   sed -i 's/{OWNER}/your-github-username/g' deploy/taniwha.service
+#
+# Installation (on the server):
+#   sudo cp deploy/taniwha.service /etc/systemd/system/taniwha.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now taniwha
+
+[Unit]
+Description=Taniwha torrent manager (Docker)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=taniwha-deploy
+Group=docker
+
+# Stop and remove any existing container from a previous run.
+# The '-' prefix tells systemd to ignore a non-zero exit code
+# (the container may already be stopped or not exist — that is fine).
+ExecStartPre=-/usr/bin/docker stop taniwha
+ExecStartPre=-/usr/bin/docker rm taniwha
+
+# Pull the latest image. NO '-' prefix: if the pull fails and there is no
+# locally cached image, ExecStart will also fail and systemd will retry
+# according to the Restart policy below. This is the safe, correct behaviour.
+ExecStartPre=/usr/bin/docker pull ghcr.io/{OWNER}/taniwha:latest
+
+ExecStart=/usr/bin/docker run \
+    --name taniwha \
+    --rm \
+    --env-file /home/taniwha-deploy/taniwha/.env \
+    -p 4000:4000 \
+    -v /var/run/rtorrent/rpc.socket:/var/run/rtorrent/rpc.socket \
+    ghcr.io/{OWNER}/taniwha:latest
+
+ExecStop=/usr/bin/docker stop taniwha
+
+Restart=on-failure
+RestartSec=10
+
+# After 3 failures within 60 s the unit enters 'failed' state to prevent
+# a broken-image restart storm. Operator must intervene.
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target
