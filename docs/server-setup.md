@@ -92,34 +92,25 @@ The service will start automatically on the next CD deployment (or you can start
 
 Create `/home/taniwha-deploy/taniwha/.env` on the server. This file is read by `docker run --env-file` and must never be committed to version control.
 
+First, generate a secret key (on any machine with Elixir or openssl):
+
 ```bash
-sudo -u taniwha-deploy tee /home/taniwha-deploy/taniwha/.env > /dev/null << 'EOF'
-# Generate with: mix phx.gen.secret
-SECRET_KEY_BASE=REPLACE_WITH_64_CHARACTER_SECRET
+# With Elixir:
+mix phx.gen.secret
+# Or with openssl:
+openssl rand -base64 48
+```
 
-# Public hostname of the server (used in URLs)
-PHX_HOST=your.domain.example.com
+Then create the file on the server, substituting your actual values:
 
-# HTTP port inside the container (4000 is the default)
-PORT=4000
-
-# Path to the rtorrent SCGI socket inside the container
-RTORRENT_SOCKET=/var/run/rtorrent/rpc.socket
-EOF
+```bash
+sudo -u taniwha-deploy printf 'SECRET_KEY_BASE=REPLACE_WITH_64_CHARACTER_SECRET\nPHX_HOST=your.domain.example.com\nPORT=4000\nRTORRENT_SOCKET=/var/run/rtorrent/rpc.socket\n' > /home/taniwha-deploy/taniwha/.env
 
 # Restrict permissions — the file contains secrets
 sudo chmod 600 /home/taniwha-deploy/taniwha/.env
 sudo chown taniwha-deploy:taniwha-deploy /home/taniwha-deploy/taniwha/.env
 ```
 
-Generate a secret key:
-
-```bash
-# On a machine with Elixir installed:
-mix phx.gen.secret
-# Or with openssl:
-openssl rand -base64 48
-```
 
 ---
 
