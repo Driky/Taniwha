@@ -20,19 +20,20 @@ COPY config/ config/
 
 RUN mix deps.get --only prod && mix deps.compile
 
-# ── Layer 2: assets (cached until assets/ or priv/ changes) ───────────────────
-COPY assets/ assets/
+# ── Layer 2: application code (cached until lib/ or priv/ changes) ───────────
+# Must compile before assets — phoenix-colocated/taniwha is generated at compile
+# time by scanning lib/ for co-located JS hooks.
+COPY lib/ lib/
 COPY priv/ priv/
 
-# Download tailwind/esbuild binaries if not cached, then minify and digest
+RUN mix compile
+
+# ── Layer 3: assets (cached until assets/ changes) ────────────────────────────
+COPY assets/ assets/
+
 RUN mix tailwind.install --if-missing && \
     mix esbuild.install --if-missing && \
     mix assets.deploy
-
-# ── Layer 3: application code ─────────────────────────────────────────────────
-COPY lib/ lib/
-
-RUN mix compile
 
 # ── Layer 4: release ──────────────────────────────────────────────────────────
 RUN mix release
