@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha -type f -name *.exs -o -name *.ex -o -name mix.exs -o -name .credo.exs)",
+      "Bash(mix archive.list)",
+      "Bash(/opt/homebrew/bin/mix archive:*)",
+      "Bash(elixir:*)",
+      "Bash(mix:*)",
+      "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha -not -path */.* -not -path */_build* -not -path */deps* -not -path */node_modules* -type f)"
+    ]
+  }
+}
