@@ -55,7 +55,7 @@ Grant only the specific commands required — no wildcards.
 Run this **from your local machine** via the admin user:
 
 ```bash
-ssh <admin-user>@<server> -p <port> "echo 'taniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl start taniwha, /bin/systemctl stop taniwha, /bin/systemctl restart taniwha, /bin/systemctl status taniwha, /bin/cp /tmp/taniwha.service /etc/systemd/system/taniwha.service, /bin/systemctl daemon-reload, /bin/systemctl enable taniwha' | sudo tee /etc/sudoers.d/taniwha-deploy && sudo chmod 440 /etc/sudoers.d/taniwha-deploy"
+ssh <admin-user>@<server> -p <port> "printf 'taniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl start taniwha\ntaniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl stop taniwha\ntaniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart taniwha\ntaniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl status taniwha\ntaniwha-deploy ALL=(ALL) NOPASSWD: /bin/cp /tmp/taniwha.service /etc/systemd/system/taniwha.service\ntaniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl daemon-reload\ntaniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl enable taniwha\n' | sudo tee /etc/sudoers.d/taniwha-deploy && sudo chmod 440 /etc/sudoers.d/taniwha-deploy"
 ```
 
 This grants exactly what is needed to complete the unit installation in section 3 and for CD deployments — nothing more.
