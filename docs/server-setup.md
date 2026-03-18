@@ -4,6 +4,30 @@ Complete operator guide for preparing a production server to run Taniwha via Doc
 
 ---
 
+## Automated setup (recommended)
+
+A script automates all steps below. Run it once from the project root on your local machine:
+
+```bash
+./deploy/setup-server.sh \
+  --admin-user ubuntu \
+  --server driky.lol \
+  --port 7777
+```
+
+The script will:
+1. Check local prerequisites (`ssh`, `scp`, `ssh-keyscan`, `openssl`)
+2. Generate `~/.ssh/taniwha_deploy` (skipped if it already exists)
+3. Create the `taniwha-deploy` user and sudoers entry on the server
+4. Install the deploy public key
+5. Prompt you for `PHX_HOST`, `RTORRENT_SOCKET`, and `PORT`, then write `.env`
+6. Copy and enable the systemd unit
+7. Print all GitHub secrets (`DEPLOY_SSH_KEY`, `DEPLOY_HOST_KEY`, etc.) ready to copy-paste
+
+The manual steps below are kept for reference and troubleshooting.
+
+---
+
 ## Prerequisites
 
 - Debian 12 (Bookworm) or Ubuntu 22.04+ VPS
