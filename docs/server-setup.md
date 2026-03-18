@@ -27,15 +27,21 @@ sudo usermod -aG docker taniwha-deploy
 sudo mkdir -p /home/taniwha-deploy/taniwha
 sudo chown taniwha-deploy:taniwha-deploy /home/taniwha-deploy/taniwha
 
-# Create the SSH key that GitHub Actions will use
+# Prepare the SSH authorized_keys file on the server (run these on the server):
 sudo -u taniwha-deploy mkdir -p /home/taniwha-deploy/.ssh
 sudo -u taniwha-deploy chmod 700 /home/taniwha-deploy/.ssh
+```
 
-# Generate an Ed25519 key pair (on your local machine, not the server):
+Then, **on your local machine** (not the server), generate the deploy key pair.
+No passphrase — GitHub Actions loads it non-interactively and a passphrase would cause the deploy step to hang:
+
+```bash
 ssh-keygen -t ed25519 -C "taniwha-deploy@github-actions" -f ~/.ssh/taniwha_deploy
-# Then copy the public key to the server:
+
+# Copy the public key to the server so it accepts connections from GitHub Actions:
 ssh-copy-id -i ~/.ssh/taniwha_deploy.pub taniwha-deploy@<server>
-# The private key content (~/.ssh/taniwha_deploy) goes into the DEPLOY_SSH_KEY GitHub secret.
+
+# The private key (~/.ssh/taniwha_deploy) goes into the DEPLOY_SSH_KEY GitHub secret.
 ```
 
 ---
