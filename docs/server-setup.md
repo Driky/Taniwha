@@ -104,7 +104,7 @@ openssl rand -base64 48
 Then create the file on the server, substituting your actual values:
 
 ```bash
-sudo -u taniwha-deploy printf 'SECRET_KEY_BASE=REPLACE_WITH_64_CHARACTER_SECRET\nPHX_HOST=your.domain.example.com\nPORT=4000\nRTORRENT_SOCKET=/var/run/rtorrent/rpc.socket\n' > /home/taniwha-deploy/taniwha/.env
+printf 'SECRET_KEY_BASE=REPLACE_WITH_64_CHARACTER_SECRET\nPHX_HOST=your.domain.example.com\nPORT=4000\nRTORRENT_SOCKET=/var/run/rtorrent/rpc.socket\n' | sudo -u taniwha-deploy tee /home/taniwha-deploy/taniwha/.env > /dev/null
 
 # Restrict permissions — the file contains secrets
 sudo chmod 600 /home/taniwha-deploy/taniwha/.env
