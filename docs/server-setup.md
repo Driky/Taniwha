@@ -40,10 +40,7 @@ ssh-keygen -t ed25519 -C "taniwha-deploy@github-actions" -f ~/.ssh/taniwha_deplo
 
 # Copy the public key to the server. Because taniwha-deploy has no password login yet,
 # go via your admin user (e.g. ubuntu) using a one-liner:
-cat ~/.ssh/taniwha_deploy.pub | ssh <admin-user>@<server> -p <port> \
-  "sudo tee /home/taniwha-deploy/.ssh/authorized_keys && \
-   sudo chmod 600 /home/taniwha-deploy/.ssh/authorized_keys && \
-   sudo chown taniwha-deploy:taniwha-deploy /home/taniwha-deploy/.ssh/authorized_keys"
+cat ~/.ssh/taniwha_deploy.pub | ssh <admin-user>@<server> -p <port> "sudo tee /home/taniwha-deploy/.ssh/authorized_keys && sudo chmod 600 /home/taniwha-deploy/.ssh/authorized_keys && sudo chown taniwha-deploy:taniwha-deploy /home/taniwha-deploy/.ssh/authorized_keys"
 
 # The private key (~/.ssh/taniwha_deploy) goes into the DEPLOY_SSH_KEY GitHub secret.
 ```
