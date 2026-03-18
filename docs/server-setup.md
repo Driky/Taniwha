@@ -52,21 +52,15 @@ cat ~/.ssh/taniwha_deploy.pub | ssh <admin-user>@<server> -p <port> "sudo tee /h
 The deploy user needs to restart the systemd unit without a password prompt.
 Grant only the specific commands required — no wildcards.
 
+Run this **from your local machine** via the admin user:
+
 ```bash
-sudo visudo -f /etc/sudoers.d/taniwha-deploy
+ssh <admin-user>@<server> -p <port> "echo 'taniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl start taniwha, /bin/systemctl stop taniwha, /bin/systemctl restart taniwha, /bin/systemctl status taniwha, /bin/cp /tmp/taniwha.service /etc/systemd/system/taniwha.service, /bin/systemctl daemon-reload, /bin/systemctl enable taniwha' | sudo tee /etc/sudoers.d/taniwha-deploy && sudo chmod 440 /etc/sudoers.d/taniwha-deploy"
 ```
 
-Contents:
+This grants exactly what is needed to complete the unit installation in section 3 and for CD deployments — nothing more.
 
-```
-# Allows taniwha-deploy to manage the Taniwha service only
-taniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl start taniwha
-taniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl stop taniwha
-taniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart taniwha
-taniwha-deploy ALL=(ALL) NOPASSWD: /bin/systemctl status taniwha
-```
-
-Verify the file parses correctly:
+Verify the file parses correctly (on the server):
 
 ```bash
 sudo visudo -c -f /etc/sudoers.d/taniwha-deploy
@@ -82,12 +76,12 @@ On your **local machine**, substitute the `{OWNER}` placeholder with your GitHub
 sed -i 's/{OWNER}/your-github-username/g' deploy/taniwha.service
 ```
 
-Copy the unit to the server and enable it:
+Copy the unit to the server and enable it (from your local machine):
 
 ```bash
-scp deploy/taniwha.service taniwha-deploy@<server>:/tmp/taniwha.service
-ssh taniwha-deploy@<server> "sudo cp /tmp/taniwha.service /etc/systemd/system/taniwha.service"
-ssh taniwha-deploy@<server> "sudo systemctl daemon-reload && sudo systemctl enable taniwha"
+scp -P <port> -i ~/.ssh/taniwha_deploy deploy/taniwha.service taniwha-deploy@<server>:/tmp/taniwha.service
+ssh -i ~/.ssh/taniwha_deploy -p <port> taniwha-deploy@<server> "sudo cp /tmp/taniwha.service /etc/systemd/system/taniwha.service"
+ssh -i ~/.ssh/taniwha_deploy -p <port> taniwha-deploy@<server> "sudo systemctl daemon-reload && sudo systemctl enable taniwha"
 ```
 
 The service will start automatically on the next CD deployment (or you can start it manually after completing the steps below).
