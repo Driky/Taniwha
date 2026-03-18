@@ -183,8 +183,8 @@ To roll back to a specific version:
 1. Edit the systemd unit on the server to pin a specific SHA:
    ```bash
    sudo nano /etc/systemd/system/taniwha.service
-   # Change: ghcr.io/{OWNER}/taniwha:latest
-   # To:     ghcr.io/{OWNER}/taniwha:<sha>
+   # Change: ghcr.io/driky/taniwha:latest
+   # To:     ghcr.io/driky/taniwha:<sha>
    ```
 
 2. Reload and restart:
@@ -210,7 +210,7 @@ After completing setup, verify each item:
 - [ ] `docker ps` shows the `taniwha` container running
 - [ ] `curl -s http://localhost:4000` returns an HTTP response (likely a redirect to HTTPS)
 - [ ] `docker logs taniwha` shows no startup errors
-- [ ] `docker images ghcr.io/<owner>/taniwha` shows both `:latest` and SHA tags
+- [ ] `docker images ghcr.io/driky/taniwha` shows both `:latest` and SHA tags
 - [ ] Push a commit to `main` → CI passes → CD triggers → new image deployed without manual intervention
 - [ ] Test rollback: pin a previous SHA, restart, verify, then restore `:latest`
 

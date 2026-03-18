@@ -1,8 +1,5 @@
 # systemd unit for Taniwha — manages the Docker container lifecycle.
 #
-# Before installing, substitute the image owner:
-#   sed -i 's/{OWNER}/your-github-username/g' deploy/taniwha.service
-#
 # Installation (on the server):
 #   sudo cp deploy/taniwha.service /etc/systemd/system/taniwha.service
 #   sudo systemctl daemon-reload
@@ -28,7 +25,7 @@ ExecStartPre=-/usr/bin/docker rm taniwha
 # Pull the latest image. NO '-' prefix: if the pull fails and there is no
 # locally cached image, ExecStart will also fail and systemd will retry
 # according to the Restart policy below. This is the safe, correct behaviour.
-ExecStartPre=/usr/bin/docker pull ghcr.io/{OWNER}/taniwha:latest
+ExecStartPre=/usr/bin/docker pull ghcr.io/driky/taniwha:latest
 
 ExecStart=/usr/bin/docker run \
     --name taniwha \
@@ -36,7 +33,7 @@ ExecStart=/usr/bin/docker run \
     --env-file /home/taniwha-deploy/taniwha/.env \
     -p 4000:4000 \
     -v /var/run/rtorrent/rpc.socket:/var/run/rtorrent/rpc.socket \
-    ghcr.io/{OWNER}/taniwha:latest
+    ghcr.io/driky/taniwha:latest
 
 ExecStop=/usr/bin/docker stop taniwha
 
