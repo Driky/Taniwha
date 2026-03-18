@@ -64,7 +64,7 @@ jobs:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
 
       # Add the server's host key to known_hosts. The DEPLOY_HOST_KEY secret
-      # must contain the output of: ssh-keyscan -H <server>
+      # must contain the output of: ssh-keyscan -H -p <port> <server>
       # This avoids the insecure StrictHostKeyChecking=no approach.
       - name: Add server to known hosts
         run: |
@@ -74,11 +74,11 @@ jobs:
 
       - name: Restart service on server
         run: |
-          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+          ssh -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
             "sudo systemctl restart taniwha"
 
       - name: Verify container is running
         run: |
           sleep 10
-          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+          ssh -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
             "docker inspect --format='{{.State.Running}}' taniwha | grep -q true"

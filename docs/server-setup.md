@@ -144,14 +144,15 @@ In your repository: **Settings → Secrets and variables → Actions → New rep
 | Secret name | Value |
 |---|---|
 | `DEPLOY_SSH_KEY` | Contents of `~/.ssh/taniwha_deploy` (the private key) |
-| `DEPLOY_HOST_KEY` | Output of `ssh-keyscan -H <server>` (see below) |
+| `DEPLOY_HOST_KEY` | Output of `ssh-keyscan -H -p <port> <server>` (see below) |
 | `DEPLOY_USER` | `taniwha-deploy` |
 | `DEPLOY_HOST` | Server IP address or hostname |
+| `DEPLOY_PORT` | SSH port (e.g. `7777`) |
 
 Getting the host key (run on your local machine):
 
 ```bash
-ssh-keyscan -H <server>
+ssh-keyscan -H -p <port> <server>
 # Copy the full output (one or more lines beginning with the hashed hostname)
 # and paste it as the DEPLOY_HOST_KEY secret value.
 ```
