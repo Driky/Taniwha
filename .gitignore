@@ -31,6 +31,9 @@ taniwha-*.tar
 # Ignore digested assets cache.
 /priv/static/cache_manifest.json
 
+# Dialyzer PLT files
+/priv/plts/
+
 # In case you use Node.js/npm, you want to ignore these.
 npm-debug.log
 /assets/node_modules/
