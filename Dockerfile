@@ -1,5 +1,5 @@
 # ── Builder stage ─────────────────────────────────────────────────────────────
-FROM hexpm/elixir:1.19.2-erlang-27.3-debian-bookworm-20250203-slim AS builder
+FROM hexpm/elixir:1.19.2-erlang-27.3.4.2-debian-bookworm-20260316-slim AS builder
 
 # Install build tools
 RUN apt-get update -y && \
