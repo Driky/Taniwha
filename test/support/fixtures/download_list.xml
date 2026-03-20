@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<methodResponse>
+  <params><param><value>
+    <array><data>
+      <value><string>ABC123DEF456ABC123DEF456ABC123DEF456ABC1</string></value>
+      <value><string>111222333444555666777888999AAABBBCCCDDD1</string></value>
+      <value><string>FEEDFACEDEADBEEFFEEDFACEDEADBEEFFEEDFAC1</string></value>
+    </data></array>
+  </value></param></params>
+</methodResponse>
