@@ -9,7 +9,9 @@ import Config
 
 config :taniwha,
   generators: [timestamp_type: :utc_datetime],
-  scgi_connection: Taniwha.SCGI.UnixConnection
+  scgi_connection: Taniwha.SCGI.UnixConnection,
+  scgi_transport: {:unix, "/var/run/rtorrent.sock"},
+  scgi_timeout: 5_000
 
 # Configure the endpoint
 config :taniwha, TaniwhaWeb.Endpoint,
