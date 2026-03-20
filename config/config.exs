@@ -8,7 +8,8 @@
 import Config
 
 config :taniwha,
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  scgi_connection: Taniwha.SCGI.UnixConnection
 
 # Configure the endpoint
 config :taniwha, TaniwhaWeb.Endpoint,
