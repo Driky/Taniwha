@@ -17,6 +17,8 @@ defmodule Taniwha.RPC.Client do
 
   use GenServer
 
+  @behaviour Taniwha.RPC.ClientBehaviour
+
   alias Taniwha.SCGI.Protocol
   alias Taniwha.XMLRPC
 
@@ -46,6 +48,7 @@ defmodule Taniwha.RPC.Client do
   Uses `:infinity` timeout on the GenServer call; the socket-level timeout
   (`:scgi_timeout`) governs how long to wait for rtorrent to respond.
   """
+  @impl true
   @spec call(String.t(), [term()]) :: {:ok, term()} | {:error, term()}
   def call(method, params) when is_binary(method) and is_list(params) do
     GenServer.call(__MODULE__, {:call, method, params}, :infinity)
@@ -57,6 +60,7 @@ defmodule Taniwha.RPC.Client do
   Each element in the returned list is a single-element array (rtorrent wraps
   every multicall result in `[value]`).
   """
+  @impl true
   @spec multicall([{String.t(), [term()]}]) :: {:ok, [term()]} | {:error, term()}
   def multicall(calls) when is_list(calls) do
     GenServer.call(__MODULE__, {:multicall, calls}, :infinity)
