@@ -17,6 +17,8 @@ defmodule Taniwha.Commands do
 
   @rpc_client Application.compile_env(:taniwha, :rpc_client, Taniwha.RPC.Client)
 
+  @torrent_fields_count length(Taniwha.Torrent.rpc_fields())
+
   @file_fields [
     "f.path=",
     "f.size_bytes=",
@@ -109,10 +111,7 @@ defmodule Taniwha.Commands do
   """
   @spec load_url(String.t()) :: :ok | {:error, term()}
   def load_url(url) do
-    case @rpc_client.call("load.start", ["", url]) do
-      {:ok, 0} -> :ok
-      error -> error
-    end
+    @rpc_client.call("load.start", ["", url]) |> ok_on_zero()
   end
 
   @doc """
@@ -124,10 +123,7 @@ defmodule Taniwha.Commands do
   """
   @spec load_raw(binary()) :: :ok | {:error, term()}
   def load_raw(data) do
-    case @rpc_client.call("load.raw_start", ["", data]) do
-      {:ok, 0} -> :ok
-      error -> error
-    end
+    @rpc_client.call("load.raw_start", ["", data]) |> ok_on_zero()
   end
 
   # ---------------------------------------------------------------------------
@@ -167,10 +163,7 @@ defmodule Taniwha.Commands do
   @spec set_file_priority(String.t(), non_neg_integer(), non_neg_integer()) ::
           :ok | {:error, term()}
   def set_file_priority(hash, index, priority) do
-    case @rpc_client.call("f.priority.set", ["#{hash}:f#{index}", priority]) do
-      {:ok, 0} -> :ok
-      error -> error
-    end
+    @rpc_client.call("f.priority.set", ["#{hash}:f#{index}", priority]) |> ok_on_zero()
   end
 
   # ---------------------------------------------------------------------------
@@ -195,11 +188,12 @@ defmodule Taniwha.Commands do
 
   @spec run_lifecycle(String.t(), String.t()) :: :ok | {:error, term()}
   defp run_lifecycle(method, hash) do
-    case @rpc_client.call(method, [hash]) do
-      {:ok, 0} -> :ok
-      error -> error
-    end
+    @rpc_client.call(method, [hash]) |> ok_on_zero()
   end
+
+  @spec ok_on_zero({:ok, 0} | {:ok, term()} | {:error, term()}) :: :ok | {:error, term()}
+  defp ok_on_zero({:ok, 0}), do: :ok
+  defp ok_on_zero(other), do: other
 
   @spec fetch_all_torrent_data([String.t()]) :: {:ok, [term()]} | {:error, term()}
   defp fetch_all_torrent_data([]), do: {:ok, []}
@@ -211,11 +205,9 @@ defmodule Taniwha.Commands do
 
   @spec build_torrents([String.t()], [term()]) :: [Torrent.t()]
   defp build_torrents(hashes, results) do
-    fields_count = length(Torrent.rpc_fields())
-
     results
     |> Enum.map(fn [v] -> v end)
-    |> Enum.chunk_every(fields_count)
+    |> Enum.chunk_every(@torrent_fields_count)
     |> Enum.zip(hashes)
     |> Enum.map(fn {values, hash} -> Torrent.from_rpc_values(hash, values) end)
   end
