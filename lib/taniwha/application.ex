@@ -6,6 +6,7 @@ defmodule Taniwha.Application do
   def start(_type, _args) do
     children = [
       Taniwha.RPC.Client,
+      Taniwha.State.Store,
       TaniwhaWeb.Endpoint,
       {Phoenix.PubSub, name: Taniwha.PubSub}
     ]
