@@ -26,7 +26,7 @@ defmodule Taniwha.State.Store do
   @doc "Returns all torrents currently in the store, in unspecified order."
   @spec get_all_torrents() :: [Torrent.t()]
   def get_all_torrents do
-    :ets.tab2list(@table) |> Enum.map(fn {_hash, torrent} -> torrent end)
+    :ets.foldl(fn {_hash, torrent}, acc -> [torrent | acc] end, [], @table)
   end
 
   @doc "Fetches a single torrent by hash. Returns `{:error, :not_found}` if absent."
@@ -67,7 +67,7 @@ defmodule Taniwha.State.Store do
 
   @impl true
   def init(_opts) do
-    table = :ets.new(@table, [:set, :named_table, :public, read_concurrency: true])
-    {:ok, %{table: table}}
+    :ets.new(@table, [:set, :named_table, :public, read_concurrency: true])
+    {:ok, %{}}
   end
 end
