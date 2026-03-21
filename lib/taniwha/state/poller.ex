@@ -36,7 +36,7 @@ defmodule Taniwha.State.Poller do
 
   @commands Application.compile_env(:taniwha, :commands, Taniwha.Commands)
 
-  @diff_fields ~w(upload_rate download_rate completed_bytes state is_active is_hash_checking peers_connected ratio complete)a
+  @diff_fields Torrent.diff_fields()
 
   # ── Public API ────────────────────────────────────────────────────────────
 

@@ -64,6 +64,8 @@ defmodule Taniwha.Torrent do
     "d.base_path"
   ]
 
+  @diff_fields ~w(upload_rate download_rate completed_bytes state is_active is_hash_checking peers_connected ratio complete)a
+
   @doc """
   Returns the ordered list of rtorrent RPC field names used to build a Torrent
   from a multicall response. `Taniwha.Commands` uses this to avoid hardcoding
@@ -71,6 +73,16 @@ defmodule Taniwha.Torrent do
   """
   @spec rpc_fields() :: [String.t()]
   def rpc_fields, do: @rpc_fields
+
+  @doc """
+  Returns the list of struct fields compared during diff operations.
+
+  A change to any of these fields triggers an `:updated` entry in
+  `Taniwha.State.Poller.compute_diffs/2`. Static fields (`name`, `base_path`,
+  etc.) are intentionally excluded to avoid noisy broadcasts.
+  """
+  @spec diff_fields() :: [atom()]
+  def diff_fields, do: @diff_fields
 
   @doc """
   Returns download progress as a float between 0.0 and 1.0.
