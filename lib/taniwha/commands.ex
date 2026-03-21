@@ -12,6 +12,8 @@ defmodule Taniwha.Commands do
       config :taniwha, rpc_client: Taniwha.RPC.MockClient
   """
 
+  @behaviour Taniwha.CommandsBehaviour
+
   alias Taniwha.Torrent
   alias Taniwha.TorrentFile
 
@@ -63,6 +65,7 @@ defmodule Taniwha.Commands do
   Calls `list_hashes/1` first, then issues one `system.multicall` covering
   every field for every torrent. Returns `{:ok, []}` if no torrents exist.
   """
+  @impl Taniwha.CommandsBehaviour
   @spec get_all_torrents(String.t()) :: {:ok, [Torrent.t()]} | {:error, term()}
   def get_all_torrents(view \\ "") do
     with {:ok, hashes} <- list_hashes(view),

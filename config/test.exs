@@ -27,7 +27,9 @@ config :taniwha,
   scgi_connection: Taniwha.SCGI.MockConnection,
   scgi_transport: {:unix, "/tmp/rtorrent_test.sock"},
   scgi_timeout: 5_000,
-  rpc_client: Taniwha.RPC.MockClient
+  rpc_client: Taniwha.RPC.MockClient,
+  commands: Taniwha.MockCommands,
+  poll_interval: 86_400_000
 
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,

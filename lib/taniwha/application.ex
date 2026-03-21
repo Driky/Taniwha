@@ -5,10 +5,11 @@ defmodule Taniwha.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {Phoenix.PubSub, name: Taniwha.PubSub},
       Taniwha.RPC.Client,
       Taniwha.State.Store,
-      TaniwhaWeb.Endpoint,
-      {Phoenix.PubSub, name: Taniwha.PubSub}
+      Taniwha.State.Poller,
+      TaniwhaWeb.Endpoint
     ]
 
     opts = [strategy: :one_for_one, name: Taniwha.Supervisor]
