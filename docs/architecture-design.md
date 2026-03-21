@@ -191,6 +191,7 @@ defmodule Taniwha.Torrent do
     ratio: float(),
     state: :stopped | :started,
     is_active: boolean(),
+    is_hash_checking: boolean(),
     complete: boolean(),
     peers_connected: non_neg_integer(),
     timestamp_started: DateTime.t() | nil,
@@ -273,7 +274,7 @@ A GenServer that runs on a configurable interval (default: 2000ms).
 4. Write changes to ETS
 5. Broadcast diffs over PubSub
 
-**Diff logic:** A torrent is "updated" if any of these fields changed: `up_rate`, `down_rate`, `completed_bytes`, `state`, `is_active`, `peers_connected`, `ratio`, `complete`.
+**Diff logic:** A torrent is "updated" if any of these fields changed: `up_rate`, `down_rate`, `completed_bytes`, `state`, `is_active`, `is_hash_checking`, `peers_connected`, `ratio`, `complete`.
 
 **PubSub topics:**
 - `"torrents:list"` — receives `{:torrent_diffs, [{:added | :updated, Torrent.t()} | {:removed, hash}]}`
@@ -359,6 +360,7 @@ Uses Guardian for JWT encoding/decoding/verification.
 | `d.state` | hash | 0 or 1 | 1 = started |
 | `d.is_active` | hash | 0 or 1 | 1 = actively transferring |
 | `d.complete` | hash | 0 or 1 | 1 = download complete |
+| `d.is_hash_checking` | hash | 0 or 1 | 1 = currently hash checking |
 | `d.start` / `d.stop` | hash | 0 | Lifecycle control |
 | `d.close` | hash | 0 | Make inactive |
 | `d.erase` | hash | 0 | Remove from client (not disk) |
