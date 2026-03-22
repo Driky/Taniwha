@@ -79,10 +79,12 @@ defmodule Taniwha.Commands do
   # ---------------------------------------------------------------------------
 
   @doc "Starts a torrent. Returns `:ok` on success."
+  @impl Taniwha.CommandsBehaviour
   @spec start(String.t()) :: :ok | {:error, term()}
   def start(hash), do: run_lifecycle("d.start", hash)
 
   @doc "Stops a torrent. Returns `:ok` on success."
+  @impl Taniwha.CommandsBehaviour
   @spec stop(String.t()) :: :ok | {:error, term()}
   def stop(hash), do: run_lifecycle("d.stop", hash)
 
@@ -91,6 +93,7 @@ defmodule Taniwha.Commands do
   def close(hash), do: run_lifecycle("d.close", hash)
 
   @doc "Erases a torrent from rtorrent. Returns `:ok` on success."
+  @impl Taniwha.CommandsBehaviour
   @spec erase(String.t()) :: :ok | {:error, term()}
   def erase(hash), do: run_lifecycle("d.erase", hash)
 
@@ -163,6 +166,7 @@ defmodule Taniwha.Commands do
   `index` is the zero-based file index within the torrent.
   `priority` is an integer: `0` = skip, `1` = normal, `2` = high.
   """
+  @impl Taniwha.CommandsBehaviour
   @spec set_file_priority(String.t(), non_neg_integer(), non_neg_integer()) ::
           :ok | {:error, term()}
   def set_file_priority(hash, index, priority) do

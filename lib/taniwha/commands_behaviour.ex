@@ -10,4 +10,9 @@ defmodule Taniwha.CommandsBehaviour do
   alias Taniwha.Torrent
 
   @callback get_all_torrents(String.t()) :: {:ok, [Torrent.t()]} | {:error, term()}
+  @callback start(String.t()) :: :ok | {:error, term()}
+  @callback stop(String.t()) :: :ok | {:error, term()}
+  @callback erase(String.t()) :: :ok | {:error, term()}
+  @callback set_file_priority(String.t(), non_neg_integer(), non_neg_integer()) ::
+              :ok | {:error, term()}
 end

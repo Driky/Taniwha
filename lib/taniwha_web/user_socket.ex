@@ -8,6 +8,8 @@ defmodule TaniwhaWeb.UserSocket do
 
   use Phoenix.Socket
 
+  channel "torrents:*", TaniwhaWeb.TorrentChannel
+
   @impl true
   def connect(%{"token" => token}, socket, _connect_info) do
     case Taniwha.Auth.verify_token(token) do
