@@ -2,8 +2,9 @@ defmodule TaniwhaWeb.API.TorrentControllerTest do
   use TaniwhaWeb.ConnCase, async: false
 
   import Mox
+  import Taniwha.Test.Fixtures, only: [torrent_fixture: 0, torrent_fixture: 1]
 
-  alias Taniwha.{MockCommands, State.Store, Torrent}
+  alias Taniwha.{MockCommands, State.Store}
 
   setup :set_mox_from_context
   setup :verify_on_exit!
@@ -12,31 +13,6 @@ defmodule TaniwhaWeb.API.TorrentControllerTest do
     Store.clear()
     on_exit(fn -> Store.clear() end)
     :ok
-  end
-
-  defp with_auth(conn) do
-    {:ok, token} = Taniwha.Auth.issue_token("test-api-key-for-tests")
-    put_req_header(conn, "authorization", "Bearer #{token}")
-  end
-
-  defp torrent_fixture(hash \\ "abc123def456abc123def456abc123de") do
-    %Torrent{
-      hash: hash,
-      name: "Test Torrent",
-      size: 1_000_000,
-      completed_bytes: 500_000,
-      upload_rate: 100,
-      download_rate: 200,
-      ratio: 0.5,
-      state: :started,
-      is_active: true,
-      complete: false,
-      is_hash_checking: false,
-      peers_connected: 5,
-      started_at: nil,
-      finished_at: nil,
-      base_path: "/downloads/test"
-    }
   end
 
   # ---------------------------------------------------------------------------

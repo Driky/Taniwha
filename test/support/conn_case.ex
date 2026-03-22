@@ -34,4 +34,15 @@ defmodule TaniwhaWeb.ConnCase do
   setup _tags do
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
+
+  @doc """
+  Adds a valid `Authorization: Bearer <jwt>` header to `conn`.
+
+  Uses the test API key configured in `config/test.exs`.
+  """
+  @spec with_auth(Plug.Conn.t()) :: Plug.Conn.t()
+  def with_auth(conn) do
+    {:ok, token} = Taniwha.Auth.issue_token("test-api-key-for-tests")
+    Plug.Conn.put_req_header(conn, "authorization", "Bearer #{token}")
+  end
 end

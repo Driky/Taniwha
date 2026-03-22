@@ -36,17 +36,12 @@ defmodule TaniwhaWeb.API.TorrentController do
   """
   @spec create(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def create(conn, %{"magnet_url" => url}) do
-    case @commands.load_url(url) do
-      :ok -> conn |> put_status(201) |> render(:create, status: "queued")
-      {:error, reason} -> conn |> put_status(422) |> json(%{error: inspect(reason)})
-    end
+    load_reply(conn, @commands.load_url(url))
   end
 
   def create(conn, %{"torrent" => %Plug.Upload{path: path}}) do
-    binary = File.read!(path)
-
-    case @commands.load_raw(binary) do
-      :ok -> conn |> put_status(201) |> render(:create, status: "queued")
+    case File.read(path) do
+      {:ok, binary} -> load_reply(conn, @commands.load_raw(binary))
       {:error, reason} -> conn |> put_status(422) |> json(%{error: inspect(reason)})
     end
   end
@@ -54,4 +49,10 @@ defmodule TaniwhaWeb.API.TorrentController do
   def create(conn, _params) do
     conn |> put_status(422) |> json(%{error: "magnet_url or torrent file required"})
   end
+
+  @spec load_reply(Plug.Conn.t(), :ok | {:error, term()}) :: Plug.Conn.t()
+  defp load_reply(conn, :ok), do: conn |> put_status(201) |> render(:create, status: "queued")
+
+  defp load_reply(conn, {:error, reason}),
+    do: conn |> put_status(422) |> json(%{error: inspect(reason)})
 end

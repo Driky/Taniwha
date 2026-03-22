@@ -14,7 +14,7 @@ defmodule TaniwhaWeb.API.AuthController do
   @spec create(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def create(conn, %{"api_key" => api_key}) do
     case Taniwha.Auth.issue_token(api_key) do
-      {:ok, token} -> json(conn, %{token: token})
+      {:ok, token} -> render(conn, :create, token: token)
       {:error, :invalid_api_key} -> conn |> put_status(401) |> json(%{error: "invalid_api_key"})
     end
   end
