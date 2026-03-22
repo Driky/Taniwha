@@ -46,6 +46,9 @@ if config_env() == :prod do
 
   config :taniwha, api_key: api_key
 
+  socket_path = System.get_env("RTORRENT_SOCKET", "/var/run/rtorrent.sock")
+  config :taniwha, scgi_transport: {:unix, socket_path}
+
   config :taniwha, TaniwhaWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
