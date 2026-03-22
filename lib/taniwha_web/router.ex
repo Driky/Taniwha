@@ -22,7 +22,10 @@ defmodule TaniwhaWeb.Router do
   scope "/", TaniwhaWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", DashboardLive, :index
+    live "/torrents/:hash", TorrentDetailLive, :show
+    live "/add", AddTorrentLive, :new
+    live "/settings", SettingsLive, :index
   end
 
   scope "/api/v1", TaniwhaWeb.API do

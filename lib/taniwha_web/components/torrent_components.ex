@@ -260,6 +260,7 @@ defmodule TaniwhaWeb.TorrentComponents do
   attr :on_start, :any, default: nil
   attr :on_stop, :any, default: nil
   attr :on_remove, :any, default: nil
+  attr :confirm_remove, :string, default: nil
 
   def torrent_row(assigns) do
     assigns =
@@ -305,6 +306,7 @@ defmodule TaniwhaWeb.TorrentComponents do
         <button
           phx-click={@on_remove}
           phx-value-hash={@torrent.hash}
+          phx-confirm={@confirm_remove}
           aria-label={"Remove #{@torrent.name}"}
           class="btn btn-ghost btn-xs text-error"
         >
