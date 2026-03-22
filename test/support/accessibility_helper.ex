@@ -21,12 +21,12 @@ defmodule TaniwhaWeb.AccessibilityHelper do
   @spec assert_aria_progressbar(String.t()) :: :ok
   def assert_aria_progressbar(html) do
     doc = LazyHTML.from_document(html)
-    progressbars = LazyHTML.query(doc, "[role=progressbar]")
+    progressbars = LazyHTML.query(doc, "[role=progressbar]") |> Enum.to_list()
 
-    assert Enum.count(progressbars) > 0,
+    assert progressbars != [],
            "Expected at least one element with role=\"progressbar\", got none.\nHTML: #{html}"
 
-    for el <- progressbars do
+    Enum.each(progressbars, fn el ->
       valuenow = LazyHTML.attribute(el, "aria-valuenow")
       valuemin = LazyHTML.attribute(el, "aria-valuemin")
       valuemax = LazyHTML.attribute(el, "aria-valuemax")
@@ -39,7 +39,7 @@ defmodule TaniwhaWeb.AccessibilityHelper do
 
       assert valuemax != [],
              "progressbar missing aria-valuemax.\nHTML: #{html}"
-    end
+    end)
 
     :ok
   end
@@ -54,7 +54,7 @@ defmodule TaniwhaWeb.AccessibilityHelper do
     doc = LazyHTML.from_document(html)
     buttons = LazyHTML.query(doc, "button")
 
-    for el <- buttons do
+    Enum.each(buttons, fn el ->
       aria_labels = LazyHTML.attribute(el, "aria-label")
       text = el |> LazyHTML.text() |> String.trim()
       has_label = aria_labels != [] and hd(aria_labels) != ""
@@ -62,7 +62,7 @@ defmodule TaniwhaWeb.AccessibilityHelper do
 
       assert has_label or has_text,
              "button has no accessible label (aria-label or text).\nButton HTML: #{LazyHTML.to_html(el)}"
-    end
+    end)
 
     :ok
   end
@@ -78,12 +78,12 @@ defmodule TaniwhaWeb.AccessibilityHelper do
     doc = LazyHTML.from_document(html)
     images = LazyHTML.query(doc, "img")
 
-    for el <- images do
+    Enum.each(images, fn el ->
       alts = LazyHTML.attribute(el, "alt")
 
       assert alts != [],
              "img element is missing alt attribute.\nImage HTML: #{LazyHTML.to_html(el)}"
-    end
+    end)
 
     :ok
   end

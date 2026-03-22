@@ -157,7 +157,6 @@ defmodule TaniwhaWeb.TorrentComponents do
     """
   end
 
-  @doc false
   @spec format_speed(non_neg_integer()) :: String.t()
   defp format_speed(bytes) when bytes < 1_024 do
     "#{bytes} B/s"
@@ -323,7 +322,7 @@ defmodule TaniwhaWeb.TorrentComponents do
         <.speed_display bytes_per_second={@torrent.download_rate} direction={:down} />
         <.speed_display bytes_per_second={@torrent.upload_rate} direction={:up} />
         <span class="tabular-nums">
-          ratio: {Float.round(@torrent.ratio * 1.0, 2)}
+          ratio: {Float.round(@torrent.ratio, 2)}
         </span>
       </div>
     </article>
@@ -334,6 +333,6 @@ defmodule TaniwhaWeb.TorrentComponents do
   defp status_to_color(:downloading), do: :blue
   defp status_to_color(:seeding), do: :green
   defp status_to_color(:paused), do: :yellow
-  defp status_to_color(:checking), do: :yellow
+  defp status_to_color(:checking), do: :blue
   defp status_to_color(_), do: :gray
 end

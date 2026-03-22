@@ -114,4 +114,13 @@ defmodule TaniwhaWeb.Layouts do
     </div>
     """
   end
+
+  # Shared nav link items used by both desktop and mobile navigation.
+  defp nav_links(assigns) do
+    ~H"""
+    <li><.link href="/">Dashboard</.link></li>
+    <li><.link href="/add">Add Torrent</.link></li>
+    <li><.link href="/settings">Settings</.link></li>
+    """
+  end
 end
