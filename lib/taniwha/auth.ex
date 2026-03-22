@@ -9,6 +9,8 @@ defmodule Taniwha.Auth do
 
   use Guardian, otp_app: :taniwha
 
+  @api_subject "api_user"
+
   @doc """
   Returns the signing secret derived from the endpoint's `secret_key_base`.
 
@@ -46,7 +48,7 @@ defmodule Taniwha.Auth do
 
     if is_binary(stored_key) and is_binary(api_key) and
          Plug.Crypto.secure_compare(api_key, stored_key) do
-      case encode_and_sign("api_user", %{}, ttl: {1, :hour}) do
+      case encode_and_sign(@api_subject, %{}, ttl: {1, :hour}) do
         {:ok, token, _claims} -> {:ok, token}
         {:error, reason} -> {:error, reason}
       end

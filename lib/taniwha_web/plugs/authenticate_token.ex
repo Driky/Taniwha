@@ -11,6 +11,8 @@ defmodule TaniwhaWeb.Plugs.AuthenticateToken do
 
   import Plug.Conn
 
+  @unauthorized_body Jason.encode!(%{error: "unauthorized"})
+
   @impl Plug
   def init(opts), do: opts
 
@@ -27,7 +29,7 @@ defmodule TaniwhaWeb.Plugs.AuthenticateToken do
   defp unauthorized(conn) do
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(401, Jason.encode!(%{error: "unauthorized"}))
+    |> send_resp(401, @unauthorized_body)
     |> halt()
   end
 end
