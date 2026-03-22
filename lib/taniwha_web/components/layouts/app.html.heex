@@ -1,0 +1,62 @@
+<div class="drawer min-h-screen">
+  <input id="nav-drawer" type="checkbox" class="drawer-toggle" />
+
+  <div class="drawer-content flex flex-col">
+    <%!-- Sticky top nav --%>
+    <nav
+      role="navigation"
+      aria-label="Main navigation"
+      class="navbar bg-base-200 border-b border-base-300 sticky top-0 z-10"
+    >
+      <%!-- Mobile hamburger + logo --%>
+      <div class="navbar-start">
+        <label
+          for="nav-drawer"
+          class="btn btn-ghost btn-circle lg:hidden"
+          aria-label="Open navigation menu"
+        >
+          <.icon name="hero-bars-3" />
+        </label>
+        <a href="/" class="btn btn-ghost text-xl font-bold">Taniwha</a>
+      </div>
+
+      <%!-- Desktop nav links --%>
+      <div class="navbar-center hidden lg:flex">
+        <ul class="menu menu-horizontal px-1" role="list">
+          <li><.link href="/">Dashboard</.link></li>
+          <li><.link href="/add">Add Torrent</.link></li>
+          <li><.link href="/settings">Settings</.link></li>
+        </ul>
+      </div>
+
+      <div class="navbar-end gap-2">
+        <TaniwhaWeb.TorrentComponents.global_stats_bar
+          upload_rate={assigns[:global_upload_rate] || 0}
+          download_rate={assigns[:global_download_rate] || 0}
+          active_count={assigns[:active_count] || 0}
+          total_count={assigns[:total_count] || 0}
+        />
+        <.theme_toggle />
+      </div>
+    </nav>
+
+    <%!-- Page content --%>
+    <main id="main-content" role="main" class="flex-1 p-4 lg:p-6">
+      {render_slot(@inner_block)}
+    </main>
+
+    <.flash_group flash={@flash} />
+  </div>
+
+  <%!-- Mobile sidebar drawer --%>
+  <div class="drawer-side z-20">
+    <label for="nav-drawer" class="drawer-overlay" aria-label="Close navigation menu"></label>
+    <nav class="menu bg-base-200 min-h-full w-56 p-4" aria-label="Mobile navigation">
+      <ul role="list">
+        <li><.link href="/">Dashboard</.link></li>
+        <li><.link href="/add">Add Torrent</.link></li>
+        <li><.link href="/settings">Settings</.link></li>
+      </ul>
+    </nav>
+  </div>
+</div>

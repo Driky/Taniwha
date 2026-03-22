@@ -32,7 +32,13 @@ defmodule TaniwhaWeb.TorrentChannel do
   # Join handlers
   # ---------------------------------------------------------------------------
 
-  @doc "Join `torrents:list` — subscribes to PubSub and returns the full snapshot."
+  @doc """
+  Join handler for `"torrents:list"` and `"torrents:{hash}"` topics.
+
+  - `"torrents:list"` — subscribes to PubSub and returns the full snapshot.
+  - `"torrents:{hash}"` — subscribes to the per-torrent PubSub topic and
+    returns the torrent snapshot, or `{:error, %{reason: "torrent_not_found"}}`.
+  """
   @impl true
   def join("torrents:list", _payload, socket) do
     :ok = Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:list")
@@ -40,10 +46,6 @@ defmodule TaniwhaWeb.TorrentChannel do
     {:ok, %{torrents: torrents}, socket}
   end
 
-  @doc """
-  Join `torrents:{hash}` — subscribes to the per-torrent PubSub topic and
-  returns the torrent snapshot, or `{:error, %{reason: "torrent_not_found"}}`.
-  """
   def join("torrents:" <> hash, _payload, socket) do
     case Store.get_torrent(hash) do
       {:ok, torrent} ->
