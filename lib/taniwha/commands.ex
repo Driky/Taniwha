@@ -115,6 +115,7 @@ defmodule Taniwha.Commands do
   Passes an empty string as the target (uses rtorrent's default download
   directory).
   """
+  @impl Taniwha.CommandsBehaviour
   @spec load_url(String.t()) :: :ok | {:error, term()}
   def load_url(url) do
     @rpc_client.call("load.start", ["", url]) |> ok_on_zero()
@@ -127,6 +128,7 @@ defmodule Taniwha.Commands do
   Passes an empty string as the target (uses rtorrent's default download
   directory).
   """
+  @impl Taniwha.CommandsBehaviour
   @spec load_raw(binary()) :: :ok | {:error, term()}
   def load_raw(data) do
     @rpc_client.call("load.raw_start", ["", data]) |> ok_on_zero()

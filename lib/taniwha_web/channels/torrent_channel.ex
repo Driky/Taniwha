@@ -23,7 +23,8 @@ defmodule TaniwhaWeb.TorrentChannel do
 
   use TaniwhaWeb, :channel
 
-  alias Taniwha.{Torrent, State.Store}
+  alias Taniwha.State.Store
+  alias TaniwhaWeb.API.TorrentJSON
 
   @commands Application.compile_env(:taniwha, :commands, Taniwha.Commands)
 
@@ -35,7 +36,7 @@ defmodule TaniwhaWeb.TorrentChannel do
   @impl true
   def join("torrents:list", _payload, socket) do
     :ok = Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:list")
-    torrents = Enum.map(Store.get_all_torrents(), &serialize/1)
+    torrents = Enum.map(Store.get_all_torrents(), &TorrentJSON.torrent/1)
     {:ok, %{torrents: torrents}, socket}
   end
 
@@ -47,7 +48,7 @@ defmodule TaniwhaWeb.TorrentChannel do
     case Store.get_torrent(hash) do
       {:ok, torrent} ->
         :ok = Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:#{hash}")
-        {:ok, %{torrent: serialize(torrent)}, socket}
+        {:ok, %{torrent: TorrentJSON.torrent(torrent)}, socket}
 
       {:error, :not_found} ->
         {:error, %{reason: "torrent_not_found"}}
@@ -97,7 +98,7 @@ defmodule TaniwhaWeb.TorrentChannel do
   end
 
   def handle_info({:torrent_updated, torrent}, socket) do
-    push(socket, "updated", %{torrent: serialize(torrent)})
+    push(socket, "updated", %{torrent: TorrentJSON.torrent(torrent)})
     {:noreply, socket}
   end
 
@@ -112,39 +113,12 @@ defmodule TaniwhaWeb.TorrentChannel do
   defp do_reply({:error, reason}, socket),
     do: {:reply, {:error, %{reason: inspect(reason)}}, socket}
 
-  @spec serialize(Torrent.t()) :: map()
-  defp serialize(%Torrent{} = t) do
-    %{
-      "hash" => t.hash,
-      "name" => t.name,
-      "size" => t.size,
-      "completedBytes" => t.completed_bytes,
-      "uploadRate" => t.upload_rate,
-      "downloadRate" => t.download_rate,
-      "ratio" => t.ratio,
-      "state" => Atom.to_string(t.state),
-      "isActive" => t.is_active,
-      "complete" => t.complete,
-      "isHashChecking" => t.is_hash_checking,
-      "peersConnected" => t.peers_connected,
-      "startedAt" => maybe_iso8601(t.started_at),
-      "finishedAt" => maybe_iso8601(t.finished_at),
-      "basePath" => t.base_path,
-      "progress" => Torrent.progress(t),
-      "status" => Atom.to_string(Torrent.status(t))
-    }
-  end
-
   @spec serialize_diffs(list()) :: [map()]
   defp serialize_diffs(diffs) do
     Enum.map(diffs, fn
-      {:added, torrent} -> %{"type" => "added", "data" => serialize(torrent)}
-      {:updated, torrent} -> %{"type" => "updated", "data" => serialize(torrent)}
+      {:added, torrent} -> %{"type" => "added", "data" => TorrentJSON.torrent(torrent)}
+      {:updated, torrent} -> %{"type" => "updated", "data" => TorrentJSON.torrent(torrent)}
       {:removed, hash} -> %{"type" => "removed", "data" => %{"hash" => hash}}
     end)
   end
-
-  @spec maybe_iso8601(DateTime.t() | nil) :: String.t() | nil
-  defp maybe_iso8601(nil), do: nil
-  defp maybe_iso8601(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
 end

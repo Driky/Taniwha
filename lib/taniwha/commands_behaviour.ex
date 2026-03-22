@@ -15,4 +15,6 @@ defmodule Taniwha.CommandsBehaviour do
   @callback erase(String.t()) :: :ok | {:error, term()}
   @callback set_file_priority(String.t(), non_neg_integer(), non_neg_integer()) ::
               :ok | {:error, term()}
+  @callback load_url(String.t()) :: :ok | {:error, term()}
+  @callback load_raw(binary()) :: :ok | {:error, term()}
 end

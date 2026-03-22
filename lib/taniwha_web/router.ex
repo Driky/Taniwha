@@ -25,15 +25,18 @@ defmodule TaniwhaWeb.Router do
     get "/", PageController, :home
   end
 
-  scope "/api/v1", TaniwhaWeb do
+  scope "/api/v1", TaniwhaWeb.API do
     pipe_through :api
 
-    post "/auth/token", AuthController, :token
+    post "/auth/token", AuthController, :create
   end
 
-  scope "/api/v1", TaniwhaWeb do
+  scope "/api/v1", TaniwhaWeb.API do
     pipe_through :api_authenticated
-    # future torrent routes go here
+
+    get "/torrents", TorrentController, :index
+    get "/torrents/:hash", TorrentController, :show
+    post "/torrents", TorrentController, :create
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
