@@ -68,11 +68,12 @@
   </div>
 
   <%!-- Bulk toolbar — visible when at least one torrent is selected --%>
+  <% selected_count = MapSet.size(@selected_hashes) %>
   <div
-    :if={MapSet.size(@selected_hashes) >= 1}
+    :if={selected_count >= 1}
     class="flex items-center gap-2 mb-3 p-2 rounded-lg bg-base-200"
   >
-    <span class="text-sm font-medium">{MapSet.size(@selected_hashes)} selected</span>
+    <span class="text-sm font-medium">{selected_count} selected</span>
     <button phx-click="bulk_start" class="btn btn-ghost btn-xs">
       <.icon name="hero-play-micro" class="size-4" /> Start all
     </button>
@@ -86,7 +87,8 @@
 
   <%!-- Sort header row + select-all --%>
   <% visible = visible_torrents(@torrents, @search, @filter, @sort_by, @sort_dir) %>
-  <% all_selected? = length(visible) > 0 and MapSet.size(@selected_hashes) == length(visible) %>
+  <% n_visible = length(visible) %>
+  <% all_selected? = n_visible > 0 and selected_count == n_visible %>
 
   <div
     :if={@torrents != []}

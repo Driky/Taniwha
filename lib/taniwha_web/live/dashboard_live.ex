@@ -158,34 +158,32 @@ defmodule TaniwhaWeb.DashboardLive do
 
   @spec apply_diffs([Torrent.t()], list()) :: [Torrent.t()]
   defp apply_diffs(torrents, diffs) do
-    Enum.reduce(diffs, torrents, fn
-      {:added, torrent}, acc ->
-        [torrent | acc]
+    torrent_map = Map.new(torrents, &{&1.hash, &1})
 
-      {:updated, torrent}, acc ->
-        Enum.map(acc, fn t -> if t.hash == torrent.hash, do: torrent, else: t end)
+    updated =
+      Enum.reduce(diffs, torrent_map, fn
+        {:added, torrent}, acc -> Map.put(acc, torrent.hash, torrent)
+        {:updated, torrent}, acc -> Map.put(acc, torrent.hash, torrent)
+        {:removed, hash}, acc -> Map.delete(acc, hash)
+      end)
 
-      {:removed, hash}, acc ->
-        Enum.reject(acc, &(&1.hash == hash))
-    end)
+    Map.values(updated)
   end
 
   @spec assign_global_stats(Phoenix.LiveView.Socket.t(), [Torrent.t()]) ::
           Phoenix.LiveView.Socket.t()
   defp assign_global_stats(socket, torrents) do
-    active =
-      Enum.count(torrents, fn t ->
-        Torrent.status(t) in [:downloading, :seeding, :checking]
+    {active, upload_rate, download_rate, total} =
+      Enum.reduce(torrents, {0, 0, 0, 0}, fn t, {ac, up, down, tot} ->
+        inc = if Torrent.status(t) in [:downloading, :seeding, :checking], do: 1, else: 0
+        {ac + inc, up + t.upload_rate, down + t.download_rate, tot + 1}
       end)
-
-    upload_rate = Enum.sum(Enum.map(torrents, & &1.upload_rate))
-    download_rate = Enum.sum(Enum.map(torrents, & &1.download_rate))
 
     socket
     |> assign(:global_upload_rate, upload_rate)
     |> assign(:global_download_rate, download_rate)
     |> assign(:active_count, active)
-    |> assign(:total_count, length(torrents))
+    |> assign(:total_count, total)
   end
 
   @spec filter_by_status([Torrent.t()], atom()) :: [Torrent.t()]
@@ -203,29 +201,22 @@ defmodule TaniwhaWeb.DashboardLive do
     Enum.filter(torrents, fn t -> String.contains?(String.downcase(t.name), q) end)
   end
 
+  @sort_columns [:name, :size, :progress, :speed, :ratio, :status]
+
   @spec sort_torrents([Torrent.t()], atom(), atom()) :: [Torrent.t()]
-  defp sort_torrents(torrents, :name, :asc), do: Enum.sort_by(torrents, & &1.name)
-  defp sort_torrents(torrents, :name, :desc), do: Enum.sort_by(torrents, & &1.name, :desc)
-  defp sort_torrents(torrents, :size, :asc), do: Enum.sort_by(torrents, & &1.size)
-  defp sort_torrents(torrents, :size, :desc), do: Enum.sort_by(torrents, & &1.size, :desc)
-  defp sort_torrents(torrents, :progress, :asc), do: Enum.sort_by(torrents, &Torrent.progress/1)
-
-  defp sort_torrents(torrents, :progress, :desc),
-    do: Enum.sort_by(torrents, &Torrent.progress/1, :desc)
-
-  defp sort_torrents(torrents, :speed, :asc), do: Enum.sort_by(torrents, & &1.download_rate)
-
-  defp sort_torrents(torrents, :speed, :desc),
-    do: Enum.sort_by(torrents, & &1.download_rate, :desc)
-
-  defp sort_torrents(torrents, :ratio, :asc), do: Enum.sort_by(torrents, & &1.ratio)
-  defp sort_torrents(torrents, :ratio, :desc), do: Enum.sort_by(torrents, & &1.ratio, :desc)
-  defp sort_torrents(torrents, :status, :asc), do: Enum.sort_by(torrents, &Torrent.status/1)
-
-  defp sort_torrents(torrents, :status, :desc),
-    do: Enum.sort_by(torrents, &Torrent.status/1, :desc)
+  defp sort_torrents(torrents, col, dir) when col in @sort_columns do
+    Enum.sort_by(torrents, sort_key(col), dir)
+  end
 
   defp sort_torrents(torrents, _col, _dir), do: torrents
+
+  @spec sort_key(atom()) :: (Torrent.t() -> term())
+  defp sort_key(:name), do: & &1.name
+  defp sort_key(:size), do: & &1.size
+  defp sort_key(:progress), do: &Torrent.progress/1
+  defp sort_key(:speed), do: & &1.download_rate
+  defp sort_key(:ratio), do: & &1.ratio
+  defp sort_key(:status), do: &Torrent.status/1
 
   @spec parse_filter(String.t()) :: atom()
   defp parse_filter("all"), do: :all
