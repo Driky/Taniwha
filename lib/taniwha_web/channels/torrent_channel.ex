@@ -34,8 +34,8 @@ defmodule TaniwhaWeb.TorrentChannel do
   @doc "Join `torrents:list` — subscribes to PubSub and returns the full snapshot."
   @impl true
   def join("torrents:list", _payload, socket) do
-    Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:list")
-    torrents = Store.get_all_torrents() |> serialize_list()
+    :ok = Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:list")
+    torrents = Enum.map(Store.get_all_torrents(), &serialize/1)
     {:ok, %{torrents: torrents}, socket}
   end
 
@@ -46,7 +46,7 @@ defmodule TaniwhaWeb.TorrentChannel do
   def join("torrents:" <> hash, _payload, socket) do
     case Store.get_torrent(hash) do
       {:ok, torrent} ->
-        Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:#{hash}")
+        :ok = Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:#{hash}")
         {:ok, %{torrent: serialize(torrent)}, socket}
 
       {:error, :not_found} ->
@@ -111,9 +111,6 @@ defmodule TaniwhaWeb.TorrentChannel do
 
   defp do_reply({:error, reason}, socket),
     do: {:reply, {:error, %{reason: inspect(reason)}}, socket}
-
-  @spec serialize_list([Torrent.t()]) :: [map()]
-  defp serialize_list(torrents), do: Enum.map(torrents, &serialize/1)
 
   @spec serialize(Torrent.t()) :: map()
   defp serialize(%Torrent{} = t) do
