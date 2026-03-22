@@ -40,6 +40,12 @@ if config_env() == :prod do
 
   config :taniwha, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  api_key =
+    System.get_env("TANIWHA_API_KEY") ||
+      raise "environment variable TANIWHA_API_KEY is missing."
+
+  config :taniwha, api_key: api_key
+
   config :taniwha, TaniwhaWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [

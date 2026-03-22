@@ -14,16 +14,27 @@ defmodule TaniwhaWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :api_authenticated do
+    plug :accepts, ["json"]
+    plug TaniwhaWeb.Plugs.AuthenticateToken
+  end
+
   scope "/", TaniwhaWeb do
     pipe_through :browser
 
     get "/", PageController, :home
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", TaniwhaWeb do
-  #   pipe_through :api
-  # end
+  scope "/api/v1", TaniwhaWeb do
+    pipe_through :api
+
+    post "/auth/token", AuthController, :token
+  end
+
+  scope "/api/v1", TaniwhaWeb do
+    pipe_through :api_authenticated
+    # future torrent routes go here
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:taniwha, :dev_routes) do
