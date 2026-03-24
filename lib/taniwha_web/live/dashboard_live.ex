@@ -9,6 +9,7 @@ defmodule TaniwhaWeb.DashboardLive do
   use TaniwhaWeb, :live_view
 
   import TaniwhaWeb.TorrentComponents
+  import TaniwhaWeb.FormatHelpers, only: [format_add_error: 1]
 
   alias Taniwha.{State.Store, Torrent}
   alias Phoenix.LiveView.AsyncResult
@@ -92,6 +93,29 @@ defmodule TaniwhaWeb.DashboardLive do
   # ---------------------------------------------------------------------------
 
   @impl true
+  def handle_event("context_menu_action", %{"action" => "start", "hash" => hash}, socket) do
+    @commands.start(hash)
+    {:noreply, socket}
+  end
+
+  def handle_event("context_menu_action", %{"action" => "stop", "hash" => hash}, socket) do
+    @commands.stop(hash)
+    {:noreply, socket}
+  end
+
+  def handle_event("context_menu_action", %{"action" => "pause", "hash" => hash}, socket) do
+    @commands.pause(hash)
+    {:noreply, socket}
+  end
+
+  def handle_event("context_menu_action", %{"action" => "erase", "hash" => hash}, socket) do
+    {:noreply, assign(socket, :confirm_action, {:erase, hash})}
+  end
+
+  def handle_event("context_menu_action", _params, socket) do
+    {:noreply, socket}
+  end
+
   def handle_event("search", %{"value" => v}, socket) do
     {:noreply, assign(socket, :search, v)}
   end
@@ -496,9 +520,4 @@ defmodule TaniwhaWeb.DashboardLive do
   defp parse_tab("peers"), do: :peers
   defp parse_tab("trackers"), do: :trackers
   defp parse_tab(_), do: :general
-
-  @spec format_add_error(term()) :: String.t()
-  defp format_add_error(:timeout), do: "Connection timed out. Is rtorrent running?"
-  defp format_add_error(:connection_refused), do: "Could not connect to rtorrent."
-  defp format_add_error(_), do: "Failed to add torrent. Please try again."
 end

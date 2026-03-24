@@ -126,6 +126,7 @@
   --taniwha-actionbar-border: #f3f4f6;
   --taniwha-table-header-bg: #f9fafb;
   --taniwha-row-border: #f3f4f6;
+  --taniwha-hover-bg: #f3f4f6;
 
   /* Search input */
   --taniwha-search-bg: #f3f4f6;
@@ -193,4 +194,10 @@
   --taniwha-search-bg: #1f2937;
   --taniwha-search-border: #4b5563;
   --taniwha-sidebar-active-bg: #172554;
+  --taniwha-hover-bg: #374151;
+}
+
+/* Context menu hover — rule lives here so it works when the menu is appended to <body> */
+[role="menu"] [role="menuitem"]:hover {
+  background: var(--taniwha-hover-bg) !important;
 }

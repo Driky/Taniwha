@@ -21,7 +21,6 @@
       search={@search}
     />
 
-    <%!-- Compute visible set once --%>
     <% visible =
       visible_torrents(@torrents, @search, @filter, @tracker_filter, @sort_by, @sort_dir) %>
     <% visible_count = length(visible) %>

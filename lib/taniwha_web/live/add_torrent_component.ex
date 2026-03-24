@@ -10,6 +10,8 @@ defmodule TaniwhaWeb.AddTorrentComponent do
 
   use TaniwhaWeb, :live_component
 
+  import TaniwhaWeb.FormatHelpers, only: [format_add_error: 1]
+
   @commands Application.compile_env(:taniwha, :commands, Taniwha.Commands)
 
   @impl true
@@ -53,7 +55,7 @@ defmodule TaniwhaWeb.AddTorrentComponent do
           {:noreply,
            socket
            |> assign(:loading, false)
-           |> assign(:error, format_error(reason))}
+           |> assign(:error, format_add_error(reason))}
       end
     end
   end
@@ -278,11 +280,6 @@ defmodule TaniwhaWeb.AddTorrentComponent do
     </div>
     """
   end
-
-  @spec format_error(term()) :: String.t()
-  defp format_error(:timeout), do: "Connection timed out. Is rtorrent running?"
-  defp format_error(:connection_refused), do: "Could not connect to rtorrent."
-  defp format_error(_), do: "Failed to add torrent. Please try again."
 
   @spec upload_error_to_string(atom()) :: String.t()
   defp upload_error_to_string(:too_large), do: "File is too large (max 10 MB)."

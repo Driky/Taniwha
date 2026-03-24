@@ -1092,13 +1092,6 @@ defmodule TaniwhaWeb.TorrentComponents do
           ].join(";");
           btn.textContent = item.label;
 
-          btn.addEventListener("mouseover", () => {
-            btn.style.background = "var(--taniwha-hover-bg,#f3f4f6)";
-          });
-          btn.addEventListener("mouseout", () => {
-            btn.style.background = "transparent";
-          });
-
           menu.appendChild(btn);
           focusable.push(btn);
         });
