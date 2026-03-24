@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "tool": "mcp__plugin_figma_figma__get_design_context",
+    "input": {
+      "fileKey": "hp8ISSdpaxXF9wiSTYsaOx",
+      "nodeId": "1:241",
+      "clientLanguages": "elixir,html,css",
+      "clientFrameworks": "phoenix,liveview"
+    },
+    "timestamp": "2026-03-24T07:22:55.754Z",
+    "source_session": "/Users/cedricchatelain/.claude/projects/-Users-cedricchatelain-workspace-projects-perso-taniwha/6dc083ff-1757-44da-96a9-763c4c263230.jsonl",
+    "extracted_at": "2026-03-24T08:33:50.003762+00:00"
+  },
+  "response": "You've reached the Figma MCP tool call limit on the Starter plan. Upgrade your seat or plan for more tool calls: https://www.figma.com/files/team/1432806713441165238/all-projects?upgrade=mcp_rate_limit_paywall"
+}

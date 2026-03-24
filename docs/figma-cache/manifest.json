@@ -1,0 +1,76 @@
+{
+  "generated_at": "2026-03-24T08:33:50.003995+00:00",
+  "total_files": 10,
+  "entries": [
+    {
+      "file": "get_metadata_hp8ISSdpaxXF9wiSTYsaOx_0_1.json",
+      "tool": "mcp__plugin_figma_figma__get_metadata",
+      "fileKey": "hp8ISSdpaxXF9wiSTYsaOx",
+      "nodeId": "0:1",
+      "timestamp": "2026-03-24T07:59:01.758Z"
+    },
+    {
+      "file": "get_design_context_hp8ISSdpaxXF9wiSTYsaOx_1_471.json",
+      "tool": "mcp__plugin_figma_figma__get_design_context",
+      "fileKey": "hp8ISSdpaxXF9wiSTYsaOx",
+      "nodeId": "1:471",
+      "timestamp": "2026-03-24T07:22:56.932Z"
+    },
+    {
+      "file": "get_design_context_hp8ISSdpaxXF9wiSTYsaOx_1_204.json",
+      "tool": "mcp__plugin_figma_figma__get_design_context",
+      "fileKey": "hp8ISSdpaxXF9wiSTYsaOx",
+      "nodeId": "1:204",
+      "timestamp": "2026-03-24T07:22:56.449Z"
+    },
+    {
+      "file": "get_design_context_hp8ISSdpaxXF9wiSTYsaOx_1_241.json",
+      "tool": "mcp__plugin_figma_figma__get_design_context",
+      "fileKey": "hp8ISSdpaxXF9wiSTYsaOx",
+      "nodeId": "1:241",
+      "timestamp": "2026-03-24T07:22:55.754Z"
+    },
+    {
+      "file": "get_design_context_hp8ISSdpaxXF9wiSTYsaOx_1_467.json",
+      "tool": "mcp__plugin_figma_figma__get_design_context",
+      "fileKey": "hp8ISSdpaxXF9wiSTYsaOx",
+      "nodeId": "1:467",
+      "timestamp": "2026-03-24T07:22:47.150Z"
+    },
+    {
+      "file": "get_design_context_hp8ISSdpaxXF9wiSTYsaOx_4_2.json",
+      "tool": "mcp__plugin_figma_figma__get_design_context",
+      "fileKey": "hp8ISSdpaxXF9wiSTYsaOx",
+      "nodeId": "4:2",
+      "timestamp": "2026-03-24T07:22:46.348Z"
+    },
+    {
+      "file": "get_design_context_hp8ISSdpaxXF9wiSTYsaOx_1_2.json",
+      "tool": "mcp__plugin_figma_figma__get_design_context",
+      "fileKey": "hp8ISSdpaxXF9wiSTYsaOx",
+      "nodeId": "1:2",
+      "timestamp": "2026-03-24T05:43:49.746Z"
+    },
+    {
+      "file": "generate_figma_design_unknown_.json",
+      "tool": "mcp__plugin_figma_figma__generate_figma_design",
+      "fileKey": "unknown",
+      "nodeId": "",
+      "timestamp": "2026-03-24T05:05:40.817Z"
+    },
+    {
+      "file": "generate_figma_design_hp8ISSdpaxXF9wiSTYsaOx_.json",
+      "tool": "mcp__plugin_figma_figma__generate_figma_design",
+      "fileKey": "hp8ISSdpaxXF9wiSTYsaOx",
+      "nodeId": "",
+      "timestamp": "2026-03-24T05:04:54.001Z"
+    },
+    {
+      "file": "whoami_unknown_.json",
+      "tool": "mcp__plugin_figma_figma__whoami",
+      "fileKey": "unknown",
+      "nodeId": "",
+      "timestamp": "2026-03-24T05:00:25.894Z"
+    }
+  ]
+}

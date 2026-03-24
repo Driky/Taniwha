@@ -80,6 +80,25 @@ taniwha/
 
 See `docs/architecture-design.md` for the full architecture design document including supervision tree, layer breakdown, RPC command reference, and testing strategy.
 
+## Figma design reference
+
+The Taniwha UI was designed in Figma (file key `hp8ISSdpaxXF9wiSTYsaOx`).
+The MCP plan is rate-limited — **always prefer the local cache over live MCP calls**.
+
+### Cache-first rule
+Before calling any `mcp__plugin_figma_figma__*` tool:
+1. Read `docs/figma-cache/CLAUDE.md` for the index of available cached nodes.
+2. Load the relevant `.json` file and use its `response` field directly.
+3. **Never call the Figma MCP for content already in the cache.**
+
+### New content
+Calling the MCP for nodes **not in the cache** requires explicit user agreement first.
+Ask before making any new MCP call.
+
+### Asset files
+SVG assets are stored in `docs/figma-cache/assets/` and already referenced by
+local path in the cache JSON files. Do not fetch them from remote URLs.
+
 ## Work process
 
 - Commit often.
