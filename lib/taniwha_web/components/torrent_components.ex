@@ -26,6 +26,7 @@ defmodule TaniwhaWeb.TorrentComponents do
     only: [format_bytes: 1, format_eta: 1, format_ratio: 1, format_speed: 1]
 
   alias Phoenix.LiveView.AsyncResult
+  alias Phoenix.LiveView.ColocatedHook
   alias Taniwha.{Peer, Torrent, Tracker, TorrentFile}
 
   # ---------------------------------------------------------------------------
@@ -806,6 +807,7 @@ defmodule TaniwhaWeb.TorrentComponents do
       aria-label={@torrent.name}
       phx-click="select_torrent"
       phx-value-hash={@torrent.hash}
+      data-hash={@torrent.hash}
       class="border-b hover:bg-[#f9fafb] dark:hover:bg-[#1a1f2e] cursor-pointer"
       style={"height: var(--taniwha-row-h); border-color: var(--taniwha-row-border)#{if @row_selected?, do: "; background: var(--taniwha-sidebar-active-bg)", else: ""}"}
     >
@@ -985,7 +987,7 @@ defmodule TaniwhaWeb.TorrentComponents do
             total_visible={@total_visible}
           />
         </thead>
-        <tbody>
+        <tbody phx-hook=".ContextMenu" id="torrent-tbody">
           <%!-- Empty state: no torrents at all --%>
           <tr :if={@torrents == [] and @all_torrents_empty?}>
             <td
@@ -1028,6 +1030,175 @@ defmodule TaniwhaWeb.TorrentComponents do
         </tbody>
       </table>
     </div>
+
+    <script :type={ColocatedHook} name=".ContextMenu">
+      const MENU_WIDTH = 208;
+      const ITEM_HEIGHT = 28;
+
+      const MENU_ITEMS = [
+        { action: "start",  label: "Start",       destructive: false },
+        { action: "pause",  label: "Pause",       destructive: false },
+        { action: "stop",   label: "Stop",        destructive: false },
+        { separator: true },
+        { action: "copy_hash", label: "Copy hash", client: true, destructive: false },
+        { separator: true },
+        { action: "erase",  label: "Remove",      destructive: true  },
+      ];
+
+      function buildMenu(hash) {
+        const menu = document.createElement("div");
+        menu.setAttribute("role", "menu");
+        menu.setAttribute("aria-label", "Torrent actions");
+        menu.style.cssText = [
+          "position:fixed",
+          `width:${MENU_WIDTH}px`,
+          "z-index:9999",
+          "padding:4px",
+          "border-radius:8px",
+          "border:1px solid var(--taniwha-row-border,#e5e7eb)",
+          "background:var(--taniwha-bg,#fff)",
+          "box-shadow:0 10px 30px rgba(0,0,0,0.15)",
+          "outline:none",
+        ].join(";");
+
+        const focusable = [];
+
+        MENU_ITEMS.forEach((item) => {
+          if (item.separator) {
+            const sep = document.createElement("div");
+            sep.setAttribute("role", "separator");
+            sep.style.cssText = "margin:4px 0;border-top:1px solid var(--taniwha-row-border,#f3f4f6)";
+            menu.appendChild(sep);
+            return;
+          }
+
+          const btn = document.createElement("button");
+          btn.setAttribute("role", "menuitem");
+          btn.setAttribute("data-action", item.action);
+          btn.setAttribute("type", "button");
+          btn.style.cssText = [
+            "display:block",
+            "width:100%",
+            "text-align:left",
+            "padding:6px 12px",
+            "font-size:11px",
+            "border-radius:6px",
+            "border:none",
+            "cursor:pointer",
+            "background:transparent",
+            item.destructive
+              ? "color:var(--taniwha-destructive,#ef4444)"
+              : "color:var(--taniwha-text,#374151)",
+          ].join(";");
+          btn.textContent = item.label;
+
+          btn.addEventListener("mouseover", () => {
+            btn.style.background = "var(--taniwha-hover-bg,#f3f4f6)";
+          });
+          btn.addEventListener("mouseout", () => {
+            btn.style.background = "transparent";
+          });
+
+          menu.appendChild(btn);
+          focusable.push(btn);
+        });
+
+        return { menu, focusable };
+      }
+
+      export default {
+        _cleanup: null,
+
+        mounted() {
+          this._onContextMenu = (e) => {
+            const row = e.target.closest("tr[data-hash]");
+            if (!row) return;
+            e.preventDefault();
+
+            const hash = row.dataset.hash;
+            this._openMenu(e.clientX, e.clientY, hash);
+          };
+
+          this.el.addEventListener("contextmenu", this._onContextMenu);
+        },
+
+        destroyed() {
+          this.el.removeEventListener("contextmenu", this._onContextMenu);
+          this._closeMenu();
+        },
+
+        _openMenu(x, y, hash) {
+          this._closeMenu();
+
+          const { menu, focusable } = buildMenu(hash);
+
+          // Position with viewport clamping
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          const estimatedH = MENU_ITEMS.length * ITEM_HEIGHT + 8;
+          const left = x + MENU_WIDTH > vw ? vw - MENU_WIDTH - 8 : x;
+          const top  = y + estimatedH  > vh ? vh - estimatedH - 8 : y;
+          menu.style.left = left + "px";
+          menu.style.top  = top  + "px";
+
+          let focusIdx = 0;
+
+          const close = () => {
+            menu.remove();
+            document.removeEventListener("keydown", onKey, true);
+            document.removeEventListener("mousedown", onOutside, true);
+            this._cleanup = null;
+          };
+
+          const onKey = (e) => {
+            if (e.key === "Escape") { close(); return; }
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              focusIdx = (focusIdx + 1) % focusable.length;
+              focusable[focusIdx].focus();
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              focusIdx = (focusIdx - 1 + focusable.length) % focusable.length;
+              focusable[focusIdx].focus();
+            } else if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              focusable[focusIdx].click();
+            }
+          };
+
+          const onOutside = (e) => {
+            if (!menu.contains(e.target)) close();
+          };
+
+          menu.addEventListener("click", (e) => {
+            const btn = e.target.closest("button[data-action]");
+            if (!btn) return;
+            const action = btn.dataset.action;
+
+            if (action === "copy_hash") {
+              navigator.clipboard.writeText(hash).catch(() => {});
+            } else {
+              this.pushEvent("context_menu_action", { action, hash });
+            }
+            close();
+          });
+
+          document.body.appendChild(menu);
+          document.addEventListener("keydown", onKey, true);
+          document.addEventListener("mousedown", onOutside, true);
+          this._cleanup = close;
+
+          // Focus first item
+          requestAnimationFrame(() => {
+            if (focusable.length > 0) focusable[0].focus();
+          });
+        },
+
+        _closeMenu() {
+          if (this._cleanup) this._cleanup();
+        },
+      };
+    </script>
     """
   end
 
