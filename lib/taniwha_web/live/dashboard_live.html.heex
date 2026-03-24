@@ -25,7 +25,6 @@
       visible_torrents(@torrents, @search, @filter, @tracker_filter, @sort_by, @sort_dir) %>
     <% visible_count = length(visible) %>
     <% selected_count = MapSet.size(@selected_hashes) %>
-    <% all_selected? = visible_count > 0 and selected_count == visible_count %>
 
     <%!-- Action bar --%>
     <.action_bar
@@ -34,61 +33,17 @@
       total_count={@total_count}
     />
 
-    <%!-- Scrollable table area --%>
-    <div class="flex-1 overflow-y-auto">
-      <table class="w-full border-collapse table-fixed">
-        <thead class="sticky top-0 z-10">
-          <.table_header
-            sort_by={@sort_by}
-            sort_dir={@sort_dir}
-            all_selected?={all_selected?}
-            total_visible={visible_count}
-          />
-        </thead>
-        <tbody>
-          <%!-- Empty state: no torrents at all --%>
-          <tr :if={visible == [] and @torrents == []}>
-            <td
-              colspan="10"
-              class="py-16 text-center text-[11px]"
-              style="color: var(--taniwha-col-header)"
-              role="status"
-              aria-label="No torrents"
-            >
-              <p class="mb-2">No torrents yet.</p>
-              <.link
-                navigate={~p"/add"}
-                class="text-[#2563eb] hover:underline"
-              >
-                Add your first torrent
-              </.link>
-            </td>
-          </tr>
-
-          <%!-- Empty state: filters active but nothing matches --%>
-          <tr :if={visible == [] and @torrents != []}>
-            <td
-              colspan="10"
-              class="py-8 text-center text-[11px]"
-              style="color: var(--taniwha-col-header)"
-              role="status"
-              aria-label="No results"
-            >
-              No torrents match your search or filter.
-            </td>
-          </tr>
-
-          <%!-- Torrent rows --%>
-          <.torrent_row
-            :for={torrent <- visible}
-            torrent={torrent}
-            selected?={MapSet.member?(@selected_hashes, torrent.hash)}
-            on_start="start_torrent"
-            on_stop="stop_torrent"
-            on_remove="remove_torrent"
-          />
-        </tbody>
-      </table>
-    </div>
+    <%!-- Torrent table (includes sticky header, rows, and empty states) --%>
+    <.torrent_table
+      torrents={visible}
+      all_torrents_empty?={@torrents == []}
+      sort_by={@sort_by}
+      sort_dir={@sort_dir}
+      selected_hashes={@selected_hashes}
+      selected_hash={@selected_hash}
+      on_start="start_torrent"
+      on_stop="stop_torrent"
+      on_remove="remove_torrent"
+    />
   </div>
 </div>

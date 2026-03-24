@@ -36,6 +36,7 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign(:tracker_filter, :all)
       |> assign(:tracker_groups, [])
       |> assign(:selected_hashes, MapSet.new())
+      |> assign(:selected_hash, nil)
       |> assign(:page_title, "Torrents")
       |> assign_global_stats(torrents)
       |> assign(:status_counts, status_counts(torrents))
@@ -144,6 +145,10 @@ defmodule TaniwhaWeb.DashboardLive do
 
   def handle_event("deselect_all", _params, socket) do
     {:noreply, assign(socket, :selected_hashes, MapSet.new())}
+  end
+
+  def handle_event("select_torrent", %{"hash" => hash}, socket) do
+    {:noreply, assign(socket, :selected_hash, hash)}
   end
 
   def handle_event("bulk_start", _params, socket) do

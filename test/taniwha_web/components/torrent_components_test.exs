@@ -527,5 +527,137 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
       html = render_component(&torrent_row/1, torrent: torrent)
       assert html =~ ~s(aria-label="Remove #{torrent.name}")
     end
+
+    test "tr has stable id attribute based on hash" do
+      torrent = Fixtures.torrent_fixture()
+      html = render_component(&torrent_row/1, torrent: torrent)
+      assert html =~ ~s(id="torrent-#{torrent.hash}")
+    end
+
+    test "tr has phx-click=select_torrent" do
+      torrent = Fixtures.torrent_fixture()
+      html = render_component(&torrent_row/1, torrent: torrent)
+      assert html =~ ~s(phx-click="select_torrent")
+    end
+
+    test "row_selected? false gives no selected highlight" do
+      torrent = Fixtures.torrent_fixture()
+      html = render_component(&torrent_row/1, torrent: torrent, row_selected?: false)
+      refute html =~ "--taniwha-sidebar-active-bg"
+    end
+
+    test "row_selected? true applies selected background style" do
+      torrent = Fixtures.torrent_fixture()
+      html = render_component(&torrent_row/1, torrent: torrent, row_selected?: true)
+      assert html =~ "--taniwha-sidebar-active-bg"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # torrent_table/1
+  # ---------------------------------------------------------------------------
+
+  describe "torrent_table/1" do
+    defp table_assigns(torrents, opts \\ []) do
+      [
+        torrents: torrents,
+        all_torrents_empty?: torrents == [] and Keyword.get(opts, :system_empty?, true),
+        sort_by: :name,
+        sort_dir: :asc,
+        selected_hashes: MapSet.new(),
+        selected_hash: nil
+      ]
+    end
+
+    test "renders a table element" do
+      html = render_component(&torrent_table/1, table_assigns([]))
+      assert html =~ "<table"
+    end
+
+    test "renders thead and tbody" do
+      html = render_component(&torrent_table/1, table_assigns([]))
+      assert html =~ "<thead"
+      assert html =~ "<tbody"
+    end
+
+    test "renders correct number of rows when torrents present" do
+      t1 = Fixtures.torrent_fixture("h1")
+      t2 = %{Fixtures.torrent_fixture("h2") | name: "Second"}
+      html = render_component(&torrent_table/1, table_assigns([t1, t2], system_empty?: false))
+      # Two torrent rows by hash id
+      assert html =~ ~s(id="torrent-h1")
+      assert html =~ ~s(id="torrent-h2")
+    end
+
+    test "renders no-torrents empty state when system has no torrents" do
+      html = render_component(&torrent_table/1, table_assigns([]))
+      assert html =~ "No torrents yet"
+    end
+
+    test "renders no-results empty state when filtered list is empty but system is not" do
+      html =
+        render_component(&torrent_table/1,
+          torrents: [],
+          all_torrents_empty?: false,
+          sort_by: :name,
+          sort_dir: :asc,
+          selected_hashes: MapSet.new(),
+          selected_hash: nil
+        )
+
+      assert html =~ "No torrents match"
+    end
+
+    test "does not show empty state when torrents are present" do
+      t = Fixtures.torrent_fixture()
+      html = render_component(&torrent_table/1, table_assigns([t], system_empty?: false))
+      refute html =~ "No torrents yet"
+      refute html =~ "No torrents match"
+    end
+
+    test "passes sort column to table header" do
+      html =
+        render_component(&torrent_table/1,
+          torrents: [],
+          all_torrents_empty?: true,
+          sort_by: :size,
+          sort_dir: :desc,
+          selected_hashes: MapSet.new(),
+          selected_hash: nil
+        )
+
+      assert html =~ ~s(aria-sort="descending")
+    end
+
+    test "selected row has highlighted background" do
+      t = Fixtures.torrent_fixture()
+
+      html =
+        render_component(&torrent_table/1,
+          torrents: [t],
+          all_torrents_empty?: false,
+          sort_by: :name,
+          sort_dir: :asc,
+          selected_hashes: MapSet.new(),
+          selected_hash: t.hash
+        )
+
+      assert html =~ "--taniwha-sidebar-active-bg"
+    end
+
+    test "all_torrents_empty? false + empty visible → no-results state" do
+      html =
+        render_component(&torrent_table/1,
+          torrents: [],
+          all_torrents_empty?: false,
+          sort_by: :name,
+          sort_dir: :asc,
+          selected_hashes: MapSet.new(),
+          selected_hash: nil
+        )
+
+      assert html =~ "No torrents match"
+      refute html =~ "No torrents yet"
+    end
   end
 end

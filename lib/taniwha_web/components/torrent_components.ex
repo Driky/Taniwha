@@ -22,6 +22,8 @@ defmodule TaniwhaWeb.TorrentComponents do
 
   use TaniwhaWeb, :html
 
+  import TaniwhaWeb.FormatHelpers, only: [format_bytes: 1, format_speed: 1]
+
   alias Taniwha.Torrent
 
   # ---------------------------------------------------------------------------
@@ -174,21 +176,6 @@ defmodule TaniwhaWeb.TorrentComponents do
   defp speed_color_style(:down), do: "color: var(--taniwha-speed-dl)"
   defp speed_color_style(:up), do: "color: var(--taniwha-speed-ul)"
   defp speed_color_style(_), do: ""
-
-  @spec format_speed(non_neg_integer()) :: String.t()
-  defp format_speed(bytes) when bytes < 1_024, do: "#{bytes} B/s"
-
-  defp format_speed(bytes) when bytes < 1_048_576 do
-    :erlang.float_to_binary(bytes / 1_024, decimals: 1) <> " KB/s"
-  end
-
-  defp format_speed(bytes) when bytes < 1_073_741_824 do
-    :erlang.float_to_binary(bytes / 1_048_576, decimals: 2) <> " MB/s"
-  end
-
-  defp format_speed(bytes) do
-    :erlang.float_to_binary(bytes / 1_073_741_824, decimals: 2) <> " GB/s"
-  end
 
   # ---------------------------------------------------------------------------
   # topbar/1
@@ -769,6 +756,7 @@ defmodule TaniwhaWeb.TorrentComponents do
   """
   attr :torrent, :map, required: true
   attr :selected?, :boolean, default: false
+  attr :row_selected?, :boolean, default: false
   attr :on_start, :any, default: nil
   attr :on_stop, :any, default: nil
   attr :on_remove, :any, default: nil
@@ -781,9 +769,12 @@ defmodule TaniwhaWeb.TorrentComponents do
 
     ~H"""
     <tr
+      id={"torrent-#{@torrent.hash}"}
       aria-label={@torrent.name}
-      class="border-b hover:bg-[#f9fafb] dark:hover:bg-[#1a1f2e]"
-      style="height: var(--taniwha-row-h); border-color: var(--taniwha-row-border)"
+      phx-click="select_torrent"
+      phx-value-hash={@torrent.hash}
+      class="border-b hover:bg-[#f9fafb] dark:hover:bg-[#1a1f2e] cursor-pointer"
+      style={"height: var(--taniwha-row-h); border-color: var(--taniwha-row-border)#{if @row_selected?, do: "; background: var(--taniwha-sidebar-active-bg)", else: ""}"}
     >
       <%!-- Checkbox --%>
       <td class="w-8 px-3">
@@ -810,7 +801,7 @@ defmodule TaniwhaWeb.TorrentComponents do
 
       <%!-- Size --%>
       <td class="px-[6px] text-right text-[11px] tabular-nums" style="color: var(--taniwha-cell-num)">
-        {format_size(@torrent.size)}
+        {format_bytes(@torrent.size)}
       </td>
 
       <%!-- Progress --%>
@@ -904,18 +895,115 @@ defmodule TaniwhaWeb.TorrentComponents do
     """
   end
 
-  @spec format_size(non_neg_integer()) :: String.t()
-  defp format_size(bytes) when bytes < 1_024, do: "#{bytes} B"
+  # ---------------------------------------------------------------------------
+  # torrent_table/1
+  # ---------------------------------------------------------------------------
 
-  defp format_size(bytes) when bytes < 1_048_576 do
-    :erlang.float_to_binary(bytes / 1_024, decimals: 1) <> " KB"
-  end
+  @doc """
+  Renders the full torrent table: sticky header row, data rows, and empty states.
 
-  defp format_size(bytes) when bytes < 1_073_741_824 do
-    :erlang.float_to_binary(bytes / 1_048_576, decimals: 1) <> " MB"
-  end
+  Accepts a pre-filtered and pre-sorted list of torrents from the LiveView.
+  The component computes `all_selected?` and `total_visible` internally.
 
-  defp format_size(bytes) do
-    :erlang.float_to_binary(bytes / 1_073_741_824, decimals: 2) <> " GB"
+  ## Attributes
+
+  - `:torrents` (required) — filtered+sorted list of `Taniwha.Torrent` structs
+  - `:all_torrents_empty?` (required) — `true` when the ETS store is empty (used to
+    distinguish "no torrents at all" from "no results after filtering")
+  - `:sort_by` (required) — active sort column atom
+  - `:sort_dir` (required) — `:asc` or `:desc`
+  - `:selected_hashes` (required) — `MapSet` of hash strings for bulk selection
+  - `:selected_hash` — hash string of the row-clicked torrent (opens detail panel),
+    or `nil`. Defaults to `nil`.
+  - `:on_start`, `:on_stop`, `:on_remove` — event name strings passed to each row
+
+  ## Examples
+
+      <.torrent_table
+        torrents={visible}
+        all_torrents_empty?={@torrents == []}
+        sort_by={@sort_by}
+        sort_dir={@sort_dir}
+        selected_hashes={@selected_hashes}
+        selected_hash={@selected_hash}
+        on_start="start_torrent"
+        on_stop="stop_torrent"
+        on_remove="remove_torrent"
+      />
+  """
+  attr :torrents, :list, required: true
+  attr :all_torrents_empty?, :boolean, required: true
+  attr :sort_by, :atom, required: true
+  attr :sort_dir, :atom, required: true
+  attr :selected_hashes, :any, required: true
+  attr :selected_hash, :any, default: nil
+  attr :on_start, :string, default: nil
+  attr :on_stop, :string, default: nil
+  attr :on_remove, :string, default: nil
+
+  def torrent_table(assigns) do
+    total_visible = length(assigns.torrents)
+    all_selected? = total_visible > 0 and MapSet.size(assigns.selected_hashes) == total_visible
+
+    assigns =
+      assigns
+      |> assign(:total_visible, total_visible)
+      |> assign(:all_selected?, all_selected?)
+
+    ~H"""
+    <div class="flex-1 overflow-y-auto">
+      <table class="w-full border-collapse table-fixed">
+        <thead class="sticky top-0 z-10">
+          <.table_header
+            sort_by={@sort_by}
+            sort_dir={@sort_dir}
+            all_selected?={@all_selected?}
+            total_visible={@total_visible}
+          />
+        </thead>
+        <tbody>
+          <%!-- Empty state: no torrents at all --%>
+          <tr :if={@torrents == [] and @all_torrents_empty?}>
+            <td
+              colspan="10"
+              class="py-16 text-center text-[11px]"
+              style="color: var(--taniwha-col-header)"
+              role="status"
+              aria-label="No torrents"
+            >
+              <p class="mb-2">No torrents yet.</p>
+              <.link navigate={~p"/add"} class="text-[#2563eb] hover:underline">
+                Add your first torrent
+              </.link>
+            </td>
+          </tr>
+
+          <%!-- Empty state: filters active but nothing matches --%>
+          <tr :if={@torrents == [] and not @all_torrents_empty?}>
+            <td
+              colspan="10"
+              class="py-8 text-center text-[11px]"
+              style="color: var(--taniwha-col-header)"
+              role="status"
+              aria-label="No results"
+            >
+              No torrents match your search or filter.
+            </td>
+          </tr>
+
+          <%!-- Torrent rows --%>
+          <.torrent_row
+            :for={torrent <- @torrents}
+            torrent={torrent}
+            selected?={MapSet.member?(@selected_hashes, torrent.hash)}
+            row_selected?={@selected_hash == torrent.hash}
+            on_start={@on_start}
+            on_stop={@on_stop}
+            on_remove={@on_remove}
+          />
+        </tbody>
+      </table>
+    </div>
+    """
   end
 end

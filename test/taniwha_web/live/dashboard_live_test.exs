@@ -520,4 +520,59 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       assert_labeled_buttons(html)
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Batch 9 — Row selection (selected_hash)
+  # ---------------------------------------------------------------------------
+
+  describe "row selection" do
+    test "no row is highlighted on mount", %{conn: conn} do
+      Store.put_torrent(Fixtures.torrent_fixture())
+      {:ok, _lv, html} = live(conn, ~p"/")
+      # Sidebar uses "background-color: var(--taniwha-sidebar-active-bg)"
+      # Row selection uses "background: var(--taniwha-sidebar-active-bg)" (no -color)
+      # Without any row selected, the shorthand form should not appear on any row
+      refute html =~ "background: var(--taniwha-sidebar-active-bg)"
+    end
+
+    test "clicking a row sets selected_hash", %{conn: conn} do
+      torrent = Fixtures.torrent_fixture()
+      Store.put_torrent(torrent)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      html = lv |> element("tr[phx-click=select_torrent]") |> render_click()
+
+      assert html =~ "background: var(--taniwha-sidebar-active-bg)"
+    end
+
+    test "clicking a different row updates selected_hash", %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | name: "First"}
+      t2 = %{Fixtures.torrent_fixture("h2") | name: "Second"}
+      Store.put_torrent(t1)
+      Store.put_torrent(t2)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      lv |> element("tr#torrent-h1[phx-click=select_torrent]") |> render_click()
+
+      # Select row h2 — h2 should be highlighted, h1 should not
+      html = lv |> element("tr#torrent-h2[phx-click=select_torrent]") |> render_click()
+
+      # h2 row should be highlighted; background style appears exactly once (for h2)
+      assert html =~ "background: var(--taniwha-sidebar-active-bg)"
+      count = html |> String.split("background: var(--taniwha-sidebar-active-bg)") |> length()
+      # split produces n+1 parts for n occurrences; only h2 should be highlighted
+      assert count == 2
+    end
+
+    test "selected row renders with highlighted background", %{conn: conn} do
+      torrent = Fixtures.torrent_fixture()
+      Store.put_torrent(torrent)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      html = lv |> element("tr[phx-click=select_torrent]") |> render_click()
+
+      assert html =~ "background: var(--taniwha-sidebar-active-bg)"
+    end
+  end
 end

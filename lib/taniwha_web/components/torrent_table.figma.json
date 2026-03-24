@@ -1,0 +1,17 @@
+{
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:160",
+  "component": "TaniwhaWeb.TorrentComponents.torrent_table/1",
+  "language": "heex",
+  "props": {
+    "torrents": "list of Taniwha.Torrent structs (pre-filtered and sorted by LiveView)",
+    "all_torrents_empty?": "boolean — true when ETS store is empty (distinguishes no-torrents from no-results-after-filter)",
+    "sort_by": "atom (:name | :size | :progress | :speed | :ratio | :status)",
+    "sort_dir": "atom (:asc | :desc)",
+    "selected_hashes": "MapSet of hash strings for bulk selection (checkbox column)",
+    "selected_hash": "string | nil — hash of row-clicked torrent for detail panel highlight",
+    "on_start": "event name string (default nil)",
+    "on_stop": "event name string (default nil)",
+    "on_remove": "event name string (default nil)"
+  },
+  "example": "<.torrent_table torrents={visible} all_torrents_empty?={@torrents == []} sort_by={@sort_by} sort_dir={@sort_dir} selected_hashes={@selected_hashes} selected_hash={@selected_hash} on_start=\"start_torrent\" on_stop=\"stop_torrent\" on_remove=\"remove_torrent\" />"
+}
