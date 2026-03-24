@@ -71,12 +71,7 @@ defmodule TaniwhaWeb.TorrentComponents do
   end
 
   @spec progress_bar_css_var(atom()) :: String.t()
-  defp progress_bar_css_var(:downloading), do: "--taniwha-status-dl-bar"
-  defp progress_bar_css_var(:seeding), do: "--taniwha-status-seed-bar"
-  defp progress_bar_css_var(:stopped), do: "--taniwha-status-stop-bar"
-  defp progress_bar_css_var(:paused), do: "--taniwha-status-stop-bar"
-  defp progress_bar_css_var(:checking), do: "--taniwha-status-check-bar"
-  defp progress_bar_css_var(_), do: "--taniwha-status-dl-bar"
+  defp progress_bar_css_var(status), do: "--taniwha-status-#{status_slug(status)}-bar"
 
   # ---------------------------------------------------------------------------
   # status_badge/1
@@ -112,29 +107,22 @@ defmodule TaniwhaWeb.TorrentComponents do
     """
   end
 
+  @spec status_slug(atom()) :: String.t()
+  defp status_slug(:downloading), do: "dl"
+  defp status_slug(:seeding), do: "seed"
+  defp status_slug(:stopped), do: "stop"
+  defp status_slug(:paused), do: "stop"
+  defp status_slug(:checking), do: "check"
+  defp status_slug(_), do: "err"
+
   @spec badge_bg_var(atom()) :: String.t()
-  defp badge_bg_var(:downloading), do: "--taniwha-status-dl-badge-bg"
-  defp badge_bg_var(:seeding), do: "--taniwha-status-seed-badge-bg"
-  defp badge_bg_var(:stopped), do: "--taniwha-status-stop-badge-bg"
-  defp badge_bg_var(:paused), do: "--taniwha-status-stop-badge-bg"
-  defp badge_bg_var(:checking), do: "--taniwha-status-check-badge-bg"
-  defp badge_bg_var(_), do: "--taniwha-status-err-badge-bg"
+  defp badge_bg_var(status), do: "--taniwha-status-#{status_slug(status)}-badge-bg"
 
   @spec badge_text_var(atom()) :: String.t()
-  defp badge_text_var(:downloading), do: "--taniwha-status-dl-badge-text"
-  defp badge_text_var(:seeding), do: "--taniwha-status-seed-badge-text"
-  defp badge_text_var(:stopped), do: "--taniwha-status-stop-badge-text"
-  defp badge_text_var(:paused), do: "--taniwha-status-stop-badge-text"
-  defp badge_text_var(:checking), do: "--taniwha-status-check-badge-text"
-  defp badge_text_var(_), do: "--taniwha-status-err-badge-text"
+  defp badge_text_var(status), do: "--taniwha-status-#{status_slug(status)}-badge-text"
 
   @spec badge_dot_var(atom()) :: String.t()
-  defp badge_dot_var(:downloading), do: "--taniwha-status-dl-dot"
-  defp badge_dot_var(:seeding), do: "--taniwha-status-seed-dot"
-  defp badge_dot_var(:stopped), do: "--taniwha-status-stop-dot"
-  defp badge_dot_var(:paused), do: "--taniwha-status-stop-dot"
-  defp badge_dot_var(:checking), do: "--taniwha-status-check-dot"
-  defp badge_dot_var(_), do: "--taniwha-status-err-dot"
+  defp badge_dot_var(status), do: "--taniwha-status-#{status_slug(status)}-dot"
 
   @spec badge_label(atom()) :: String.t()
   defp badge_label(:downloading), do: "DL"
@@ -475,17 +463,15 @@ defmodule TaniwhaWeb.TorrentComponents do
 
   @spec sidebar_item_style(boolean()) :: String.t()
   defp sidebar_item_style(true),
-    do: "background-color: #eff6ff; color: var(--taniwha-sidebar-active); font-weight: 500"
+    do:
+      "background-color: var(--taniwha-sidebar-active-bg); color: var(--taniwha-sidebar-active); font-weight: 500"
 
   defp sidebar_item_style(false),
     do: "color: var(--taniwha-sidebar-inactive)"
 
   @spec status_dot_color(:all | :downloading | :seeding | :stopped | :checking) :: String.t()
-  defp status_dot_color(:all), do: "#9ca3af"
-  defp status_dot_color(:downloading), do: "#3b82f6"
-  defp status_dot_color(:seeding), do: "#22c55e"
-  defp status_dot_color(:stopped), do: "#94a3b8"
-  defp status_dot_color(:checking), do: "#f59e0b"
+  defp status_dot_color(:all), do: "var(--taniwha-sidebar-section)"
+  defp status_dot_color(status), do: "var(--taniwha-status-#{status_slug(status)}-dot)"
 
   # ---------------------------------------------------------------------------
   # action_bar/1

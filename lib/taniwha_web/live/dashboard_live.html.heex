@@ -23,12 +23,13 @@
     <%!-- Compute visible set once --%>
     <% visible =
       visible_torrents(@torrents, @search, @filter, @tracker_filter, @sort_by, @sort_dir) %>
+    <% visible_count = length(visible) %>
     <% selected_count = MapSet.size(@selected_hashes) %>
-    <% all_selected? = length(visible) > 0 and selected_count == length(visible) %>
+    <% all_selected? = visible_count > 0 and selected_count == visible_count %>
 
     <%!-- Action bar --%>
     <.action_bar
-      visible_count={length(visible)}
+      visible_count={visible_count}
       selected_count={selected_count}
       total_count={@total_count}
     />
@@ -41,7 +42,7 @@
             sort_by={@sort_by}
             sort_dir={@sort_dir}
             all_selected?={all_selected?}
-            total_visible={length(visible)}
+            total_visible={visible_count}
           />
         </thead>
         <tbody>

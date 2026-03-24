@@ -111,6 +111,7 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign(:torrents, torrents)
       |> assign(:selected_hashes, selected)
       |> assign_global_stats(torrents)
+      |> assign(:status_counts, status_counts(torrents))
 
     {:noreply, socket}
   end

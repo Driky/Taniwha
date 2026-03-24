@@ -139,6 +139,7 @@
   --taniwha-logo: #111827;
   --taniwha-sidebar-section: #9ca3af;
   --taniwha-sidebar-active: #1d4ed8;
+  --taniwha-sidebar-active-bg: #eff6ff;
   --taniwha-sidebar-inactive: #4b5563;
   --taniwha-col-header: #6b7280;
   --taniwha-cell-name: #111827;
@@ -191,4 +192,5 @@
   --taniwha-col-header: #4b5563;
   --taniwha-search-bg: #1f2937;
   --taniwha-search-border: #4b5563;
+  --taniwha-sidebar-active-bg: #172554;
 }
