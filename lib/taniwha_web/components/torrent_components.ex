@@ -1212,6 +1212,14 @@ defmodule TaniwhaWeb.TorrentComponents do
   defp format_datetime(nil), do: "—"
   defp format_datetime(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
 
+  defp loading_skeleton(assigns) do
+    ~H"""
+    <div class="space-y-[6px]">
+      <div :for={_ <- 1..4} class="h-[28px] rounded animate-pulse bg-[#f3f4f6] dark:bg-[#1f2937]" />
+    </div>
+    """
+  end
+
   # ---------------------------------------------------------------------------
   # files_tab/1
   # ---------------------------------------------------------------------------
@@ -1231,11 +1239,7 @@ defmodule TaniwhaWeb.TorrentComponents do
   def files_tab(assigns) do
     ~H"""
     <.async_result :let={files} assign={@detail_files}>
-      <:loading>
-        <div class="space-y-[6px]">
-          <div :for={_ <- 1..4} class="h-[28px] rounded animate-pulse bg-[#f3f4f6] dark:bg-[#1f2937]" />
-        </div>
-      </:loading>
+      <:loading><.loading_skeleton /></:loading>
       <:failed :let={_reason}>
         <p class="text-[11px] text-[#ef4444]">Failed to load files</p>
       </:failed>
@@ -1320,11 +1324,7 @@ defmodule TaniwhaWeb.TorrentComponents do
   def peers_tab(assigns) do
     ~H"""
     <.async_result :let={peers} assign={@detail_peers}>
-      <:loading>
-        <div class="space-y-[6px]">
-          <div :for={_ <- 1..4} class="h-[28px] rounded animate-pulse bg-[#f3f4f6] dark:bg-[#1f2937]" />
-        </div>
-      </:loading>
+      <:loading><.loading_skeleton /></:loading>
       <:failed :let={_reason}>
         <p class="text-[11px] text-[#ef4444]">Failed to load peers</p>
       </:failed>
@@ -1389,11 +1389,7 @@ defmodule TaniwhaWeb.TorrentComponents do
   def trackers_tab(assigns) do
     ~H"""
     <.async_result :let={trackers} assign={@detail_trackers}>
-      <:loading>
-        <div class="space-y-[6px]">
-          <div :for={_ <- 1..4} class="h-[28px] rounded animate-pulse bg-[#f3f4f6] dark:bg-[#1f2937]" />
-        </div>
-      </:loading>
+      <:loading><.loading_skeleton /></:loading>
       <:failed :let={_reason}>
         <p class="text-[11px] text-[#ef4444]">Failed to load trackers</p>
       </:failed>

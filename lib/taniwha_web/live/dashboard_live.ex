@@ -350,52 +350,32 @@ defmodule TaniwhaWeb.DashboardLive do
   end
 
   @spec load_tab(Phoenix.LiveView.Socket.t(), atom()) :: Phoenix.LiveView.Socket.t()
-  defp load_tab(socket, :files) do
-    if socket.assigns.detail_files.loading != nil or socket.assigns.detail_files.ok? do
-      socket
-    else
-      hash = socket.assigns.selected_hash
-
-      assign_async(socket, [:detail_files], fn ->
-        case @commands.list_files(hash) do
-          {:ok, files} -> {:ok, %{detail_files: files}}
-          {:error, r} -> {:error, r}
-        end
-      end)
-    end
-  end
-
-  defp load_tab(socket, :peers) do
-    if socket.assigns.detail_peers.loading != nil or socket.assigns.detail_peers.ok? do
-      socket
-    else
-      hash = socket.assigns.selected_hash
-
-      assign_async(socket, [:detail_peers], fn ->
-        case @commands.list_peers(hash) do
-          {:ok, peers} -> {:ok, %{detail_peers: peers}}
-          {:error, r} -> {:error, r}
-        end
-      end)
-    end
-  end
-
-  defp load_tab(socket, :trackers) do
-    if socket.assigns.detail_trackers.loading != nil or socket.assigns.detail_trackers.ok? do
-      socket
-    else
-      hash = socket.assigns.selected_hash
-
-      assign_async(socket, [:detail_trackers], fn ->
-        case @commands.list_trackers(hash) do
-          {:ok, trackers} -> {:ok, %{detail_trackers: trackers}}
-          {:error, r} -> {:error, r}
-        end
-      end)
-    end
-  end
-
+  defp load_tab(socket, :files), do: load_async_tab(socket, :detail_files, &@commands.list_files/1)
+  defp load_tab(socket, :peers), do: load_async_tab(socket, :detail_peers, &@commands.list_peers/1)
+  defp load_tab(socket, :trackers), do: load_async_tab(socket, :detail_trackers, &@commands.list_trackers/1)
   defp load_tab(socket, :general), do: socket
+
+  @spec load_async_tab(
+          Phoenix.LiveView.Socket.t(),
+          atom(),
+          (String.t() -> {:ok, list()} | {:error, term()})
+        ) :: Phoenix.LiveView.Socket.t()
+  defp load_async_tab(socket, field, command) do
+    result = Map.get(socket.assigns, field)
+
+    if result.loading != nil or result.ok? do
+      socket
+    else
+      hash = socket.assigns.selected_hash
+
+      assign_async(socket, [field], fn ->
+        case command.(hash) do
+          {:ok, data} -> {:ok, %{field => data}}
+          {:error, r} -> {:error, r}
+        end
+      end)
+    end
+  end
 
   @spec parse_tab(String.t()) :: :general | :files | :peers | :trackers
   defp parse_tab("files"), do: :files
