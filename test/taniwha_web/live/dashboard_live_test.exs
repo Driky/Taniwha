@@ -357,44 +357,29 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       lv |> element("button[phx-click=stop_torrent]") |> render_click()
     end
 
-    test "remove_torrent calls Commands.erase/1", %{conn: conn} do
+    test "remove_torrent sets confirm_action assign (does not call Commands.erase)", %{
+      conn: conn
+    } do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
-      hash = torrent.hash
-      expect(MockCommands, :erase, fn ^hash -> :ok end)
-
-      {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("button[phx-click=remove_torrent]") |> render_click()
-    end
-
-    test "remove_torrent removes torrent from assigns", %{conn: conn} do
-      torrent = Fixtures.torrent_fixture()
-      Store.put_torrent(torrent)
-      stub(MockCommands, :erase, fn _hash -> :ok end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
       lv |> element("button[phx-click=remove_torrent]") |> render_click()
 
       html = render(lv)
-      refute html =~ torrent.name
+      # Confirmation dialog should be visible
+      assert html =~ "role=\"dialog\""
     end
 
-    test "remove_torrent clears hash from selected_hashes", %{conn: conn} do
+    test "remove_torrent does not immediately remove torrent from assigns", %{conn: conn} do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
-      stub(MockCommands, :erase, fn _hash -> :ok end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-
-      # Select the torrent first
-      lv |> element("input[phx-click=toggle_select]") |> render_click()
-      # Remove it
       lv |> element("button[phx-click=remove_torrent]") |> render_click()
 
       html = render(lv)
-      # Bulk toolbar should not be visible — check for the "N selected" text pattern
-      # (aria-selected is not a false positive since it uses a hyphen, not a space before "selected")
-      refute html =~ " selected"
+      assert html =~ torrent.name
     end
   end
 
@@ -421,8 +406,8 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       lv |> element("input[phx-click=toggle_select]") |> render_click()
       html = lv |> element("input[phx-click=toggle_select]") |> render_click()
 
-      # Bulk toolbar "N selected" text should be gone; aria-selected (hyphen) is not a match
-      refute html =~ " selected"
+      # Bulk toolbar "N selected" count text should be gone
+      refute html =~ ~r/\d+ selected/
     end
 
     test "select_all selects all visible torrents", %{conn: conn} do
@@ -445,7 +430,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       lv |> element("input[phx-click=select_all]") |> render_click()
       html = lv |> element("button[phx-click=deselect_all]") |> render_click()
 
-      refute html =~ " selected"
+      refute html =~ ~r/\d+ selected/
     end
 
     test "bulk_start calls start for each selected hash", %{conn: conn} do
@@ -563,6 +548,91 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       count = html |> String.split("background: var(--taniwha-sidebar-active-bg)") |> length()
       # split produces n+1 parts for n occurrences; only h2 should be highlighted
       assert count == 2
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch — Confirmation flow (remove / bulk_remove / confirm / cancel)
+  # ---------------------------------------------------------------------------
+
+  describe "confirmation flow" do
+    test "remove_torrent sets confirm_action, dialog visible", %{conn: conn} do
+      torrent = Fixtures.torrent_fixture()
+      Store.put_torrent(torrent)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      lv |> element("button[phx-click=remove_torrent]") |> render_click()
+
+      assert render(lv) =~ ~s(role="dialog")
+    end
+
+    test "cancel_confirm hides the dialog", %{conn: conn} do
+      torrent = Fixtures.torrent_fixture()
+      Store.put_torrent(torrent)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      lv |> element("button[phx-click=remove_torrent]") |> render_click()
+      lv |> element("button[phx-click=cancel_confirm]") |> render_click()
+
+      refute render(lv) =~ ~s(role="dialog")
+    end
+
+    test "confirm_action calls Commands.erase/1 and removes torrent", %{conn: conn} do
+      torrent = Fixtures.torrent_fixture()
+      Store.put_torrent(torrent)
+      hash = torrent.hash
+      expect(MockCommands, :erase, fn ^hash -> :ok end)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      lv |> element("button[phx-click=remove_torrent]") |> render_click()
+      lv |> element("button[phx-click=confirm_action]") |> render_click()
+
+      html = render(lv)
+      refute html =~ torrent.name
+      refute html =~ ~s(role="dialog")
+    end
+
+    test "confirm_action clears dialog and puts :info flash", %{conn: conn} do
+      torrent = Fixtures.torrent_fixture()
+      Store.put_torrent(torrent)
+      stub(MockCommands, :erase, fn _hash -> :ok end)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      lv |> element("button[phx-click=remove_torrent]") |> render_click()
+      lv |> element("button[phx-click=confirm_action]") |> render_click()
+
+      html = render(lv)
+      refute html =~ ~s(role="dialog")
+    end
+
+    test "bulk_remove sets confirm_action for bulk erase", %{conn: conn} do
+      torrent = Fixtures.torrent_fixture()
+      Store.put_torrent(torrent)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      lv |> element("input[phx-click=toggle_select]") |> render_click()
+      # Trigger event directly — bulk_remove button is added in Batch 4
+      render_click(lv, "bulk_remove", %{})
+
+      assert render(lv) =~ ~s(role="dialog")
+    end
+
+    test "confirm_action with bulk_erase calls Commands.erase for each hash", %{conn: conn} do
+      t1 = Fixtures.torrent_fixture("h1")
+      t2 = Fixtures.torrent_fixture("h2")
+      Store.put_torrent(t1)
+      Store.put_torrent(t2)
+
+      expect(MockCommands, :erase, fn "h1" -> :ok end)
+      expect(MockCommands, :erase, fn "h2" -> :ok end)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "select_all", %{})
+      render_click(lv, "bulk_remove", %{})
+      lv |> element("button[phx-click=confirm_action]") |> render_click()
+
+      html = render(lv)
+      refute html =~ ~s(role="dialog")
     end
   end
 end

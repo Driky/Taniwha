@@ -394,9 +394,35 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
       assert html =~ "2 selected"
     end
 
-    test "does not show selected text when selected_count is 0" do
+    test "does not show N selected count text when selected_count is 0" do
       html = render_component(&action_bar/1, visible_count: 3, selected_count: 0)
-      refute html =~ " selected"
+      refute html =~ ~r/\d+ selected/
+    end
+
+    test "Start button is disabled when selected_count is 0" do
+      html = render_component(&action_bar/1, visible_count: 3, selected_count: 0)
+      assert html =~ ~r/phx-click="bulk_start"[^>]*disabled/
+    end
+
+    test "Stop button is disabled when selected_count is 0" do
+      html = render_component(&action_bar/1, visible_count: 3, selected_count: 0)
+      assert html =~ ~r/phx-click="bulk_stop"[^>]*disabled/
+    end
+
+    test "Remove button is disabled when selected_count is 0" do
+      html = render_component(&action_bar/1, visible_count: 3, selected_count: 0)
+      assert html =~ ~r/phx-click="bulk_remove"[^>]*disabled/
+    end
+
+    test "bulk Remove button is enabled when selected_count > 0" do
+      html = render_component(&action_bar/1, visible_count: 3, selected_count: 1)
+      # disabled attribute should not be present on the remove button when selected
+      refute html =~ ~r/phx-click="bulk_remove"[^>]*disabled/
+    end
+
+    test "bulk Remove button has phx-click=bulk_remove" do
+      html = render_component(&action_bar/1, visible_count: 3, selected_count: 1)
+      assert html =~ ~s(phx-click="bulk_remove")
     end
   end
 
@@ -663,6 +689,70 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
 
       assert html =~ "No torrents match"
       refute html =~ "No torrents yet"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # confirmation_dialog/1
+  # ---------------------------------------------------------------------------
+
+  describe "confirmation_dialog/1" do
+    test "renders nothing when confirm_action is nil" do
+      html = render_component(&confirmation_dialog/1, confirm_action: nil, torrent_name: nil)
+      refute html =~ "role=\"dialog\""
+      refute html =~ "confirm_action"
+    end
+
+    test "renders dialog with torrent name when confirm_action is {:erase, hash}" do
+      html =
+        render_component(&confirmation_dialog/1,
+          confirm_action: {:erase, "abc123"},
+          torrent_name: "Foo.torrent"
+        )
+
+      assert html =~ "role=\"dialog\""
+      assert html =~ "Foo.torrent"
+    end
+
+    test "confirm button has phx-click=confirm_action" do
+      html =
+        render_component(&confirmation_dialog/1,
+          confirm_action: {:erase, "abc123"},
+          torrent_name: "Foo.torrent"
+        )
+
+      assert html =~ ~s(phx-click="confirm_action")
+    end
+
+    test "cancel button has phx-click=cancel_confirm" do
+      html =
+        render_component(&confirmation_dialog/1,
+          confirm_action: {:erase, "abc123"},
+          torrent_name: "Foo.torrent"
+        )
+
+      assert html =~ ~s(phx-click="cancel_confirm")
+    end
+
+    test "dialog container has role=dialog and aria-modal=true" do
+      html =
+        render_component(&confirmation_dialog/1,
+          confirm_action: {:erase, "abc123"},
+          torrent_name: "Foo.torrent"
+        )
+
+      assert html =~ ~s(role="dialog")
+      assert html =~ ~s(aria-modal="true")
+    end
+
+    test "confirm button has aria-label for screen readers" do
+      html =
+        render_component(&confirmation_dialog/1,
+          confirm_action: {:erase, "abc123"},
+          torrent_name: "Foo.torrent"
+        )
+
+      assert html =~ ~r/aria-label="[^"]+"/
     end
   end
 end

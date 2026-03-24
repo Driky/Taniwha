@@ -61,3 +61,25 @@
     </div>
   </div>
 </div>
+
+<%!-- Add torrent modal --%>
+<.live_component
+  :if={@show_add_modal}
+  module={TaniwhaWeb.AddTorrentComponent}
+  id="add-torrent-modal"
+  file_uploads={@uploads}
+/>
+
+<%!-- Toast notifications --%>
+<Layouts.flash_group flash={@flash} />
+
+<%!-- Confirmation dialog overlay --%>
+<.confirmation_dialog
+  confirm_action={@confirm_action}
+  torrent_name={
+    if is_tuple(@confirm_action) and elem(@confirm_action, 0) == :erase do
+      torrent = Enum.find(@torrents, &(&1.hash == elem(@confirm_action, 1)))
+      torrent && torrent.name
+    end
+  }
+/>

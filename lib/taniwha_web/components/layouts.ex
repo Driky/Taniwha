@@ -50,6 +50,7 @@ defmodule TaniwhaWeb.Layouts do
     <div id={@id} aria-live="polite">
       <.flash kind={:info} flash={@flash} />
       <.flash kind={:error} flash={@flash} />
+      <.flash kind={:success} flash={@flash} />
 
       <.flash
         id="client-error"

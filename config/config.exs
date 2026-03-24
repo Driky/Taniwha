@@ -7,6 +7,10 @@
 # General application configuration
 import Config
 
+config :mime, :types, %{
+  "application/x-bittorrent" => ["torrent"]
+}
+
 config :taniwha,
   generators: [timestamp_type: :utc_datetime],
   scgi_connection: Taniwha.SCGI.UnixConnection,

@@ -29,6 +29,11 @@ defmodule TaniwhaWeb.DashboardLive do
 
     socket =
       socket
+      |> allow_upload(:torrent_file,
+        accept: ~w[application/x-bittorrent],
+        max_entries: 1,
+        max_file_size: 10_000_000
+      )
       |> assign(:torrents, torrents)
       |> assign(:search, "")
       |> assign(:sort_by, :name)
@@ -43,6 +48,8 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign(:detail_peers, %AsyncResult{})
       |> assign(:detail_trackers, %AsyncResult{})
       |> assign(:page_title, "Torrents")
+      |> assign(:confirm_action, nil)
+      |> assign(:show_add_modal, false)
       |> assign_global_stats(torrents)
       |> assign(:status_counts, status_counts(torrents))
 
@@ -71,6 +78,13 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign(:status_counts, status_counts(torrents))
 
     {:noreply, socket}
+  end
+
+  def handle_info({:add_torrent_success}, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_add_modal, false)
+     |> put_flash(:success, "Torrent added")}
   end
 
   # ---------------------------------------------------------------------------
@@ -114,19 +128,101 @@ defmodule TaniwhaWeb.DashboardLive do
   end
 
   def handle_event("remove_torrent", %{"hash" => hash}, socket) do
-    @commands.erase(hash)
+    {:noreply, assign(socket, :confirm_action, {:erase, hash})}
+  end
 
-    torrents = Enum.reject(socket.assigns.torrents, &(&1.hash == hash))
-    selected = MapSet.delete(socket.assigns.selected_hashes, hash)
+  def handle_event("bulk_remove", _params, socket) do
+    hashes = MapSet.to_list(socket.assigns.selected_hashes)
+    {:noreply, assign(socket, :confirm_action, {:bulk_erase, hashes})}
+  end
 
-    socket =
-      socket
-      |> assign(:torrents, torrents)
-      |> assign(:selected_hashes, selected)
-      |> assign_global_stats(torrents)
-      |> assign(:status_counts, status_counts(torrents))
+  def handle_event("confirm_action", _params, socket) do
+    case socket.assigns.confirm_action do
+      {:erase, hash} ->
+        @commands.erase(hash)
+        torrents = Enum.reject(socket.assigns.torrents, &(&1.hash == hash))
+        selected = MapSet.delete(socket.assigns.selected_hashes, hash)
 
+        socket =
+          socket
+          |> assign(:torrents, torrents)
+          |> assign(:selected_hashes, selected)
+          |> assign(:confirm_action, nil)
+          |> assign_global_stats(torrents)
+          |> assign(:status_counts, status_counts(torrents))
+          |> put_flash(:info, "Torrent removed")
+
+        {:noreply, socket}
+
+      {:bulk_erase, hashes} ->
+        Enum.each(hashes, &@commands.erase/1)
+        hash_set = MapSet.new(hashes)
+        torrents = Enum.reject(socket.assigns.torrents, &MapSet.member?(hash_set, &1.hash))
+
+        socket =
+          socket
+          |> assign(:torrents, torrents)
+          |> assign(:selected_hashes, MapSet.new())
+          |> assign(:confirm_action, nil)
+          |> assign_global_stats(torrents)
+          |> assign(:status_counts, status_counts(torrents))
+          |> put_flash(:info, "Torrents removed")
+
+        {:noreply, socket}
+
+      nil ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_confirm", _params, socket) do
+    {:noreply, assign(socket, :confirm_action, nil)}
+  end
+
+  def handle_event("show_add_modal", _params, socket) do
+    {:noreply, assign(socket, :show_add_modal, true)}
+  end
+
+  def handle_event("hide_add_modal", _params, socket) do
+    {:noreply, assign(socket, :show_add_modal, false)}
+  end
+
+  def handle_event("validate", _params, socket) do
     {:noreply, socket}
+  end
+
+  def handle_event("submit_file", _params, socket) do
+    results =
+      consume_uploaded_entries(socket, :torrent_file, fn %{path: path}, _entry ->
+        File.read(path)
+      end)
+
+    case results do
+      [binary] when is_binary(binary) ->
+        case @commands.load_raw(binary) do
+          :ok ->
+            {:noreply,
+             socket
+             |> assign(:show_add_modal, false)
+             |> put_flash(:success, "Torrent added")}
+
+          {:error, reason} ->
+            send_update(TaniwhaWeb.AddTorrentComponent,
+              id: "add-torrent-modal",
+              error: format_add_error(reason),
+              loading: false
+            )
+
+            {:noreply, socket}
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :torrent_file, ref)}
   end
 
   def handle_event("toggle_select", %{"hash" => hash}, socket) do
@@ -190,11 +286,19 @@ defmodule TaniwhaWeb.DashboardLive do
   end
 
   def handle_event("keydown", %{"key" => "Escape"}, socket) do
-    if socket.assigns.selected_hash do
-      unsubscribe_detail(socket.assigns.selected_hash)
-      {:noreply, socket |> assign(:selected_hash, nil) |> reset_detail_assigns()}
-    else
-      {:noreply, socket}
+    cond do
+      socket.assigns.confirm_action != nil ->
+        {:noreply, assign(socket, :confirm_action, nil)}
+
+      socket.assigns.show_add_modal ->
+        {:noreply, assign(socket, :show_add_modal, false)}
+
+      socket.assigns.selected_hash ->
+        unsubscribe_detail(socket.assigns.selected_hash)
+        {:noreply, socket |> assign(:selected_hash, nil) |> reset_detail_assigns()}
+
+      true ->
+        {:noreply, socket}
     end
   end
 
@@ -392,4 +496,9 @@ defmodule TaniwhaWeb.DashboardLive do
   defp parse_tab("peers"), do: :peers
   defp parse_tab("trackers"), do: :trackers
   defp parse_tab(_), do: :general
+
+  @spec format_add_error(term()) :: String.t()
+  defp format_add_error(:timeout), do: "Connection timed out. Is rtorrent running?"
+  defp format_add_error(:connection_refused), do: "Could not connect to rtorrent."
+  defp format_add_error(_), do: "Failed to add torrent. Please try again."
 end

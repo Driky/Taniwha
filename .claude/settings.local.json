@@ -33,7 +33,10 @@
       "Bash(jq .response[0].text /Users/cedricchatelain/workspace/projects/perso/taniwha/docs/figma-cache/get_design_context_hp8ISSdpaxXF9wiSTYsaOx_1_2.json)",
       "Bash(jq .response[1].text /Users/cedricchatelain/workspace/projects/perso/taniwha/docs/figma-cache/get_design_context_hp8ISSdpaxXF9wiSTYsaOx_4_2.json)",
       "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha/lib/taniwha_web -name *live.ex)",
-      "Bash(jq -r .response[0].text)"
+      "Bash(jq -r .response[0].text)",
+      "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha/assets/js -type f -name *.js)",
+      "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha -type f -name *.figma.* -o -name *figma.config*)",
+      "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha -name *.js -path */phoenix-colocated/*)"
     ]
   }
 }
