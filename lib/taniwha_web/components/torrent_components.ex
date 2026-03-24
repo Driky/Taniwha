@@ -944,7 +944,7 @@ defmodule TaniwhaWeb.TorrentComponents do
     assigns = assign(assigns, :all_selected?, all_selected?)
 
     ~H"""
-    <div class="flex-1 overflow-y-auto">
+    <div class="min-h-0 flex-1 overflow-y-auto">
       <table class="w-full border-collapse table-fixed">
         <thead class="sticky top-0 z-10">
           <.table_header
