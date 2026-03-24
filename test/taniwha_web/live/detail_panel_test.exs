@@ -280,7 +280,14 @@ defmodule TaniwhaWeb.DetailPanelTest do
     end
 
     test "priority change triggers set_file_priority command", %{lv: lv, torrent: torrent} do
-      file = %TorrentFile{path: "file.mkv", size: 100, priority: 1, completed_chunks: 0, total_chunks: 1}
+      file = %TorrentFile{
+        path: "file.mkv",
+        size: 100,
+        priority: 1,
+        completed_chunks: 0,
+        total_chunks: 1
+      }
+
       stub(MockCommands, :list_files, fn _hash -> {:ok, [file]} end)
 
       lv
@@ -415,8 +422,13 @@ defmodule TaniwhaWeb.DetailPanelTest do
     end
 
     test "enabled tracker has green status indicator", %{lv: lv} do
-      tracker = %Tracker{url: "http://t.example.com/announce", is_enabled: true,
-                          scrape_complete: 0, scrape_incomplete: 0, normal_interval: 0}
+      tracker = %Tracker{
+        url: "http://t.example.com/announce",
+        is_enabled: true,
+        scrape_complete: 0,
+        scrape_incomplete: 0,
+        normal_interval: 0
+      }
 
       stub(MockCommands, :list_trackers, fn _hash -> {:ok, [tracker]} end)
 
@@ -429,8 +441,13 @@ defmodule TaniwhaWeb.DetailPanelTest do
     end
 
     test "disabled tracker has gray status indicator", %{lv: lv} do
-      tracker = %Tracker{url: "http://t.example.com/announce", is_enabled: false,
-                          scrape_complete: 0, scrape_incomplete: 0, normal_interval: 0}
+      tracker = %Tracker{
+        url: "http://t.example.com/announce",
+        is_enabled: false,
+        scrape_complete: 0,
+        scrape_incomplete: 0,
+        normal_interval: 0
+      }
 
       stub(MockCommands, :list_trackers, fn _hash -> {:ok, [tracker]} end)
 

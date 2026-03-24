@@ -180,7 +180,11 @@ defmodule TaniwhaWeb.DashboardLive do
     {:noreply, socket |> assign(:active_tab, tab_atom) |> load_tab(tab_atom)}
   end
 
-  def handle_event("set_file_priority", %{"hash" => hash, "index" => index, "priority" => priority}, socket) do
+  def handle_event(
+        "set_file_priority",
+        %{"hash" => hash, "index" => index, "priority" => priority},
+        socket
+      ) do
     @commands.set_file_priority(hash, String.to_integer(index), String.to_integer(priority))
     {:noreply, socket}
   end
@@ -350,9 +354,15 @@ defmodule TaniwhaWeb.DashboardLive do
   end
 
   @spec load_tab(Phoenix.LiveView.Socket.t(), atom()) :: Phoenix.LiveView.Socket.t()
-  defp load_tab(socket, :files), do: load_async_tab(socket, :detail_files, &@commands.list_files/1)
-  defp load_tab(socket, :peers), do: load_async_tab(socket, :detail_peers, &@commands.list_peers/1)
-  defp load_tab(socket, :trackers), do: load_async_tab(socket, :detail_trackers, &@commands.list_trackers/1)
+  defp load_tab(socket, :files),
+    do: load_async_tab(socket, :detail_files, &@commands.list_files/1)
+
+  defp load_tab(socket, :peers),
+    do: load_async_tab(socket, :detail_peers, &@commands.list_peers/1)
+
+  defp load_tab(socket, :trackers),
+    do: load_async_tab(socket, :detail_trackers, &@commands.list_trackers/1)
+
   defp load_tab(socket, :general), do: socket
 
   @spec load_async_tab(

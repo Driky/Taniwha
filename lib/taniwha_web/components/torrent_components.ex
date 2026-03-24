@@ -1148,17 +1148,23 @@ defmodule TaniwhaWeb.TorrentComponents do
       <div>
         <div class="text-[#9ca3af] dark:text-[#4b5563] text-[10px] mb-[2px]">Downloaded</div>
         <div>
-          <span class="text-[#374151] dark:text-[#d1d5db]">{format_bytes(@torrent.completed_bytes)}</span>
+          <span class="text-[#374151] dark:text-[#d1d5db]">
+            {format_bytes(@torrent.completed_bytes)}
+          </span>
           <span class="text-[#9ca3af] dark:text-[#6b7280] ml-[2px]">({@progress_pct}%)</span>
         </div>
       </div>
       <div>
         <div class="text-[#9ca3af] dark:text-[#4b5563] text-[10px] mb-[2px]">Download speed</div>
-        <div class="text-[#2563eb] dark:text-[#60a5fa] font-medium">{format_speed(@torrent.download_rate)}</div>
+        <div class="text-[#2563eb] dark:text-[#60a5fa] font-medium">
+          {format_speed(@torrent.download_rate)}
+        </div>
       </div>
       <div>
         <div class="text-[#9ca3af] dark:text-[#4b5563] text-[10px] mb-[2px]">Upload speed</div>
-        <div class="text-[#16a34a] dark:text-[#4ade80] font-medium">{format_speed(@torrent.upload_rate)}</div>
+        <div class="text-[#16a34a] dark:text-[#4ade80] font-medium">
+          {format_speed(@torrent.upload_rate)}
+        </div>
       </div>
       <div>
         <div class="text-[#9ca3af] dark:text-[#4b5563] text-[10px] mb-[2px]">ETA</div>
@@ -1189,7 +1195,9 @@ defmodule TaniwhaWeb.TorrentComponents do
       <div>
         <div class="text-[#9ca3af] dark:text-[#4b5563] text-[10px] mb-[2px]">Completed</div>
         <%= if @torrent.finished_at do %>
-          <div class="text-[#374151] dark:text-[#d1d5db]">{format_datetime(@torrent.finished_at)}</div>
+          <div class="text-[#374151] dark:text-[#d1d5db]">
+            {format_datetime(@torrent.finished_at)}
+          </div>
         <% else %>
           <div class="text-[#9ca3af] dark:text-[#6b7280] italic">In progress…</div>
         <% end %>
@@ -1272,7 +1280,10 @@ defmodule TaniwhaWeb.TorrentComponents do
             </td>
             <td class="pr-2">
               <div class="flex items-center gap-[4px]">
-                <span class="shrink-0 w-[28px] text-right tabular-nums" style="color: var(--taniwha-cell-pct)">
+                <span
+                  class="shrink-0 w-[28px] text-right tabular-nums"
+                  style="color: var(--taniwha-cell-pct)"
+                >
                   {round(TorrentFile.progress(file) * 100)}%
                 </span>
                 <div class="flex-1">
@@ -1355,7 +1366,9 @@ defmodule TaniwhaWeb.TorrentComponents do
                 {Peer.address_port(peer)}
               </span>
             </td>
-            <td class="pr-2 truncate" style="color: var(--taniwha-cell-name)">{peer.client_version}</td>
+            <td class="pr-2 truncate" style="color: var(--taniwha-cell-name)">
+              {peer.client_version}
+            </td>
             <td class="pr-2 text-right">
               <.speed_display bytes_per_second={peer.down_rate} direction={:down} />
             </td>
