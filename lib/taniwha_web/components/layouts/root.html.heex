@@ -12,21 +12,36 @@
     </script>
     <script>
       (() => {
+        const html = document.documentElement;
+        const mq = window.matchMedia("(prefers-color-scheme: dark)");
+
         const setTheme = (theme) => {
           if (theme === "system") {
             localStorage.removeItem("phx:theme");
-            document.documentElement.removeAttribute("data-theme");
+            html.removeAttribute("data-theme-mode");
+            html.setAttribute("data-theme", mq.matches ? "dark" : "light");
           } else {
             localStorage.setItem("phx:theme", theme);
-            document.documentElement.setAttribute("data-theme", theme);
+            html.setAttribute("data-theme-mode", theme);
+            html.setAttribute("data-theme", theme);
           }
         };
-        if (!document.documentElement.hasAttribute("data-theme")) {
+
+        if (!html.hasAttribute("data-theme")) {
           setTheme(localStorage.getItem("phx:theme") || "system");
         }
-        window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
-        
+
+        window.addEventListener("storage", (e) => {
+          if (e.key === "phx:theme") setTheme(e.newValue || "system");
+        });
+
         window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
+
+        mq.addEventListener("change", (e) => {
+          if (!localStorage.getItem("phx:theme")) {
+            html.setAttribute("data-theme", e.matches ? "dark" : "light");
+          }
+        });
       })();
     </script>
   </head>
