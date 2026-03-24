@@ -96,8 +96,8 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       send(lv.pid, {:torrent_diffs, [{:added, torrent}]})
 
       html = render(lv)
-      # total_count badge shows "1" after adding one torrent
-      assert html =~ ~s(badge-neutral tabular-nums">1<)
+      # visible count in action_bar shows "1" after adding one torrent
+      assert html =~ "1 torrents"
     end
   end
 
@@ -171,7 +171,11 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      html = lv |> element("[role=tablist] [phx-value-value=all]") |> render_click()
+      html =
+        lv
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=all]")
+        |> render_click()
+
       assert html =~ downloading.name
       assert html =~ stopped.name
     end
@@ -197,7 +201,11 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      html = lv |> element("[role=tablist] [phx-value-value=downloading]") |> render_click()
+      html =
+        lv
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=downloading]")
+        |> render_click()
+
       assert html =~ "Active DL"
       refute html =~ "Stopped One"
     end
@@ -223,7 +231,11 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      html = lv |> element("[role=tablist] [phx-value-value=seeding]") |> render_click()
+      html =
+        lv
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=seeding]")
+        |> render_click()
+
       assert html =~ "Seeder"
       refute html =~ "Stopper"
     end
@@ -249,7 +261,11 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      html = lv |> element("[role=tablist] [phx-value-value=stopped]") |> render_click()
+      html =
+        lv
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=stopped]")
+        |> render_click()
+
       refute html =~ "Downloader"
       assert html =~ "Stopper"
     end
@@ -312,7 +328,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
     test "sort indicator appears on active column", %{conn: conn} do
       Store.put_torrent(Fixtures.torrent_fixture())
       {:ok, _lv, html} = live(conn, ~p"/")
-      assert html =~ "↑"
+      assert html =~ "hero-chevron-up-micro"
     end
   end
 
@@ -427,7 +443,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
       lv |> element("input[phx-click=select_all]") |> render_click()
-      html = lv |> element("input[phx-click=deselect_all]") |> render_click()
+      html = lv |> element("button[phx-click=deselect_all]") |> render_click()
 
       refute html =~ " selected"
     end
@@ -478,10 +494,10 @@ defmodule TaniwhaWeb.DashboardLiveTest do
   # ---------------------------------------------------------------------------
 
   describe "accessibility" do
-    test "filter tabs have role=tablist and aria-selected", %{conn: conn} do
+    test "filter tabs have aria-pressed for active state", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/")
-      assert html =~ ~s(role="tablist")
-      assert html =~ ~s(aria-selected)
+      assert html =~ ~s(aria-pressed="true")
+      assert html =~ ~s(aria-pressed="false")
     end
 
     test "sort buttons have accessible text content", %{conn: conn} do

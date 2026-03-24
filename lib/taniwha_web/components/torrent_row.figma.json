@@ -1,0 +1,13 @@
+{
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:162",
+  "component": "TaniwhaWeb.TorrentComponents.torrent_row/1",
+  "language": "heex",
+  "props": {
+    "torrent": "Taniwha.Torrent struct",
+    "selected?": "boolean (default false)",
+    "on_start": "event name string (default nil)",
+    "on_stop": "event name string (default nil)",
+    "on_remove": "event name string (default nil)"
+  },
+  "example": "<.torrent_row torrent={@torrent} selected?={false} on_start=\"start_torrent\" on_stop=\"stop_torrent\" on_remove=\"remove_torrent\" />"
+}

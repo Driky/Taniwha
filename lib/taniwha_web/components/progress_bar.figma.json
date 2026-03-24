@@ -1,0 +1,11 @@
+{
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:2",
+  "component": "TaniwhaWeb.TorrentComponents.progress_bar/1",
+  "language": "heex",
+  "props": {
+    "value": "float 0.0–100.0",
+    "color": "atom (:downloading | :seeding | :stopped | :paused | :checking), default :downloading",
+    "id": "string (optional)"
+  },
+  "example": "<.progress_bar value={45.5} color={:downloading} />"
+}

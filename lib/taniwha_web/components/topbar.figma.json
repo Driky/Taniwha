@@ -1,0 +1,11 @@
+{
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:9",
+  "component": "TaniwhaWeb.TorrentComponents.topbar/1",
+  "language": "heex",
+  "props": {
+    "upload_rate": "integer (bytes/s)",
+    "download_rate": "integer (bytes/s)",
+    "search": "string"
+  },
+  "example": "<.topbar upload_rate={0} download_rate={0} search=\"\" />"
+}

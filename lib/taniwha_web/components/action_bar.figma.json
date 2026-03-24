@@ -1,0 +1,11 @@
+{
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:134",
+  "component": "TaniwhaWeb.TorrentComponents.action_bar/1",
+  "language": "heex",
+  "props": {
+    "visible_count": "integer",
+    "selected_count": "integer (default 0)",
+    "total_count": "integer (default 0)"
+  },
+  "example": "<.action_bar visible_count={6} selected_count={0} total_count={6} />"
+}

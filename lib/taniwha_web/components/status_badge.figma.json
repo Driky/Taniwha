@@ -1,0 +1,9 @@
+{
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:2",
+  "component": "TaniwhaWeb.TorrentComponents.status_badge/1",
+  "language": "heex",
+  "props": {
+    "status": "atom (:downloading | :seeding | :stopped | :paused | :checking | :unknown)"
+  },
+  "example": "<.status_badge status={:downloading} />"
+}

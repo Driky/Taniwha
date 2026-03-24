@@ -1,0 +1,12 @@
+{
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:366",
+  "component": "TaniwhaWeb.TorrentComponents.table_header/1",
+  "language": "heex",
+  "props": {
+    "sort_by": "atom (:name | :size | :progress | :speed | :ratio | :status)",
+    "sort_dir": "atom (:asc | :desc)",
+    "all_selected?": "boolean (default false)",
+    "total_visible": "integer (default 0)"
+  },
+  "example": "<.table_header sort_by={:name} sort_dir={:asc} all_selected?={false} total_visible={6} />"
+}

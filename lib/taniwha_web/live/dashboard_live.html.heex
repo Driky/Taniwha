@@ -1,194 +1,93 @@
-<section aria-labelledby="dashboard-heading">
-  <%!-- Header row --%>
-  <div class="flex items-center justify-between mb-4">
-    <div class="flex items-center gap-2">
-      <h1 id="dashboard-heading" class="text-2xl font-bold">Torrents</h1>
-      <span class="badge badge-neutral tabular-nums">{@total_count}</span>
-    </div>
-    <.link navigate={~p"/add"} class="btn btn-primary btn-sm">
-      <.icon name="hero-plus-micro" class="size-4" /> Add
-    </.link>
-  </div>
+<%!-- Flood-style full-viewport layout --%>
+<div
+  class="flex h-screen overflow-hidden"
+  style="background: var(--taniwha-content-bg)"
+>
+  <%!-- Sidebar --%>
+  <.sidebar
+    filter={@filter}
+    tracker_filter={@tracker_filter}
+    status_counts={@status_counts}
+    tracker_groups={@tracker_groups}
+  />
 
-  <%!-- Toolbar: search + filter tabs --%>
-  <div class="flex flex-col sm:flex-row gap-2 mb-4">
-    <input
-      type="search"
-      name="value"
-      value={@search}
-      placeholder="Search torrents…"
-      phx-change="search"
-      phx-debounce="300"
-      aria-label="Search torrents"
-      class="input input-bordered input-sm w-full sm:w-64"
+  <%!-- Right column: topbar + action bar + table --%>
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <%!-- Topbar --%>
+    <.topbar
+      upload_rate={@global_upload_rate}
+      download_rate={@global_download_rate}
+      search={@search}
     />
 
-    <div
-      role="tablist"
-      class="tabs tabs-boxed tabs-sm self-start"
-      aria-label="Filter torrents by status"
-    >
-      <button
-        role="tab"
-        phx-click="filter"
-        phx-value-value="all"
-        aria-selected={to_string(@filter == :all)}
-        class={"tab #{if @filter == :all, do: "tab-active"}"}
-      >
-        All
-      </button>
-      <button
-        role="tab"
-        phx-click="filter"
-        phx-value-value="downloading"
-        aria-selected={to_string(@filter == :downloading)}
-        class={"tab #{if @filter == :downloading, do: "tab-active"}"}
-      >
-        Downloading
-      </button>
-      <button
-        role="tab"
-        phx-click="filter"
-        phx-value-value="seeding"
-        aria-selected={to_string(@filter == :seeding)}
-        class={"tab #{if @filter == :seeding, do: "tab-active"}"}
-      >
-        Seeding
-      </button>
-      <button
-        role="tab"
-        phx-click="filter"
-        phx-value-value="stopped"
-        aria-selected={to_string(@filter == :stopped)}
-        class={"tab #{if @filter == :stopped, do: "tab-active"}"}
-      >
-        Stopped
-      </button>
-    </div>
-  </div>
+    <%!-- Compute visible set once --%>
+    <% visible =
+      visible_torrents(@torrents, @search, @filter, @tracker_filter, @sort_by, @sort_dir) %>
+    <% selected_count = MapSet.size(@selected_hashes) %>
+    <% all_selected? = length(visible) > 0 and selected_count == length(visible) %>
 
-  <%!-- Bulk toolbar — visible when at least one torrent is selected --%>
-  <% selected_count = MapSet.size(@selected_hashes) %>
-  <div
-    :if={selected_count >= 1}
-    class="flex items-center gap-2 mb-3 p-2 rounded-lg bg-base-200"
-  >
-    <span class="text-sm font-medium">{selected_count} selected</span>
-    <button phx-click="bulk_start" class="btn btn-ghost btn-xs">
-      <.icon name="hero-play-micro" class="size-4" /> Start all
-    </button>
-    <button phx-click="bulk_stop" class="btn btn-ghost btn-xs">
-      <.icon name="hero-stop-micro" class="size-4" /> Stop all
-    </button>
-    <button phx-click="deselect_all" class="btn btn-ghost btn-xs">
-      Clear
-    </button>
-  </div>
-
-  <%!-- Sort header row + select-all --%>
-  <% visible = visible_torrents(@torrents, @search, @filter, @sort_by, @sort_dir) %>
-  <% n_visible = length(visible) %>
-  <% all_selected? = n_visible > 0 and selected_count == n_visible %>
-
-  <div
-    :if={@torrents != []}
-    class="flex items-center gap-2 px-3 py-1 text-xs text-base-content/60 mb-1"
-  >
-    <input
-      type="checkbox"
-      checked={all_selected?}
-      phx-click={if all_selected?, do: "deselect_all", else: "select_all"}
-      aria-label={if all_selected?, do: "Deselect all torrents", else: "Select all torrents"}
-      class="checkbox checkbox-xs"
+    <%!-- Action bar --%>
+    <.action_bar
+      visible_count={length(visible)}
+      selected_count={selected_count}
+      total_count={@total_count}
     />
 
-    <button
-      phx-click="sort"
-      phx-value-by="name"
-      class="font-medium hover:text-base-content transition-colors"
-      aria-label="Sort by name"
-    >
-      Name{if @sort_by == :name, do: if(@sort_dir == :asc, do: " ↑", else: " ↓")}
-    </button>
-    <button
-      phx-click="sort"
-      phx-value-by="size"
-      class="ml-auto hover:text-base-content transition-colors"
-      aria-label="Sort by size"
-    >
-      Size{if @sort_by == :size, do: if(@sort_dir == :asc, do: " ↑", else: " ↓")}
-    </button>
-    <button
-      phx-click="sort"
-      phx-value-by="progress"
-      class="hover:text-base-content transition-colors"
-      aria-label="Sort by progress"
-    >
-      Progress{if @sort_by == :progress, do: if(@sort_dir == :asc, do: " ↑", else: " ↓")}
-    </button>
-    <button
-      phx-click="sort"
-      phx-value-by="speed"
-      class="hover:text-base-content transition-colors"
-      aria-label="Sort by speed"
-    >
-      Speed{if @sort_by == :speed, do: if(@sort_dir == :asc, do: " ↑", else: " ↓")}
-    </button>
-    <button
-      phx-click="sort"
-      phx-value-by="ratio"
-      class="hover:text-base-content transition-colors"
-      aria-label="Sort by ratio"
-    >
-      Ratio{if @sort_by == :ratio, do: if(@sort_dir == :asc, do: " ↑", else: " ↓")}
-    </button>
-    <button
-      phx-click="sort"
-      phx-value-by="status"
-      class="hover:text-base-content transition-colors"
-      aria-label="Sort by status"
-    >
-      Status{if @sort_by == :status, do: if(@sort_dir == :asc, do: " ↑", else: " ↓")}
-    </button>
-  </div>
+    <%!-- Scrollable table area --%>
+    <div class="flex-1 overflow-y-auto">
+      <table class="w-full border-collapse table-fixed">
+        <thead class="sticky top-0 z-10">
+          <.table_header
+            sort_by={@sort_by}
+            sort_dir={@sort_dir}
+            all_selected?={all_selected?}
+            total_visible={length(visible)}
+          />
+        </thead>
+        <tbody>
+          <%!-- Empty state: no torrents at all --%>
+          <tr :if={visible == [] and @torrents == []}>
+            <td
+              colspan="10"
+              class="py-16 text-center text-[11px]"
+              style="color: var(--taniwha-col-header)"
+              role="status"
+              aria-label="No torrents"
+            >
+              <p class="mb-2">No torrents yet.</p>
+              <.link
+                navigate={~p"/add"}
+                class="text-[#2563eb] hover:underline"
+              >
+                Add your first torrent
+              </.link>
+            </td>
+          </tr>
 
-  <%!-- Torrent list --%>
-  <div role="list" class="flex flex-col gap-2">
-    <div :for={torrent <- visible} role="listitem" class="flex items-start gap-2">
-      <input
-        type="checkbox"
-        checked={MapSet.member?(@selected_hashes, torrent.hash)}
-        phx-click="toggle_select"
-        phx-value-hash={torrent.hash}
-        aria-label={"Select #{torrent.name}"}
-        class="checkbox checkbox-sm mt-3"
-      />
-      <div class="flex-1 min-w-0">
-        <TaniwhaWeb.TorrentComponents.torrent_row
-          torrent={torrent}
-          on_start="start_torrent"
-          on_stop="stop_torrent"
-          on_remove="remove_torrent"
-          confirm_remove="Remove this torrent?"
-        />
-      </div>
+          <%!-- Empty state: filters active but nothing matches --%>
+          <tr :if={visible == [] and @torrents != []}>
+            <td
+              colspan="10"
+              class="py-8 text-center text-[11px]"
+              style="color: var(--taniwha-col-header)"
+              role="status"
+              aria-label="No results"
+            >
+              No torrents match your search or filter.
+            </td>
+          </tr>
+
+          <%!-- Torrent rows --%>
+          <.torrent_row
+            :for={torrent <- visible}
+            torrent={torrent}
+            selected?={MapSet.member?(@selected_hashes, torrent.hash)}
+            on_start="start_torrent"
+            on_stop="stop_torrent"
+            on_remove="remove_torrent"
+          />
+        </tbody>
+      </table>
     </div>
   </div>
-
-  <%!-- Empty states --%>
-  <div :if={@torrents == []} role="status" aria-label="No torrents" class="text-center py-16">
-    <p class="text-base-content/60 mb-4">No torrents yet</p>
-    <.link navigate={~p"/add"} class="btn btn-primary btn-sm">
-      Add your first torrent
-    </.link>
-  </div>
-
-  <div
-    :if={@torrents != [] and visible == []}
-    role="status"
-    aria-label="No results"
-    class="text-center py-8 text-base-content/60"
-  >
-    No torrents match your search or filter.
-  </div>
-</section>
+</div>

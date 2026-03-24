@@ -1,0 +1,12 @@
+{
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:35",
+  "component": "TaniwhaWeb.TorrentComponents.sidebar/1",
+  "language": "heex",
+  "props": {
+    "filter": "atom (:all | :downloading | :seeding | :stopped | :checking)",
+    "tracker_filter": "atom :all or domain string",
+    "status_counts": "map with keys :all/:downloading/:seeding/:stopped/:checking/:paused",
+    "tracker_groups": "list of {domain, count} tuples"
+  },
+  "example": "<.sidebar filter={:all} tracker_filter={:all} status_counts={%{all: 0, downloading: 0, seeding: 0, stopped: 0, checking: 0, paused: 0}} tracker_groups={[]} />"
+}

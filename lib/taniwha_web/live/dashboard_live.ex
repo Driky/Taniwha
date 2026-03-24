@@ -8,6 +8,8 @@ defmodule TaniwhaWeb.DashboardLive do
 
   use TaniwhaWeb, :live_view
 
+  import TaniwhaWeb.TorrentComponents
+
   alias Taniwha.{State.Store, Torrent}
 
   @commands Application.compile_env(:taniwha, :commands, Taniwha.Commands)
@@ -31,9 +33,12 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign(:sort_by, :name)
       |> assign(:sort_dir, :asc)
       |> assign(:filter, :all)
+      |> assign(:tracker_filter, :all)
+      |> assign(:tracker_groups, [])
       |> assign(:selected_hashes, MapSet.new())
       |> assign(:page_title, "Torrents")
       |> assign_global_stats(torrents)
+      |> assign(:status_counts, status_counts(torrents))
 
     {:ok, socket}
   end
@@ -50,6 +55,7 @@ defmodule TaniwhaWeb.DashboardLive do
       socket
       |> assign(:torrents, torrents)
       |> assign_global_stats(torrents)
+      |> assign(:status_counts, status_counts(torrents))
 
     {:noreply, socket}
   end
@@ -65,6 +71,10 @@ defmodule TaniwhaWeb.DashboardLive do
 
   def handle_event("filter", %{"value" => v}, socket) do
     {:noreply, assign(socket, :filter, parse_filter(v))}
+  end
+
+  def handle_event("filter_tracker", %{"value" => domain}, socket) do
+    {:noreply, assign(socket, :tracker_filter, parse_tracker_filter(domain))}
   end
 
   def handle_event("sort", %{"by" => col}, socket) do
@@ -117,10 +127,16 @@ defmodule TaniwhaWeb.DashboardLive do
   end
 
   def handle_event("select_all", _params, socket) do
-    %{torrents: torrents, search: search, filter: filter, sort_by: sort_by, sort_dir: sort_dir} =
-      socket.assigns
+    %{
+      torrents: torrents,
+      search: search,
+      filter: filter,
+      tracker_filter: tracker_filter,
+      sort_by: sort_by,
+      sort_dir: sort_dir
+    } = socket.assigns
 
-    visible = visible_torrents(torrents, search, filter, sort_by, sort_dir)
+    visible = visible_torrents(torrents, search, filter, tracker_filter, sort_by, sort_dir)
     selected = visible |> Enum.map(& &1.hash) |> MapSet.new()
     {:noreply, assign(socket, :selected_hashes, selected)}
   end
@@ -144,12 +160,31 @@ defmodule TaniwhaWeb.DashboardLive do
   # ---------------------------------------------------------------------------
 
   @doc false
-  @spec visible_torrents([Torrent.t()], String.t(), atom(), atom(), atom()) :: [Torrent.t()]
-  def visible_torrents(torrents, search, filter, sort_by, sort_dir) do
+  @spec visible_torrents([Torrent.t()], String.t(), atom(), atom() | String.t(), atom(), atom()) ::
+          [Torrent.t()]
+  def visible_torrents(torrents, search, filter, tracker_filter, sort_by, sort_dir) do
     torrents
     |> filter_by_status(filter)
+    |> filter_by_tracker(tracker_filter)
     |> filter_by_search(search)
     |> sort_torrents(sort_by, sort_dir)
+  end
+
+  @doc false
+  @spec status_counts([Torrent.t()]) :: map()
+  def status_counts(torrents) do
+    base = %{
+      all: length(torrents),
+      downloading: 0,
+      seeding: 0,
+      stopped: 0,
+      checking: 0,
+      paused: 0
+    }
+
+    Enum.reduce(torrents, base, fn t, acc ->
+      Map.update(acc, Torrent.status(t), 1, &(&1 + 1))
+    end)
   end
 
   # ---------------------------------------------------------------------------
@@ -218,12 +253,21 @@ defmodule TaniwhaWeb.DashboardLive do
   defp sort_key(:ratio), do: & &1.ratio
   defp sort_key(:status), do: &Torrent.status/1
 
+  @spec filter_by_tracker([Torrent.t()], atom() | String.t()) :: [Torrent.t()]
+  # TODO: implement when Torrent struct exposes tracker URLs
+  defp filter_by_tracker(torrents, :all), do: torrents
+  defp filter_by_tracker(torrents, _domain), do: torrents
+
   @spec parse_filter(String.t()) :: atom()
   defp parse_filter("all"), do: :all
   defp parse_filter("downloading"), do: :downloading
   defp parse_filter("seeding"), do: :seeding
   defp parse_filter("stopped"), do: :stopped
   defp parse_filter(_), do: :all
+
+  @spec parse_tracker_filter(String.t()) :: :all | String.t()
+  defp parse_tracker_filter("all"), do: :all
+  defp parse_tracker_filter(domain), do: domain
 
   @spec parse_sort_column(String.t()) :: atom()
   defp parse_sort_column("name"), do: :name

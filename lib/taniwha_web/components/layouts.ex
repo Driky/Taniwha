@@ -92,6 +92,7 @@ defmodule TaniwhaWeb.Layouts do
         class="flex p-2 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
+        aria-label="Use system theme"
       >
         <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>
@@ -100,6 +101,7 @@ defmodule TaniwhaWeb.Layouts do
         class="flex p-2 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
+        aria-label="Use light theme"
       >
         <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>
@@ -108,19 +110,11 @@ defmodule TaniwhaWeb.Layouts do
         class="flex p-2 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
+        aria-label="Use dark theme"
       >
         <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>
     </div>
-    """
-  end
-
-  # Shared nav link items used by both desktop and mobile navigation.
-  defp nav_links(assigns) do
-    ~H"""
-    <li><.link href="/">Dashboard</.link></li>
-    <li><.link href="/add">Add Torrent</.link></li>
-    <li><.link href="/settings">Settings</.link></li>
     """
   end
 end

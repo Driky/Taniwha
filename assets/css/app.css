@@ -103,3 +103,92 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+/* Taniwha design tokens — extracted from Figma (hp8ISSdpaxXF9wiSTYsaOx) */
+:root {
+  /* Layout dimensions */
+  --taniwha-topbar-h: 40px;
+  --taniwha-sidebar-w: 140px;
+  --taniwha-actionbar-h: 32px;
+  --taniwha-row-h: 28px;
+
+  /* Topbar */
+  --taniwha-topbar-bg: #ffffff;
+  --taniwha-topbar-border: #e5e7eb;
+
+  /* Sidebar */
+  --taniwha-sidebar-bg: #f9fafb;
+  --taniwha-sidebar-border: #e5e7eb;
+
+  /* Content / table */
+  --taniwha-content-bg: #ffffff;
+  --taniwha-actionbar-bg: #f9fafb;
+  --taniwha-actionbar-border: #f3f4f6;
+  --taniwha-table-header-bg: #f9fafb;
+  --taniwha-row-border: #f3f4f6;
+
+  /* Search input */
+  --taniwha-search-bg: #f3f4f6;
+  --taniwha-search-border: #e5e7eb;
+
+  /* Speed colours */
+  --taniwha-speed-dl: #2563eb;
+  --taniwha-speed-ul: #16a34a;
+
+  /* Typography */
+  --taniwha-logo: #111827;
+  --taniwha-sidebar-section: #9ca3af;
+  --taniwha-sidebar-active: #1d4ed8;
+  --taniwha-sidebar-inactive: #4b5563;
+  --taniwha-col-header: #6b7280;
+  --taniwha-cell-name: #111827;
+  --taniwha-cell-num: #4b5563;
+  --taniwha-cell-pct: #9ca3af;
+
+  /* Status — dots, progress bars */
+  --taniwha-status-dl-dot: #3b82f6;
+  --taniwha-status-dl-bar: #3b82f6;
+  --taniwha-status-dl-badge-bg: #dbeafe;
+  --taniwha-status-dl-badge-text: #1d4ed8;
+
+  --taniwha-status-seed-dot: #22c55e;
+  --taniwha-status-seed-bar: #22c55e;
+  --taniwha-status-seed-badge-bg: #dcfce7;
+  --taniwha-status-seed-badge-text: #15803d;
+
+  --taniwha-status-stop-dot: #94a3b8;
+  --taniwha-status-stop-bar: #94a3b8;
+  --taniwha-status-stop-badge-bg: #f3f4f6;
+  --taniwha-status-stop-badge-text: #6b7280;
+
+  --taniwha-status-check-dot: #f59e0b;
+  --taniwha-status-check-bar: #f59e0b;
+  --taniwha-status-check-badge-bg: #fef3c7;
+  --taniwha-status-check-badge-text: #92400e;
+
+  --taniwha-status-err-dot: #ef4444;
+  --taniwha-status-err-bar: #ef4444;
+  --taniwha-status-err-badge-bg: #fee2e2;
+  --taniwha-status-err-badge-text: #991b1b;
+}
+
+/* Dark mode overrides */
+[data-theme=dark] {
+  --taniwha-topbar-bg: #0f1117;
+  --taniwha-topbar-border: #374151;
+  --taniwha-logo: #f9fafb;
+  --taniwha-sidebar-bg: #131620;
+  --taniwha-sidebar-border: #374151;
+  --taniwha-sidebar-section: #4b5563;
+  --taniwha-speed-dl: #60a5fa;
+  --taniwha-speed-ul: #4ade80;
+  --taniwha-content-bg: #0f1117;
+  --taniwha-actionbar-bg: #131620;
+  --taniwha-table-header-bg: #131620;
+  --taniwha-row-border: #1f2937;
+  --taniwha-cell-name: #f9fafb;
+  --taniwha-cell-num: #9ca3af;
+  --taniwha-col-header: #4b5563;
+  --taniwha-search-bg: #1f2937;
+  --taniwha-search-border: #4b5563;
+}
