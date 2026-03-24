@@ -1,0 +1,12 @@
+{
+  "_note": "Node ID unknown — Figma MCP was rate-limited for nodes 1:204, 1:241, 1:471. Update node-id when available. Toast notifications are rendered via the flash/1 component with kind={:success}.",
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=0:0",
+  "component": "TaniwhaWeb.CoreComponents.flash/1",
+  "language": "heex",
+  "props": {
+    "kind": ":success | :info | :error",
+    "flash": "map",
+    "title": "String.t() (optional)"
+  },
+  "example": "<.flash kind={:success} flash={@flash} />"
+}

@@ -1,0 +1,12 @@
+{
+  "_note": "Node ID unknown — Figma MCP was rate-limited for nodes 1:204, 1:241, 1:471. Update node-id when available.",
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=0:0",
+  "component": "TaniwhaWeb.AddTorrentComponent",
+  "language": "heex",
+  "props": {
+    "id": "String.t() (required)",
+    "show": "boolean",
+    "file_uploads": "Phoenix.LiveView.UploadConfig map"
+  },
+  "example": "<.live_component module={TaniwhaWeb.AddTorrentComponent} id=\"add-torrent-modal\" show={@show_add_modal} file_uploads={@uploads} />"
+}

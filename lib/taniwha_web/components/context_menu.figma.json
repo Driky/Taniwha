@@ -1,0 +1,16 @@
+{
+  "_note": "Node ID unknown — Figma MCP was rate-limited for nodes 1:204, 1:241, 1:471. Update node-id when available. The context menu is a ColocatedHook (.ContextMenu) embedded in torrent_table/1; it has no standalone HEEx component.",
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=0:0",
+  "component": "TaniwhaWeb.TorrentComponents.torrent_table/1",
+  "language": "heex",
+  "props": {
+    "torrents": "[Torrent.t()]",
+    "selected_hashes": "MapSet.t()",
+    "selected_hash": "String.t() | nil",
+    "sort_by": "atom",
+    "sort_dir": ":asc | :desc",
+    "total_visible": "integer",
+    "all_torrents_empty?": "boolean"
+  },
+  "example": "<.torrent_table torrents={@torrents} selected_hashes={@selected_hashes} selected_hash={@selected_hash} sort_by={:name} sort_dir={:asc} total_visible={length(@torrents)} all_torrents_empty?={@torrents == []} />"
+}

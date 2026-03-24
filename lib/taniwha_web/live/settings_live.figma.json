@@ -1,0 +1,12 @@
+{
+  "_note": "Node ID unknown — Figma MCP was rate-limited for nodes 1:204, 1:241, 1:471. Update node-id when available.",
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=0:0",
+  "component": "TaniwhaWeb.SettingsLive",
+  "language": "heex",
+  "props": {
+    "api_key_revealed": "boolean",
+    "connection_status": ":ok | :error",
+    "system_info": "map with elixir, otp, phoenix, taniwha version keys"
+  },
+  "example": "<.live_component module={TaniwhaWeb.SettingsLive} id=\"settings\" />"
+}

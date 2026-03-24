@@ -43,8 +43,7 @@ defmodule TaniwhaWeb.SettingsLive do
           aria-label="Back to dashboard"
           class="flex items-center gap-1.5 text-[12px] text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
         >
-          <.icon name="hero-arrow-left-mini" class="size-4" />
-          Dashboard
+          <.icon name="hero-arrow-left-mini" class="size-4" /> Dashboard
         </.link>
         <span class="text-gray-300 dark:text-gray-600">/</span>
         <span class="text-[12px] font-semibold text-gray-700 dark:text-gray-200">Settings</span>
@@ -75,7 +74,7 @@ defmodule TaniwhaWeb.SettingsLive do
               aria-hidden="true"
             />
             <span class="text-[12px] text-gray-700 dark:text-gray-300">
-              <%= if @connection_status == :ok, do: "Connected", else: "Not connected" %>
+              {if @connection_status == :ok, do: "Connected", else: "Not connected"}
             </span>
           </div>
         </div>
@@ -91,7 +90,9 @@ defmodule TaniwhaWeb.SettingsLive do
           <div class="px-5 py-4">
             <div class="flex items-center gap-2 max-w-[480px] rounded-[7px] border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 px-3 py-2">
               <code class="flex-1 text-[11px] font-mono text-gray-700 dark:text-gray-300 break-all">
-                <%= if @api_key_revealed, do: @api_key, else: String.duplicate("•", min(String.length(@api_key), 32)) %>
+                {if @api_key_revealed,
+                  do: @api_key,
+                  else: String.duplicate("•", min(String.length(@api_key), 32))}
               </code>
               <button
                 type="button"
@@ -100,7 +101,7 @@ defmodule TaniwhaWeb.SettingsLive do
                 aria-pressed={to_string(@api_key_revealed)}
                 class="shrink-0 px-3 py-1.5 text-[11px] rounded-[7px] border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
               >
-                <%= if @api_key_revealed, do: "Hide", else: "Reveal" %>
+                {if @api_key_revealed, do: "Hide", else: "Reveal"}
               </button>
               <button
                 type="button"
