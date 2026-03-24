@@ -11,6 +11,7 @@ defmodule TaniwhaWeb.DashboardLive do
   import TaniwhaWeb.TorrentComponents
 
   alias Taniwha.{State.Store, Torrent}
+  alias Phoenix.LiveView.AsyncResult
 
   @commands Application.compile_env(:taniwha, :commands, Taniwha.Commands)
 
@@ -37,6 +38,10 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign(:tracker_groups, [])
       |> assign(:selected_hashes, MapSet.new())
       |> assign(:selected_hash, nil)
+      |> assign(:active_tab, :general)
+      |> assign(:detail_files, %AsyncResult{})
+      |> assign(:detail_peers, %AsyncResult{})
+      |> assign(:detail_trackers, %AsyncResult{})
       |> assign(:page_title, "Torrents")
       |> assign_global_stats(torrents)
       |> assign(:status_counts, status_counts(torrents))
@@ -49,6 +54,13 @@ defmodule TaniwhaWeb.DashboardLive do
   # ---------------------------------------------------------------------------
 
   @impl true
+  def handle_info({:torrent_updated, torrent}, socket) do
+    {:noreply,
+     update(socket, :torrents, fn ts ->
+       Enum.map(ts, fn t -> if t.hash == torrent.hash, do: torrent, else: t end)
+     end)}
+  end
+
   def handle_info({:torrent_diffs, diffs}, socket) do
     torrents = apply_diffs(socket.assigns.torrents, diffs)
 
@@ -148,8 +160,41 @@ defmodule TaniwhaWeb.DashboardLive do
   end
 
   def handle_event("select_torrent", %{"hash" => hash}, socket) do
-    {:noreply, assign(socket, :selected_hash, hash)}
+    if socket.assigns.selected_hash == hash do
+      unsubscribe_detail(hash)
+      {:noreply, socket |> assign(:selected_hash, nil) |> reset_detail_assigns()}
+    else
+      unsubscribe_detail(socket.assigns.selected_hash)
+      Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:#{hash}")
+      {:noreply, socket |> assign(:selected_hash, hash) |> reset_detail_assigns()}
+    end
   end
+
+  def handle_event("close_panel", _params, socket) do
+    unsubscribe_detail(socket.assigns.selected_hash)
+    {:noreply, socket |> assign(:selected_hash, nil) |> reset_detail_assigns()}
+  end
+
+  def handle_event("switch_tab", %{"tab" => tab}, socket) do
+    tab_atom = parse_tab(tab)
+    {:noreply, socket |> assign(:active_tab, tab_atom) |> load_tab(tab_atom)}
+  end
+
+  def handle_event("set_file_priority", %{"hash" => hash, "index" => index, "priority" => priority}, socket) do
+    @commands.set_file_priority(hash, String.to_integer(index), String.to_integer(priority))
+    {:noreply, socket}
+  end
+
+  def handle_event("keydown", %{"key" => "Escape"}, socket) do
+    if socket.assigns.selected_hash do
+      unsubscribe_detail(socket.assigns.selected_hash)
+      {:noreply, socket |> assign(:selected_hash, nil) |> reset_detail_assigns()}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("keydown", _params, socket), do: {:noreply, socket}
 
   def handle_event("bulk_start", _params, socket) do
     Enum.each(socket.assigns.selected_hashes, &@commands.start/1)
@@ -287,4 +332,74 @@ defmodule TaniwhaWeb.DashboardLive do
   @spec toggle_dir(:asc | :desc) :: :desc | :asc
   defp toggle_dir(:asc), do: :desc
   defp toggle_dir(:desc), do: :asc
+
+  @spec reset_detail_assigns(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
+  defp reset_detail_assigns(socket) do
+    socket
+    |> assign(:active_tab, :general)
+    |> assign(:detail_files, %AsyncResult{})
+    |> assign(:detail_peers, %AsyncResult{})
+    |> assign(:detail_trackers, %AsyncResult{})
+  end
+
+  @spec unsubscribe_detail(String.t() | nil) :: :ok
+  defp unsubscribe_detail(nil), do: :ok
+
+  defp unsubscribe_detail(hash) do
+    Phoenix.PubSub.unsubscribe(Taniwha.PubSub, "torrents:#{hash}")
+  end
+
+  @spec load_tab(Phoenix.LiveView.Socket.t(), atom()) :: Phoenix.LiveView.Socket.t()
+  defp load_tab(socket, :files) do
+    if socket.assigns.detail_files.loading != nil or socket.assigns.detail_files.ok? do
+      socket
+    else
+      hash = socket.assigns.selected_hash
+
+      assign_async(socket, [:detail_files], fn ->
+        case @commands.list_files(hash) do
+          {:ok, files} -> {:ok, %{detail_files: files}}
+          {:error, r} -> {:error, r}
+        end
+      end)
+    end
+  end
+
+  defp load_tab(socket, :peers) do
+    if socket.assigns.detail_peers.loading != nil or socket.assigns.detail_peers.ok? do
+      socket
+    else
+      hash = socket.assigns.selected_hash
+
+      assign_async(socket, [:detail_peers], fn ->
+        case @commands.list_peers(hash) do
+          {:ok, peers} -> {:ok, %{detail_peers: peers}}
+          {:error, r} -> {:error, r}
+        end
+      end)
+    end
+  end
+
+  defp load_tab(socket, :trackers) do
+    if socket.assigns.detail_trackers.loading != nil or socket.assigns.detail_trackers.ok? do
+      socket
+    else
+      hash = socket.assigns.selected_hash
+
+      assign_async(socket, [:detail_trackers], fn ->
+        case @commands.list_trackers(hash) do
+          {:ok, trackers} -> {:ok, %{detail_trackers: trackers}}
+          {:error, r} -> {:error, r}
+        end
+      end)
+    end
+  end
+
+  defp load_tab(socket, :general), do: socket
+
+  @spec parse_tab(String.t()) :: :general | :files | :peers | :trackers
+  defp parse_tab("files"), do: :files
+  defp parse_tab("peers"), do: :peers
+  defp parse_tab("trackers"), do: :trackers
+  defp parse_tab(_), do: :general
 end

@@ -14,7 +14,9 @@ defmodule Taniwha.Commands do
 
   @behaviour Taniwha.CommandsBehaviour
 
+  alias Taniwha.Peer
   alias Taniwha.Torrent
+  alias Taniwha.Tracker
   alias Taniwha.TorrentFile
 
   @rpc_client Application.compile_env(:taniwha, :rpc_client, Taniwha.RPC.Client)
@@ -27,6 +29,23 @@ defmodule Taniwha.Commands do
     "f.priority=",
     "f.completed_chunks=",
     "f.size_chunks="
+  ]
+
+  @peer_fields [
+    "p.address=",
+    "p.port=",
+    "p.client_version=",
+    "p.down_rate=",
+    "p.up_rate=",
+    "p.completed_percent="
+  ]
+
+  @tracker_fields [
+    "t.url=",
+    "t.is_enabled=",
+    "t.scrape_complete=",
+    "t.scrape_incomplete=",
+    "t.normal_interval="
   ]
 
   # ---------------------------------------------------------------------------
@@ -144,6 +163,7 @@ defmodule Taniwha.Commands do
   Calls rtorrent's `f.multicall` command. Returns `TorrentFile` structs in
   the order rtorrent reports them (zero-based index order).
   """
+  @impl Taniwha.CommandsBehaviour
   @spec list_files(String.t()) :: {:ok, [TorrentFile.t()]} | {:error, term()}
   def list_files(hash) do
     with {:ok, files} <- @rpc_client.call("f.multicall", [hash, "" | @file_fields]) do
@@ -155,6 +175,57 @@ defmodule Taniwha.Commands do
             priority: priority,
             completed_chunks: completed,
             total_chunks: total
+          }
+        end)
+
+      {:ok, result}
+    end
+  end
+
+  @doc """
+  Lists the peers connected to a torrent.
+
+  Calls rtorrent's `p.multicall` command. Returns `Peer` structs in the order
+  rtorrent reports them.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec list_peers(String.t()) :: {:ok, [Peer.t()]} | {:error, term()}
+  def list_peers(hash) do
+    with {:ok, peers} <- @rpc_client.call("p.multicall", [hash, "" | @peer_fields]) do
+      result =
+        Enum.map(peers, fn [addr, port, client, down, up, pct] ->
+          %Peer{
+            address: addr,
+            port: port,
+            client_version: client,
+            down_rate: down,
+            up_rate: up,
+            completed_percent: pct * 1.0
+          }
+        end)
+
+      {:ok, result}
+    end
+  end
+
+  @doc """
+  Lists the trackers associated with a torrent.
+
+  Calls rtorrent's `t.multicall` command. Returns `Tracker` structs in the
+  order rtorrent reports them.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec list_trackers(String.t()) :: {:ok, [Tracker.t()]} | {:error, term()}
+  def list_trackers(hash) do
+    with {:ok, trackers} <- @rpc_client.call("t.multicall", [hash, "" | @tracker_fields]) do
+      result =
+        Enum.map(trackers, fn [url, enabled, complete, incomplete, interval] ->
+          %Tracker{
+            url: url,
+            is_enabled: enabled == 1,
+            scrape_complete: complete,
+            scrape_incomplete: incomplete,
+            normal_interval: interval
           }
         end)
 

@@ -4,7 +4,9 @@ defmodule Taniwha.CommandsTest do
   import Mox
 
   alias Taniwha.Commands
+  alias Taniwha.Peer
   alias Taniwha.Torrent
+  alias Taniwha.Tracker
   alias Taniwha.TorrentFile
 
   setup :verify_on_exit!
@@ -315,6 +317,106 @@ defmodule Taniwha.CommandsTest do
       end)
 
       assert Commands.global_up_rate() == {:error, :timeout}
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch 9 — list_peers/1
+  # ---------------------------------------------------------------------------
+
+  describe "list_peers/1" do
+    test "calls p.multicall with correct fields and parses Peer structs" do
+      hash = "abc123"
+
+      expect(Taniwha.RPC.MockClient, :call, fn "p.multicall",
+                                               [
+                                                 ^hash,
+                                                 "",
+                                                 "p.address=",
+                                                 "p.port=",
+                                                 "p.client_version=",
+                                                 "p.down_rate=",
+                                                 "p.up_rate=",
+                                                 "p.completed_percent="
+                                               ] ->
+        {:ok,
+         [
+           ["192.168.1.1", 51_413, "uTorrent/3.5.5", 512_000, 256_000, 75],
+           ["10.0.0.2", 6881, "qBittorrent/4.4.0", 0, 1_024_000, 100]
+         ]}
+      end)
+
+      {:ok, peers} = Commands.list_peers(hash)
+      assert length(peers) == 2
+
+      assert hd(peers) == %Peer{
+               address: "192.168.1.1",
+               port: 51_413,
+               client_version: "uTorrent/3.5.5",
+               down_rate: 512_000,
+               up_rate: 256_000,
+               completed_percent: 75.0
+             }
+    end
+
+    test "handles empty peer list" do
+      expect(Taniwha.RPC.MockClient, :call, fn "p.multicall", _ -> {:ok, []} end)
+      assert Commands.list_peers("abc123") == {:ok, []}
+    end
+
+    test "propagates RPC error" do
+      expect(Taniwha.RPC.MockClient, :call, fn "p.multicall", _ -> {:error, :timeout} end)
+      assert Commands.list_peers("abc123") == {:error, :timeout}
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch 10 — list_trackers/1
+  # ---------------------------------------------------------------------------
+
+  describe "list_trackers/1" do
+    test "calls t.multicall with correct fields and parses Tracker structs" do
+      hash = "abc123"
+
+      expect(Taniwha.RPC.MockClient, :call, fn "t.multicall",
+                                               [
+                                                 ^hash,
+                                                 "",
+                                                 "t.url=",
+                                                 "t.is_enabled=",
+                                                 "t.scrape_complete=",
+                                                 "t.scrape_incomplete=",
+                                                 "t.normal_interval="
+                                               ] ->
+        {:ok,
+         [
+           ["http://tracker.example.com/announce", 1, 42, 5, 1800],
+           ["udp://tracker2.example.com:6969", 0, 0, 0, 0]
+         ]}
+      end)
+
+      {:ok, trackers} = Commands.list_trackers(hash)
+      assert length(trackers) == 2
+
+      assert hd(trackers) == %Tracker{
+               url: "http://tracker.example.com/announce",
+               is_enabled: true,
+               scrape_complete: 42,
+               scrape_incomplete: 5,
+               normal_interval: 1800
+             }
+
+      assert Enum.at(trackers, 1).is_enabled == false
+    end
+
+    test "handles empty tracker list" do
+      expect(Taniwha.RPC.MockClient, :call, fn "t.multicall", _ -> {:ok, []} end)
+      assert Commands.list_trackers("abc123") == {:ok, []}
+    end
+
+    test "propagates RPC error" do
+      expect(Taniwha.RPC.MockClient, :call, fn "t.multicall", _ -> {:error, :timeout} end)
+      assert Commands.list_trackers("abc123") == {:error, :timeout}
     end
   end
 
