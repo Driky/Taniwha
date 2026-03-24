@@ -8,10 +8,11 @@
     "sort_by": "atom (:name | :size | :progress | :speed | :ratio | :status)",
     "sort_dir": "atom (:asc | :desc)",
     "selected_hashes": "MapSet of hash strings for bulk selection (checkbox column)",
+    "total_visible": "integer — length of the filtered torrent list (pass visible_count from template)",
     "selected_hash": "string | nil — hash of row-clicked torrent for detail panel highlight",
     "on_start": "event name string (default nil)",
     "on_stop": "event name string (default nil)",
     "on_remove": "event name string (default nil)"
   },
-  "example": "<.torrent_table torrents={visible} all_torrents_empty?={@torrents == []} sort_by={@sort_by} sort_dir={@sort_dir} selected_hashes={@selected_hashes} selected_hash={@selected_hash} on_start=\"start_torrent\" on_stop=\"stop_torrent\" on_remove=\"remove_torrent\" />"
+  "example": "<.torrent_table torrents={visible} all_torrents_empty?={@torrents == []} sort_by={@sort_by} sort_dir={@sort_dir} selected_hashes={@selected_hashes} total_visible={visible_count} selected_hash={@selected_hash} on_start=\"start_torrent\" on_stop=\"stop_torrent\" on_remove=\"remove_torrent\" />"
 }

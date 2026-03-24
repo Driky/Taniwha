@@ -20,10 +20,6 @@ defmodule TaniwhaWeb.FormatHelpers do
       "1:02:03"
   """
 
-  # ---------------------------------------------------------------------------
-  # format_bytes/1
-  # ---------------------------------------------------------------------------
-
   @doc """
   Formats a byte count as a human-readable string.
 
@@ -56,10 +52,6 @@ defmodule TaniwhaWeb.FormatHelpers do
     :erlang.float_to_binary(bytes / 1_073_741_824, decimals: 2) <> " GB"
   end
 
-  # ---------------------------------------------------------------------------
-  # format_speed/1
-  # ---------------------------------------------------------------------------
-
   @doc """
   Formats a bytes-per-second value as a human-readable speed string.
 
@@ -90,10 +82,6 @@ defmodule TaniwhaWeb.FormatHelpers do
     :erlang.float_to_binary(bytes / 1_073_741_824, decimals: 2) <> " GB/s"
   end
 
-  # ---------------------------------------------------------------------------
-  # format_ratio/1
-  # ---------------------------------------------------------------------------
-
   @doc """
   Formats a ratio float to 2 decimal places.
 
@@ -108,10 +96,6 @@ defmodule TaniwhaWeb.FormatHelpers do
   def format_ratio(ratio) do
     :erlang.float_to_binary(ratio, decimals: 2)
   end
-
-  # ---------------------------------------------------------------------------
-  # format_eta/1
-  # ---------------------------------------------------------------------------
 
   @doc """
   Formats a remaining-time value (in seconds) as a human-readable string.

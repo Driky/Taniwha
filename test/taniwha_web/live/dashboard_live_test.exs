@@ -564,15 +564,5 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       # split produces n+1 parts for n occurrences; only h2 should be highlighted
       assert count == 2
     end
-
-    test "selected row renders with highlighted background", %{conn: conn} do
-      torrent = Fixtures.torrent_fixture()
-      Store.put_torrent(torrent)
-
-      {:ok, lv, _html} = live(conn, ~p"/")
-      html = lv |> element("tr[phx-click=select_torrent]") |> render_click()
-
-      assert html =~ "background: var(--taniwha-sidebar-active-bg)"
-    end
   end
 end

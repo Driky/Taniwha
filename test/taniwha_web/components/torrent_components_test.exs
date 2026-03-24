@@ -565,6 +565,7 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
         sort_by: :name,
         sort_dir: :asc,
         selected_hashes: MapSet.new(),
+        total_visible: length(torrents),
         selected_hash: nil
       ]
     end
@@ -602,6 +603,7 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
           sort_by: :name,
           sort_dir: :asc,
           selected_hashes: MapSet.new(),
+          total_visible: 0,
           selected_hash: nil
         )
 
@@ -623,6 +625,7 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
           sort_by: :size,
           sort_dir: :desc,
           selected_hashes: MapSet.new(),
+          total_visible: 0,
           selected_hash: nil
         )
 
@@ -639,6 +642,7 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
           sort_by: :name,
           sort_dir: :asc,
           selected_hashes: MapSet.new(),
+          total_visible: 1,
           selected_hash: t.hash
         )
 
@@ -653,6 +657,7 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
           sort_by: :name,
           sort_dir: :asc,
           selected_hashes: MapSet.new(),
+          total_visible: 0,
           selected_hash: nil
         )
 

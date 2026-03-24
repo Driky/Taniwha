@@ -22,7 +22,7 @@ defmodule TaniwhaWeb.TorrentComponents do
 
   use TaniwhaWeb, :html
 
-  import TaniwhaWeb.FormatHelpers, only: [format_bytes: 1, format_speed: 1]
+  import TaniwhaWeb.FormatHelpers, only: [format_bytes: 1, format_ratio: 1, format_speed: 1]
 
   alias Taniwha.Torrent
 
@@ -776,7 +776,6 @@ defmodule TaniwhaWeb.TorrentComponents do
       class="border-b hover:bg-[#f9fafb] dark:hover:bg-[#1a1f2e] cursor-pointer"
       style={"height: var(--taniwha-row-h); border-color: var(--taniwha-row-border)#{if @row_selected?, do: "; background: var(--taniwha-sidebar-active-bg)", else: ""}"}
     >
-      <%!-- Checkbox --%>
       <td class="w-8 px-3">
         <input
           type="checkbox"
@@ -788,7 +787,6 @@ defmodule TaniwhaWeb.TorrentComponents do
         />
       </td>
 
-      <%!-- Name --%>
       <td class="px-[6px] overflow-hidden">
         <span
           class="block truncate text-[11px]"
@@ -799,12 +797,10 @@ defmodule TaniwhaWeb.TorrentComponents do
         </span>
       </td>
 
-      <%!-- Size --%>
       <td class="px-[6px] text-right text-[11px] tabular-nums" style="color: var(--taniwha-cell-num)">
         {format_bytes(@torrent.size)}
       </td>
 
-      <%!-- Progress --%>
       <td class="px-[6px]">
         <div class="flex items-center gap-[4px]">
           <span
@@ -819,12 +815,10 @@ defmodule TaniwhaWeb.TorrentComponents do
         </div>
       </td>
 
-      <%!-- Down --%>
       <td class="px-[6px] text-right">
         <.speed_display bytes_per_second={@torrent.download_rate} direction={:down} />
       </td>
 
-      <%!-- Up --%>
       <td class="px-[6px] text-right">
         <.speed_display bytes_per_second={@torrent.upload_rate} direction={:up} />
       </td>
@@ -837,7 +831,6 @@ defmodule TaniwhaWeb.TorrentComponents do
         —
       </td>
 
-      <%!-- Peers --%>
       <td
         class="px-[6px] text-right text-[11px] tabular-nums"
         style="color: var(--taniwha-cell-num)"
@@ -845,15 +838,13 @@ defmodule TaniwhaWeb.TorrentComponents do
         {@torrent.peers_connected}
       </td>
 
-      <%!-- Ratio --%>
       <td
         class="px-[6px] text-right text-[11px] tabular-nums"
         style="color: var(--taniwha-cell-num)"
       >
-        {Float.round(@torrent.ratio, 2)}
+        {format_ratio(@torrent.ratio)}
       </td>
 
-      <%!-- Status + action buttons --%>
       <td class="px-[6px]">
         <div class="flex items-center gap-1">
           <.status_badge status={@status} />
@@ -903,7 +894,7 @@ defmodule TaniwhaWeb.TorrentComponents do
   Renders the full torrent table: sticky header row, data rows, and empty states.
 
   Accepts a pre-filtered and pre-sorted list of torrents from the LiveView.
-  The component computes `all_selected?` and `total_visible` internally.
+  The component computes `all_selected?` internally from `:total_visible` and `:selected_hashes`.
 
   ## Attributes
 
@@ -913,6 +904,7 @@ defmodule TaniwhaWeb.TorrentComponents do
   - `:sort_by` (required) — active sort column atom
   - `:sort_dir` (required) — `:asc` or `:desc`
   - `:selected_hashes` (required) — `MapSet` of hash strings for bulk selection
+  - `:total_visible` (required) — count of visible torrents (pass `length(visible)` from template)
   - `:selected_hash` — hash string of the row-clicked torrent (opens detail panel),
     or `nil`. Defaults to `nil`.
   - `:on_start`, `:on_stop`, `:on_remove` — event name strings passed to each row
@@ -925,6 +917,7 @@ defmodule TaniwhaWeb.TorrentComponents do
         sort_by={@sort_by}
         sort_dir={@sort_dir}
         selected_hashes={@selected_hashes}
+        total_visible={visible_count}
         selected_hash={@selected_hash}
         on_start="start_torrent"
         on_stop="stop_torrent"
@@ -936,19 +929,17 @@ defmodule TaniwhaWeb.TorrentComponents do
   attr :sort_by, :atom, required: true
   attr :sort_dir, :atom, required: true
   attr :selected_hashes, :any, required: true
+  attr :total_visible, :integer, required: true
   attr :selected_hash, :any, default: nil
   attr :on_start, :string, default: nil
   attr :on_stop, :string, default: nil
   attr :on_remove, :string, default: nil
 
   def torrent_table(assigns) do
-    total_visible = length(assigns.torrents)
-    all_selected? = total_visible > 0 and MapSet.size(assigns.selected_hashes) == total_visible
+    all_selected? =
+      assigns.total_visible > 0 and MapSet.size(assigns.selected_hashes) == assigns.total_visible
 
-    assigns =
-      assigns
-      |> assign(:total_visible, total_visible)
-      |> assign(:all_selected?, all_selected?)
+    assigns = assign(assigns, :all_selected?, all_selected?)
 
     ~H"""
     <div class="flex-1 overflow-y-auto">
