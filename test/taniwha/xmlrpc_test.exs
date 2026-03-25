@@ -66,6 +66,13 @@ defmodule Taniwha.XMLRPCTest do
       assert xml =~ "<double>"
       assert xml =~ "3.14"
     end
+
+    test "encodes {:base64, binary} as <base64>" do
+      data = <<0, 1, 2, 3, 255>>
+      xml = XMLRPC.encode_call("m", [{:base64, data}])
+      assert xml =~ "<base64>#{Base.encode64(data)}</base64>"
+      refute xml =~ "<string>"
+    end
   end
 
   # ---------------------------------------------------------------------------

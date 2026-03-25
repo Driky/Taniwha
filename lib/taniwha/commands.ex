@@ -151,7 +151,7 @@ defmodule Taniwha.Commands do
   @impl Taniwha.CommandsBehaviour
   @spec load_raw(binary()) :: :ok | {:error, term()}
   def load_raw(data) do
-    @rpc_client.call("load.raw_start", ["", data]) |> ok_on_zero()
+    @rpc_client.call("load.raw_start", ["", {:base64, data}]) |> ok_on_zero()
   end
 
   # ---------------------------------------------------------------------------

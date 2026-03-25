@@ -8,6 +8,7 @@ defmodule Taniwha.XMLRPC do
   ## Type mapping
 
   ### Encoding (Elixir → XML-RPC)
+  - `{:base64, binary()}` → `<base64>` (Base64-encoded, for raw binary payloads)
   - `binary()` → `<string>` (with HTML entity escaping)
   - `integer()` → `<i8>`
   - `float()` → `<double>`
@@ -28,7 +29,8 @@ defmodule Taniwha.XMLRPC do
   import SweetXml
 
   @type xmlrpc_value ::
-          String.t()
+          {:base64, binary()}
+          | String.t()
           | integer()
           | float()
           | boolean()
@@ -205,6 +207,10 @@ defmodule Taniwha.XMLRPC do
   # ---------------------------------------------------------------------------
 
   @spec encode_value(xmlrpc_value()) :: String.t()
+  defp encode_value({:base64, data}) when is_binary(data) do
+    "<base64>#{Base.encode64(data)}</base64>"
+  end
+
   defp encode_value(v) when is_binary(v) do
     "<string>#{escape_xml(v)}</string>"
   end

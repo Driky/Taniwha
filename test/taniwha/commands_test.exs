@@ -217,10 +217,12 @@ defmodule Taniwha.CommandsTest do
   end
 
   describe "load_raw/1" do
-    test "calls load.raw_start with empty target and raw data" do
+    test "calls load.raw_start with empty target and base64-wrapped data" do
       data = <<0, 1, 2, 3>>
 
-      expect(Taniwha.RPC.MockClient, :call, fn "load.raw_start", ["", ^data] -> {:ok, 0} end)
+      expect(Taniwha.RPC.MockClient, :call, fn "load.raw_start", ["", {:base64, ^data}] ->
+        {:ok, 0}
+      end)
 
       assert Commands.load_raw(data) == :ok
     end
