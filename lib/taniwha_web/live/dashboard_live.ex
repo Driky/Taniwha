@@ -31,7 +31,7 @@ defmodule TaniwhaWeb.DashboardLive do
     socket =
       socket
       |> allow_upload(:torrent_file,
-        accept: ~w[application/x-bittorrent],
+        accept: ~w[application/x-bittorrent .torrent],
         max_entries: 1,
         max_file_size: 10_000_000
       )
