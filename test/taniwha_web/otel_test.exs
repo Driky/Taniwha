@@ -31,7 +31,7 @@ defmodule TaniwhaWeb.OtelTest do
 
   # Pull in the span record so we can read span fields in assertions.
   @span_fields Record.extract(:span, from_lib: "opentelemetry/include/otel_span.hrl")
-  Record.defrecordp :span, @span_fields
+  Record.defrecordp(:span, @span_fields)
 
   setup :set_mox_from_context
   setup :verify_on_exit!
