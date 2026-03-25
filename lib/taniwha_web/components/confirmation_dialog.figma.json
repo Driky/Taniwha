@@ -1,7 +1,7 @@
 {
   "_note": "Node ID unknown — Figma MCP was rate-limited for nodes 1:204, 1:241, 1:471. Update node-id when available.",
   "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=0:0",
-  "component": "TaniwhaWeb.TorrentComponents.confirmation_dialog/1",
+  "component": "TaniwhaWeb.TorrentComponents.Dialogs.confirmation_dialog/1",
   "language": "heex",
   "props": {
     "confirm_action": "nil | {:erase, String.t()} | {:bulk_erase, [String.t()]}",

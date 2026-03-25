@@ -635,4 +635,43 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       refute html =~ ~s(role="dialog")
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Batch 11 — Context menu server events
+  # ---------------------------------------------------------------------------
+
+  describe "context menu actions" do
+    setup %{conn: conn} do
+      torrent = Fixtures.torrent_fixture()
+      Store.put_torrent(torrent)
+      {:ok, lv, _html} = live(conn, ~p"/")
+      {:ok, lv: lv, hash: torrent.hash}
+    end
+
+    test "start action calls Commands.start/1", %{lv: lv, hash: hash} do
+      expect(MockCommands, :start, fn ^hash -> :ok end)
+      render_click(lv, "context_menu_action", %{"action" => "start", "hash" => hash})
+    end
+
+    test "stop action calls Commands.stop/1", %{lv: lv, hash: hash} do
+      expect(MockCommands, :stop, fn ^hash -> :ok end)
+      render_click(lv, "context_menu_action", %{"action" => "stop", "hash" => hash})
+    end
+
+    test "erase action sets confirm_action without erasing", %{lv: lv, hash: hash} do
+      render_click(lv, "context_menu_action", %{"action" => "erase", "hash" => hash})
+      assert render(lv) =~ ~s(role="dialog")
+    end
+
+    test "pause action calls Commands.pause/1", %{lv: lv, hash: hash} do
+      expect(MockCommands, :pause, fn ^hash -> :ok end)
+      render_click(lv, "context_menu_action", %{"action" => "pause", "hash" => hash})
+    end
+
+    test "unknown action is a no-op", %{lv: lv, hash: hash} do
+      # Should not crash
+      render_click(lv, "context_menu_action", %{"action" => "unknown", "hash" => hash})
+      assert Process.alive?(lv.pid)
+    end
+  end
 end

@@ -1,6 +1,6 @@
 {
   "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:2",
-  "component": "TaniwhaWeb.TorrentComponents.progress_bar/1",
+  "component": "TaniwhaWeb.TorrentComponents.StatusComponents.progress_bar/1",
   "language": "heex",
   "props": {
     "value": "float 0.0–100.0",

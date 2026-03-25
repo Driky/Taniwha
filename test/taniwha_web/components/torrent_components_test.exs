@@ -2,7 +2,7 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
   use TaniwhaWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
-  import TaniwhaWeb.TorrentComponents
+  use TaniwhaWeb.TorrentComponents
   import TaniwhaWeb.AccessibilityHelper
 
   alias Taniwha.Test.Fixtures

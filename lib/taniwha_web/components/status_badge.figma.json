@@ -1,6 +1,6 @@
 {
   "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:2",
-  "component": "TaniwhaWeb.TorrentComponents.status_badge/1",
+  "component": "TaniwhaWeb.TorrentComponents.StatusComponents.status_badge/1",
   "language": "heex",
   "props": {
     "status": "atom (:downloading | :seeding | :stopped | :paused | :checking | :unknown)"

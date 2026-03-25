@@ -1,6 +1,6 @@
 {
   "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:366",
-  "component": "TaniwhaWeb.TorrentComponents.table_header/1",
+  "component": "TaniwhaWeb.TorrentComponents.TableComponents.table_header/1",
   "language": "heex",
   "props": {
     "sort_by": "atom (:name | :size | :progress | :speed | :ratio | :status)",

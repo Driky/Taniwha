@@ -1,6 +1,6 @@
 {
   "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:162",
-  "component": "TaniwhaWeb.TorrentComponents.torrent_row/1",
+  "component": "TaniwhaWeb.TorrentComponents.TableComponents.torrent_row/1",
   "language": "heex",
   "props": {
     "torrent": "Taniwha.Torrent struct",

@@ -8,7 +8,7 @@ defmodule TaniwhaWeb.DashboardLive do
 
   use TaniwhaWeb, :live_view
 
-  import TaniwhaWeb.TorrentComponents
+  use TaniwhaWeb.TorrentComponents
   import TaniwhaWeb.FormatHelpers, only: [format_add_error: 1]
 
   alias Taniwha.{State.Store, Torrent}

@@ -1,6 +1,6 @@
 {
   "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:35",
-  "component": "TaniwhaWeb.TorrentComponents.sidebar/1",
+  "component": "TaniwhaWeb.TorrentComponents.LayoutComponents.sidebar/1",
   "language": "heex",
   "props": {
     "filter": "atom (:all | :downloading | :seeding | :stopped | :checking)",

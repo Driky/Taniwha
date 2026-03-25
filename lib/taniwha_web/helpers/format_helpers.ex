@@ -98,6 +98,23 @@ defmodule TaniwhaWeb.FormatHelpers do
   end
 
   @doc """
+  Formats an error reason from a torrent add operation as a user-facing string.
+
+  ## Examples
+
+      iex> format_add_error(:timeout)
+      "Connection timed out. Is rtorrent running?"
+      iex> format_add_error(:connection_refused)
+      "Could not connect to rtorrent."
+      iex> format_add_error(:something_else)
+      "Failed to add torrent. Please try again."
+  """
+  @spec format_add_error(term()) :: String.t()
+  def format_add_error(:timeout), do: "Connection timed out. Is rtorrent running?"
+  def format_add_error(:connection_refused), do: "Could not connect to rtorrent."
+  def format_add_error(_), do: "Failed to add torrent. Please try again."
+
+  @doc """
   Formats a remaining-time value (in seconds) as a human-readable string.
 
   - `nil` or `:infinity` → `"∞"`
@@ -116,23 +133,6 @@ defmodule TaniwhaWeb.FormatHelpers do
       iex> format_eta(3_723)
       "1:02:03"
   """
-  @doc """
-  Formats an error reason from a torrent add operation as a user-facing string.
-
-  ## Examples
-
-      iex> format_add_error(:timeout)
-      "Connection timed out. Is rtorrent running?"
-      iex> format_add_error(:connection_refused)
-      "Could not connect to rtorrent."
-      iex> format_add_error(:something_else)
-      "Failed to add torrent. Please try again."
-  """
-  @spec format_add_error(term()) :: String.t()
-  def format_add_error(:timeout), do: "Connection timed out. Is rtorrent running?"
-  def format_add_error(:connection_refused), do: "Could not connect to rtorrent."
-  def format_add_error(_), do: "Failed to add torrent. Please try again."
-
   @spec format_eta(non_neg_integer() | nil | :infinity) :: String.t()
   def format_eta(nil), do: "∞"
   def format_eta(:infinity), do: "∞"

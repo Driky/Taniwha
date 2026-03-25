@@ -1,6 +1,6 @@
 {
   "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=4:9",
-  "component": "TaniwhaWeb.TorrentComponents.topbar/1",
+  "component": "TaniwhaWeb.TorrentComponents.LayoutComponents.topbar/1",
   "language": "heex",
   "props": {
     "upload_rate": "integer (bytes/s)",

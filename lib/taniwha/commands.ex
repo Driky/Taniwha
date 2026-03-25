@@ -116,6 +116,7 @@ defmodule Taniwha.Commands do
   @spec erase(String.t()) :: :ok | {:error, term()}
   def erase(hash), do: run_lifecycle("d.erase", hash)
 
+  @impl Taniwha.CommandsBehaviour
   @doc "Pauses a torrent. Returns `:ok` on success."
   @spec pause(String.t()) :: :ok | {:error, term()}
   def pause(hash), do: run_lifecycle("d.pause", hash)
