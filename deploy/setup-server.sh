@@ -122,7 +122,7 @@ ok "Environment values collected (SECRET_KEY_BASE auto-generated)"
 # Step 6 — Create .env on server via deploy key
 # ---------------------------------------------------------------------------
 info "Step 6/8 — Writing .env on server"
-printf 'SECRET_KEY_BASE=%s\nPHX_HOST=%s\nPORT=%s\nRTORRENT_SOCKET=%s\n' \
+printf 'SECRET_KEY_BASE=%s\nPHX_HOST=%s\nPORT=%s\nRTORRENT_SOCKET=%s\n\n# OpenTelemetry (optional — leave ENDPOINT empty to disable)\nOTEL_SERVICE_NAME=taniwha\nOTEL_EXPORTER_OTLP_ENDPOINT=\nOTEL_EXPORTER_OTLP_PROTOCOL=http_protobuf\nOTEL_EXPORTER_OTLP_HEADERS=\n' \
   "$SECRET_KEY_BASE" "$PHX_HOST" "$APP_PORT" "$RTORRENT_SOCKET" \
   | ssh -i "$DEPLOY_KEY" -p "${PORT}" "taniwha-deploy@${SERVER}" \
       "tee /home/taniwha-deploy/taniwha/.env > /dev/null && chmod 600 /home/taniwha-deploy/taniwha/.env"

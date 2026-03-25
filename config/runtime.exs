@@ -24,11 +24,48 @@ config :taniwha, TaniwhaWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :prod do
+  # ---------------------------------------------------------------------------
+  # OpenTelemetry — vendor-agnostic tracing via OTLP (production only).
+  # Dev uses the stdout exporter (see config/dev.exs).
+  # Test uses the simple processor with no exporter (see config/test.exs).
+  # All settings are driven by environment variables; no values are hardcoded.
+  #
+  # Supported OTEL_* environment variables:
+  #   OTEL_SERVICE_NAME             Service name in traces (default: "taniwha")
+  #   OTEL_EXPORTER_OTLP_ENDPOINT   Collector URL (default: http://localhost:4318)
+  #   OTEL_EXPORTER_OTLP_PROTOCOL   "http_protobuf" or "grpc" (default: http_protobuf)
+  #   OTEL_EXPORTER_OTLP_HEADERS    Auth headers, e.g. "signoz-ingestion-key=<key>"
+  #   OTEL_TRACES_SAMPLER           Set "always_off" to disable tracing entirely
+  # ---------------------------------------------------------------------------
+  otel_endpoint = System.get_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+
+  otel_protocol =
+    case System.get_env("OTEL_EXPORTER_OTLP_PROTOCOL", "http_protobuf") do
+      "grpc" -> :grpc
+      _ -> :http_protobuf
+    end
+
+  config :opentelemetry,
+    resource: [service: [name: System.get_env("OTEL_SERVICE_NAME", "taniwha")]],
+    processors: [
+      otel_batch_processor: %{
+        exporter: {
+          :opentelemetry_exporter,
+          %{protocol: otel_protocol, endpoints: [otel_endpoint]}
+        }
+      }
+    ]
+
+  # Note: OTEL_EXPORTER_OTLP_HEADERS is read natively by opentelemetry_exporter
+  # following the OTel spec — no manual parsing is required.
+
+  # ---------------------------------------------------------------------------
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
   # want to use a different value for prod and you most likely don't want
   # to check this value into version control, so we use an environment
   # variable instead.
+  # ---------------------------------------------------------------------------
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
       raise """

@@ -33,6 +33,11 @@ config :taniwha,
 
 config :taniwha, api_key: "test-api-key-for-tests"
 
+# OpenTelemetry: run the simple processor (required for span-capture tests to call
+# set_exporter/2) but set no exporter, so spans are dropped by default.
+# Individual tests override via :otel_simple_processor.set_exporter/2.
+config :opentelemetry, processors: [{:otel_simple_processor, %{}}]
+
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true

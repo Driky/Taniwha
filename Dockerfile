@@ -70,6 +70,13 @@ USER taniwha
 # SECRET_KEY_BASE and PHX_HOST must be provided at runtime via --env-file
 ENV PHX_SERVER=true
 
+# OpenTelemetry — all optional; set in .env for production.
+# OTEL_SERVICE_NAME          Service name shown in traces (default: "taniwha")
+# OTEL_EXPORTER_OTLP_ENDPOINT  OTLP collector URL (default: http://localhost:4318)
+# OTEL_EXPORTER_OTLP_PROTOCOL  "http_protobuf" or "grpc" (default: http_protobuf)
+# OTEL_EXPORTER_OTLP_HEADERS   Auth headers, e.g. "signoz-ingestion-key=<key>"
+# OTEL_TRACES_SAMPLER          Sampling strategy (set "always_off" to disable)
+
 EXPOSE 4000
 
 # Exec form ensures SIGTERM reaches the BEAM directly

@@ -25,7 +25,7 @@ defmodule Taniwha.MixProject do
   def application do
     [
       mod: {Taniwha.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :opentelemetry]
     ]
   end
 
@@ -69,6 +69,12 @@ defmodule Taniwha.MixProject do
       {:bandit, "~> 1.5"},
       {:guardian, "~> 2.3"},
       {:sweet_xml, "~> 0.7"},
+      {:opentelemetry, "~> 1.7.0"},
+      {:opentelemetry_api, "~> 1.5.0"},
+      {:opentelemetry_exporter, "~> 1.10.0"},
+      {:opentelemetry_semantic_conventions, "~> 1.27.0"},
+      {:opentelemetry_phoenix, "~> 2.0.1"},
+      {:opentelemetry_bandit, "~> 0.3.0"},
       {:mox, "~> 1.0", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}

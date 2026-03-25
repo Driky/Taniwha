@@ -80,5 +80,12 @@ config :phoenix_live_view,
 
 config :taniwha, api_key: "dev-api-key"
 
+# OpenTelemetry: print spans to the terminal in development.
+# To silence: set OTEL_TRACES_SAMPLER=always_off in your shell.
+# To send to a local collector: set OTEL_EXPORTER_OTLP_ENDPOINT in your shell
+# (runtime.exs will override this config when the env var is present).
+config :opentelemetry,
+  processors: [{:otel_simple_processor, %{exporter: {:otel_exporter_stdout, []}}}]
+
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false

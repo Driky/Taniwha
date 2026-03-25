@@ -4,6 +4,12 @@ defmodule Taniwha.Application do
 
   @impl true
   def start(_type, _args) do
+    # Attach OpenTelemetry telemetry handlers before any supervised process starts.
+    # These hook into :telemetry events emitted by Bandit and Phoenix, producing
+    # HTTP request and LiveView spans automatically.
+    OpentelemetryBandit.setup()
+    OpentelemetryPhoenix.setup(adapter: :bandit)
+
     children = [
       {Phoenix.PubSub, name: Taniwha.PubSub},
       Taniwha.RPC.Client,

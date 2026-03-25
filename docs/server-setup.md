@@ -138,6 +138,50 @@ sudo chown taniwha-deploy:taniwha-deploy /home/taniwha-deploy/taniwha/.env
 
 ---
 
+## 4b. Observability (optional)
+
+Taniwha ships with OpenTelemetry (OTel) auto-instrumentation. Traces are exported via OTLP to any compatible backend (SigNoz, Grafana Tempo, Jaeger, Datadog, etc.).
+
+### Environment variables
+
+Add the following to `/home/taniwha-deploy/taniwha/.env`:
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OTEL_SERVICE_NAME` | no | `taniwha` | Service name in traces |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | yes (prod) | `http://localhost:4318` | OTLP collector endpoint |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | no | `http_protobuf` | `http_protobuf` or `grpc` |
+| `OTEL_EXPORTER_OTLP_HEADERS` | no | — | Auth headers (e.g. `signoz-ingestion-key=<key>` for SigNoz Cloud) |
+| `OTEL_TRACES_SAMPLER` | no | `parentbased_always_on` | Set `always_off` to disable tracing entirely |
+
+Leave `OTEL_EXPORTER_OTLP_ENDPOINT` empty to disable export (the app still starts normally).
+
+### SigNoz Cloud example
+
+```
+OTEL_EXPORTER_OTLP_ENDPOINT=https://ingest.{region}.signoz.cloud:443
+OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+OTEL_EXPORTER_OTLP_HEADERS=signoz-ingestion-key=<your-key>
+```
+
+### Self-hosted SigNoz / Jaeger / Grafana Tempo
+
+```
+OTEL_EXPORTER_OTLP_ENDPOINT=http://<collector-host>:4318
+```
+
+### OpenTelemetry Collector sidecar pattern
+
+Instead of pointing directly at the backend, you can run an OTel Collector on the same host and forward from there — useful for batching, filtering, or multi-backend fanout:
+
+```
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318   # Collector HTTP receiver
+```
+
+The Collector forwards to your backend(s) per its own pipeline config.
+
+---
+
 ## 5. rtorrent socket permissions
 
 The `taniwha-deploy` user (who runs the Docker daemon client) must be able to read/write the rtorrent socket that is bind-mounted into the container.
