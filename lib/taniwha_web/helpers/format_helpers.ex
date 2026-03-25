@@ -152,4 +152,18 @@ defmodule TaniwhaWeb.FormatHelpers do
 
     "#{h}:#{String.pad_leading(Integer.to_string(m), 2, "0")}:#{String.pad_leading(Integer.to_string(s), 2, "0")}"
   end
+
+  @doc """
+  Formats a `DateTime` as `"YYYY-MM-DD HH:MM"`, or `"—"` when `nil`.
+
+  ## Examples
+
+      iex> format_datetime(nil)
+      "—"
+      iex> format_datetime(~U[2024-03-15 09:30:00Z])
+      "2024-03-15 09:30"
+  """
+  @spec format_datetime(DateTime.t() | nil) :: String.t()
+  def format_datetime(nil), do: "—"
+  def format_datetime(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
 end

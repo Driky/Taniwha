@@ -5,7 +5,7 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
 
   use TaniwhaWeb, :html
 
-  import TaniwhaWeb.TorrentComponents.StatusComponents, only: [speed_display: 1]
+  import TaniwhaWeb.TorrentComponents.StatusComponents, only: [speed_display: 1, status_slug: 1]
 
   # ---------------------------------------------------------------------------
   # topbar/1
@@ -289,17 +289,5 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
 
   @spec status_dot_color(:all | :downloading | :seeding | :stopped | :checking) :: String.t()
   defp status_dot_color(:all), do: "var(--taniwha-sidebar-section)"
-
-  defp status_dot_color(status) do
-    slug =
-      case status do
-        :downloading -> "dl"
-        :seeding -> "seed"
-        :stopped -> "stop"
-        :checking -> "check"
-        _ -> "err"
-      end
-
-    "var(--taniwha-status-#{slug}-dot)"
-  end
+  defp status_dot_color(status), do: "var(--taniwha-status-#{status_slug(status)}-dot)"
 end

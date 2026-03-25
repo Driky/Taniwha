@@ -456,6 +456,7 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
             <.icon name="hero-stop-micro" class="size-3" />
           </button>
           <button
+            :if={@on_remove}
             type="button"
             phx-click={@on_remove}
             phx-value-hash={@torrent.hash}

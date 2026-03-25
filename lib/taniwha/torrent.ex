@@ -119,6 +119,22 @@ defmodule Taniwha.Torrent do
   def status(%__MODULE__{}), do: :unknown
 
   @doc """
+  Returns the estimated remaining download time in seconds, or `nil` if unknown.
+
+  Returns `0` when the torrent is already complete. Returns `nil` when the
+  download rate is zero or the torrent has no size information.
+  """
+  @spec eta(t()) :: non_neg_integer() | nil
+  def eta(%__MODULE__{complete: true}), do: 0
+
+  def eta(%__MODULE__{download_rate: rate, size: size, completed_bytes: done})
+      when rate > 0 do
+    div(size - done, rate)
+  end
+
+  def eta(%__MODULE__{}), do: nil
+
+  @doc """
   Constructs a `Torrent` from a hash string and a flat list of RPC values.
 
   Values must be in the same order as `rpc_fields/0`. The caller

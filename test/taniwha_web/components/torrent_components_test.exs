@@ -550,7 +550,7 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
 
     test "remove button has descriptive aria-label" do
       torrent = Fixtures.torrent_fixture()
-      html = render_component(&torrent_row/1, torrent: torrent)
+      html = render_component(&torrent_row/1, torrent: torrent, on_remove: "remove_torrent")
       assert html =~ ~s(aria-label="Remove #{torrent.name}")
     end
 

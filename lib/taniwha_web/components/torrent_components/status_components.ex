@@ -93,13 +93,14 @@ defmodule TaniwhaWeb.TorrentComponents.StatusComponents do
     """
   end
 
+  @doc "Maps a torrent status atom to the CSS variable slug used in design tokens."
   @spec status_slug(atom()) :: String.t()
-  defp status_slug(:downloading), do: "dl"
-  defp status_slug(:seeding), do: "seed"
-  defp status_slug(:stopped), do: "stop"
-  defp status_slug(:paused), do: "stop"
-  defp status_slug(:checking), do: "check"
-  defp status_slug(_), do: "err"
+  def status_slug(:downloading), do: "dl"
+  def status_slug(:seeding), do: "seed"
+  def status_slug(:stopped), do: "stop"
+  def status_slug(:paused), do: "stop"
+  def status_slug(:checking), do: "check"
+  def status_slug(_), do: "err"
 
   @spec badge_bg_var(atom()) :: String.t()
   defp badge_bg_var(status), do: "--taniwha-status-#{status_slug(status)}-badge-bg"

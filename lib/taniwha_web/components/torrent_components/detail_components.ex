@@ -7,7 +7,7 @@ defmodule TaniwhaWeb.TorrentComponents.DetailComponents do
   use TaniwhaWeb, :html
 
   import TaniwhaWeb.FormatHelpers,
-    only: [format_bytes: 1, format_eta: 1, format_ratio: 1, format_speed: 1]
+    only: [format_bytes: 1, format_datetime: 1, format_eta: 1, format_ratio: 1, format_speed: 1]
 
   import TaniwhaWeb.TorrentComponents.StatusComponents, only: [progress_bar: 1, speed_display: 1]
 
@@ -145,7 +145,7 @@ defmodule TaniwhaWeb.TorrentComponents.DetailComponents do
     assigns =
       assigns
       |> assign(:progress_pct, round(Torrent.progress(assigns.torrent) * 100))
-      |> assign(:eta, compute_eta(assigns.torrent))
+      |> assign(:eta, Torrent.eta(assigns.torrent))
 
     ~H"""
     <div class="grid grid-cols-3 gap-y-2 gap-x-6 text-[11px]">
@@ -220,20 +220,6 @@ defmodule TaniwhaWeb.TorrentComponents.DetailComponents do
     """
   end
 
-  @spec compute_eta(Torrent.t()) :: non_neg_integer() | nil
-  defp compute_eta(%Torrent{complete: true}), do: 0
-
-  defp compute_eta(%Torrent{download_rate: rate, size: size, completed_bytes: done})
-       when rate > 0 do
-    div(size - done, rate)
-  end
-
-  defp compute_eta(_), do: nil
-
-  @spec format_datetime(DateTime.t() | nil) :: String.t()
-  defp format_datetime(nil), do: "—"
-  defp format_datetime(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
-
   defp loading_skeleton(assigns) do
     ~H"""
     <div class="space-y-[6px]">
@@ -293,18 +279,16 @@ defmodule TaniwhaWeb.TorrentComponents.DetailComponents do
               {format_bytes(file.size)}
             </td>
             <td class="pr-2">
+              <% pct = TorrentFile.progress(file) * 100 %>
               <div class="flex items-center gap-[4px]">
                 <span
                   class="shrink-0 w-[28px] text-right tabular-nums"
                   style="color: var(--taniwha-cell-pct)"
                 >
-                  {round(TorrentFile.progress(file) * 100)}%
+                  {round(pct)}%
                 </span>
                 <div class="flex-1">
-                  <.progress_bar
-                    value={TorrentFile.progress(file) * 100}
-                    color={:downloading}
-                  />
+                  <.progress_bar value={pct} color={:downloading} />
                 </div>
               </div>
             </td>
@@ -445,9 +429,8 @@ defmodule TaniwhaWeb.TorrentComponents.DetailComponents do
               <span class="block truncate" title={tracker.url}>{tracker_host(tracker.url)}</span>
             </td>
             <td class="pr-2">
-              <span class={tracker_status_class(Tracker.status(tracker))}>
-                {tracker_status_label(Tracker.status(tracker))}
-              </span>
+              <% ts = Tracker.status(tracker) %>
+              <span class={tracker_status_class(ts)}>{tracker_status_label(ts)}</span>
             </td>
             <td class="pr-2 text-right tabular-nums" style="color: var(--taniwha-cell-num)">
               {tracker.scrape_complete}
