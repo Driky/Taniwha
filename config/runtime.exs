@@ -59,13 +59,11 @@ if config_env() == :prod do
   # Note: OTEL_EXPORTER_OTLP_HEADERS is read natively by opentelemetry_exporter
   # following the OTel spec — no manual parsing is required.
 
-  # ---------------------------------------------------------------------------
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
   # want to use a different value for prod and you most likely don't want
   # to check this value into version control, so we use an environment
   # variable instead.
-  # ---------------------------------------------------------------------------
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
       raise """

@@ -37,8 +37,11 @@ defmodule TaniwhaWeb.OtelTest do
   setup :verify_on_exit!
 
   setup do
-    # Route all exported spans to this test process for the duration of the test.
+    # Route exported spans to this test process for the duration of the test.
+    # on_exit restores the exporter so spans after this test are silently dropped
+    # (sent to the exiting cleanup process) rather than leaking into other modules.
     :otel_simple_processor.set_exporter(:otel_exporter_pid, self())
+    on_exit(fn -> :otel_simple_processor.set_exporter(:otel_exporter_pid, self()) end)
     :ok
   end
 
