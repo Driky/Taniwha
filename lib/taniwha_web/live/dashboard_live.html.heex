@@ -21,6 +21,9 @@
       search={@search}
     />
 
+    <%!-- Connection lost banner: shown when rtorrent is unreachable --%>
+    <.connection_banner connection_status={@connection_status} />
+
     <% visible =
       visible_torrents(@torrents, @search, @filter, @tracker_filter, @sort_by, @sort_dir) %>
     <% visible_count = length(visible) %>

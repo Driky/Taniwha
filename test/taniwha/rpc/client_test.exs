@@ -43,11 +43,11 @@ defmodule Taniwha.RPC.ClientTest do
   # ---------------------------------------------------------------------------
 
   describe "call/2 error cases" do
-    test "connect failure returns error without calling close" do
+    test "connect failure returns :connection_failed without calling close" do
       MockConnection
       |> expect(:connect, fn {:unix, _} -> {:error, :enoent} end)
 
-      assert {:error, :enoent} = Client.call("d.name", ["abc123"])
+      assert {:error, :connection_failed} = Client.call("d.name", ["abc123"])
     end
 
     test "send failure closes socket and returns error" do
@@ -107,6 +107,68 @@ defmodule Taniwha.RPC.ClientTest do
       assert {:ok, results} = Client.multicall(calls)
       assert length(results) == 7
       assert [["Ubuntu 24.04.2 LTS"] | _] = results
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch 3b — call/2 retry on connect failure
+  # ---------------------------------------------------------------------------
+
+  describe "call/2 retry on connect failure" do
+    setup do
+      Application.put_env(:taniwha, :rpc_max_retries, 3)
+      on_exit(fn -> Application.put_env(:taniwha, :rpc_max_retries, 0) end)
+    end
+
+    test "succeeds on 2nd attempt after first connect fails" do
+      xml = Fixtures.torrent_name_xml()
+      response = scgi_response(xml)
+
+      MockConnection
+      |> expect(:connect, fn {:unix, _} -> {:error, :econnrefused} end)
+      |> expect(:connect, fn {:unix, _} -> {:ok, :fake_socket} end)
+      |> expect(:send_request, fn :fake_socket, _frame -> :ok end)
+      |> expect(:receive_response, fn :fake_socket, _timeout -> {:ok, response} end)
+      |> expect(:close, fn :fake_socket -> :ok end)
+
+      assert {:ok, "Ubuntu 24.04.2 LTS"} = Client.call("d.name", ["abc123"])
+    end
+
+    test "returns {:error, :connection_failed} after max retries (3) exhausted" do
+      # 1 initial attempt + 3 retries = 4 total connect calls
+      MockConnection
+      |> expect(:connect, 4, fn {:unix, _} -> {:error, :econnrefused} end)
+
+      assert {:error, :connection_failed} = Client.call("d.name", ["abc123"])
+    end
+
+    test "does NOT retry on send error — only connect failures trigger retry" do
+      MockConnection
+      |> expect(:connect, fn {:unix, _} -> {:ok, :fake_socket} end)
+      |> expect(:send_request, fn :fake_socket, _frame -> {:error, :closed} end)
+      |> expect(:close, fn :fake_socket -> :ok end)
+
+      # Only 1 connect expected
+      assert {:error, :closed} = Client.call("d.name", ["abc123"])
+    end
+
+    test "does NOT retry on receive error" do
+      MockConnection
+      |> expect(:connect, fn {:unix, _} -> {:ok, :fake_socket} end)
+      |> expect(:send_request, fn :fake_socket, _frame -> :ok end)
+      |> expect(:receive_response, fn :fake_socket, _timeout -> {:error, :timeout} end)
+      |> expect(:close, fn :fake_socket -> :ok end)
+
+      # Only 1 connect expected
+      assert {:error, :timeout} = Client.call("d.name", ["abc123"])
+    end
+
+    test "GenServer stays alive after all retries exhausted" do
+      MockConnection
+      |> expect(:connect, 4, fn {:unix, _} -> {:error, :econnrefused} end)
+
+      assert {:error, :connection_failed} = Client.call("d.name", ["abc123"])
+      assert Process.alive?(Process.whereis(Client))
     end
   end
 

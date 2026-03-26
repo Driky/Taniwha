@@ -11,7 +11,6 @@ defmodule TaniwhaWeb.TorrentChannelOtelTest do
   use TaniwhaWeb.ChannelCase, async: false
 
   import Taniwha.OtelTestHelper
-  import Taniwha.Test.Fixtures, only: [torrent_fixture: 0]
 
   alias Taniwha.State.Store
   alias TaniwhaWeb.{TorrentChannel, UserSocket}
@@ -43,7 +42,7 @@ defmodule TaniwhaWeb.TorrentChannelOtelTest do
       |> expect(:start, fn _hash -> :ok end)
 
       channel_socket = join_list(socket)
-      push(channel_socket, "start", %{"hash" => "abc123"})
+      push(channel_socket, "start", %{"hash" => String.duplicate("a", 40)})
       :sys.get_state(channel_socket.channel_pid)
 
       assert_span("taniwha.channel.start")
@@ -54,7 +53,7 @@ defmodule TaniwhaWeb.TorrentChannelOtelTest do
       |> expect(:start, fn _hash -> :ok end)
 
       channel_socket = join_list(socket)
-      push(channel_socket, "start", %{"hash" => "abc123"})
+      push(channel_socket, "start", %{"hash" => String.duplicate("a", 40)})
       :sys.get_state(channel_socket.channel_pid)
 
       assert_span("taniwha.channel.start", attributes: [{"channel.event", "start"}])
@@ -65,21 +64,23 @@ defmodule TaniwhaWeb.TorrentChannelOtelTest do
       |> expect(:start, fn _hash -> :ok end)
 
       channel_socket = join_list(socket)
-      push(channel_socket, "start", %{"hash" => "abc123"})
+      push(channel_socket, "start", %{"hash" => String.duplicate("a", 40)})
       :sys.get_state(channel_socket.channel_pid)
 
       assert_span("taniwha.channel.start", attributes: [{"channel.topic", "torrents:list"}])
     end
+
+    @hash String.duplicate("d", 40)
 
     test "sets torrent.hash attribute", %{socket: socket} do
       Taniwha.MockCommands
       |> expect(:start, fn _hash -> :ok end)
 
       channel_socket = join_list(socket)
-      push(channel_socket, "start", %{"hash" => "deadbeef"})
+      push(channel_socket, "start", %{"hash" => @hash})
       :sys.get_state(channel_socket.channel_pid)
 
-      assert_span("taniwha.channel.start", attributes: [{"torrent.hash", "deadbeef"}])
+      assert_span("taniwha.channel.start", attributes: [{"torrent.hash", @hash}])
     end
 
     test "sets error status when command fails", %{socket: socket} do
@@ -87,7 +88,7 @@ defmodule TaniwhaWeb.TorrentChannelOtelTest do
       |> expect(:start, fn _hash -> {:error, :timeout} end)
 
       channel_socket = join_list(socket)
-      push(channel_socket, "start", %{"hash" => "abc123"})
+      push(channel_socket, "start", %{"hash" => String.duplicate("a", 40)})
       :sys.get_state(channel_socket.channel_pid)
 
       span = assert_span("taniwha.channel.start")
@@ -100,19 +101,21 @@ defmodule TaniwhaWeb.TorrentChannelOtelTest do
   # ---------------------------------------------------------------------------
 
   describe "handle_in stop" do
+    @hash String.duplicate("e", 40)
+
     test "creates taniwha.channel.stop span with attributes", %{socket: socket} do
       Taniwha.MockCommands
       |> expect(:stop, fn _hash -> :ok end)
 
       channel_socket = join_list(socket)
-      push(channel_socket, "stop", %{"hash" => "deadbeef"})
+      push(channel_socket, "stop", %{"hash" => @hash})
       :sys.get_state(channel_socket.channel_pid)
 
       assert_span("taniwha.channel.stop",
         attributes: [
           {"channel.event", "stop"},
           {"channel.topic", "torrents:list"},
-          {"torrent.hash", "deadbeef"}
+          {"torrent.hash", @hash}
         ]
       )
     end
@@ -123,18 +126,20 @@ defmodule TaniwhaWeb.TorrentChannelOtelTest do
   # ---------------------------------------------------------------------------
 
   describe "handle_in remove" do
+    @hash String.duplicate("f", 40)
+
     test "creates taniwha.channel.remove span with attributes", %{socket: socket} do
       Taniwha.MockCommands
       |> expect(:erase, fn _hash -> :ok end)
 
       channel_socket = join_list(socket)
-      push(channel_socket, "remove", %{"hash" => "deadbeef"})
+      push(channel_socket, "remove", %{"hash" => @hash})
       :sys.get_state(channel_socket.channel_pid)
 
       assert_span("taniwha.channel.remove",
         attributes: [
           {"channel.event", "remove"},
-          {"torrent.hash", "deadbeef"}
+          {"torrent.hash", @hash}
         ]
       )
     end
@@ -152,7 +157,7 @@ defmodule TaniwhaWeb.TorrentChannelOtelTest do
       channel_socket = join_list(socket)
 
       push(channel_socket, "set_file_priority", %{
-        "hash" => "abc123",
+        "hash" => String.duplicate("a", 40),
         "index" => 0,
         "priority" => 1
       })
@@ -162,7 +167,7 @@ defmodule TaniwhaWeb.TorrentChannelOtelTest do
       assert_span("taniwha.channel.set_file_priority",
         attributes: [
           {"channel.event", "set_file_priority"},
-          {"torrent.hash", "abc123"}
+          {"torrent.hash", String.duplicate("a", 40)}
         ]
       )
     end

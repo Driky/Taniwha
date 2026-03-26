@@ -29,7 +29,9 @@ config :taniwha,
   scgi_timeout: 5_000,
   rpc_client: Taniwha.RPC.MockClient,
   commands: Taniwha.MockCommands,
-  poll_interval: 86_400_000
+  poll_interval: 86_400_000,
+  rpc_max_retries: 0,
+  rpc_retry_base_ms: 0
 
 config :taniwha, api_key: "test-api-key-for-tests"
 

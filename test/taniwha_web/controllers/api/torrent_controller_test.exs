@@ -147,4 +147,48 @@ defmodule TaniwhaWeb.API.TorrentControllerTest do
       assert %{"error" => "magnet_url or torrent file required"} = json_response(conn, 422)
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # POST /api/v1/torrents — URL validation
+  # ---------------------------------------------------------------------------
+
+  describe "POST /api/v1/torrents URL validation" do
+    test "rejects a plain-text URL with 422", %{conn: conn} do
+      conn = conn |> with_auth() |> post("/api/v1/torrents", %{"magnet_url" => "not-a-url"})
+      assert %{"error" => "invalid_url"} = json_response(conn, 422)
+    end
+
+    test "rejects an ftp:// URL with 422", %{conn: conn} do
+      conn =
+        conn
+        |> with_auth()
+        |> post("/api/v1/torrents", %{"magnet_url" => "ftp://example.com/file.torrent"})
+
+      assert %{"error" => "invalid_url"} = json_response(conn, 422)
+    end
+
+    test "accepts a valid magnet link", %{conn: conn} do
+      expect(MockCommands, :load_url, fn _url -> :ok end)
+
+      conn =
+        conn
+        |> with_auth()
+        |> post("/api/v1/torrents", %{
+          "magnet_url" => "magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c"
+        })
+
+      assert json_response(conn, 201)
+    end
+
+    test "accepts a valid https URL", %{conn: conn} do
+      expect(MockCommands, :load_url, fn _url -> :ok end)
+
+      conn =
+        conn
+        |> with_auth()
+        |> post("/api/v1/torrents", %{"magnet_url" => "https://example.com/file.torrent"})
+
+      assert json_response(conn, 201)
+    end
+  end
 end

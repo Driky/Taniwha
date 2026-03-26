@@ -674,4 +674,119 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       assert Process.alive?(lv.pid)
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Batch 8 — Connection status banner
+  # ---------------------------------------------------------------------------
+
+  describe "connection status banner" do
+    test "no banner on initial mount", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/")
+      refute html =~ "Connection to rtorrent lost"
+    end
+
+    test "banner appears on {:connection_status, :disconnected}", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      send(lv.pid, {:connection_status, :disconnected})
+      assert render(lv) =~ "Connection to rtorrent lost"
+    end
+
+    test "banner disappears when :connected follows :disconnected", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      send(lv.pid, {:connection_status, :disconnected})
+      send(lv.pid, {:connection_status, :connected})
+      refute render(lv) =~ "Connection to rtorrent lost"
+    end
+
+    test "Reconnected flash appears when :connected follows :disconnected", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      send(lv.pid, {:connection_status, :disconnected})
+      send(lv.pid, {:connection_status, :connected})
+      assert render(lv) =~ "Reconnected"
+    end
+
+    test "no Reconnected flash on initial :connected (no prior disconnection)", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      send(lv.pid, {:connection_status, :connected})
+      refute render(lv) =~ "Reconnected"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch 9 — Action error handling
+  # ---------------------------------------------------------------------------
+
+  describe "action error handling" do
+    setup %{conn: conn} do
+      torrent = Fixtures.torrent_fixture()
+      Store.put_torrent(torrent)
+      {:ok, lv, _html} = live(conn, ~p"/")
+      {:ok, lv: lv, hash: torrent.hash}
+    end
+
+    test "start_torrent shows error flash on failure", %{lv: lv, hash: hash} do
+      expect(MockCommands, :start, fn _hash -> {:error, :connection_failed} end)
+      render_click(lv, "start_torrent", %{"hash" => hash})
+      assert render(lv) =~ "Failed to start"
+    end
+
+    test "stop_torrent shows error flash on failure", %{lv: lv, hash: hash} do
+      expect(MockCommands, :stop, fn _hash -> {:error, :connection_failed} end)
+      render_click(lv, "stop_torrent", %{"hash" => hash})
+      assert render(lv) =~ "Failed to stop"
+    end
+
+    test "start_torrent does not show error flash on success", %{lv: lv, hash: hash} do
+      expect(MockCommands, :start, fn _hash -> :ok end)
+      render_click(lv, "start_torrent", %{"hash" => hash})
+      refute render(lv) =~ "Failed to start"
+    end
+
+    test "context_menu_action start shows error flash on failure", %{lv: lv, hash: hash} do
+      expect(MockCommands, :start, fn _hash -> {:error, :connection_failed} end)
+      render_click(lv, "context_menu_action", %{"action" => "start", "hash" => hash})
+      assert render(lv) =~ "Failed to start"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch 10 — Detail panel closes on external removal
+  # ---------------------------------------------------------------------------
+
+  describe "detail panel closes when selected torrent removed" do
+    test "panel closes and info flash shown when selected torrent removed via diff", %{conn: conn} do
+      torrent = Fixtures.torrent_fixture()
+      Store.put_torrent(torrent)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      # Select the torrent to open the detail panel
+      render_click(lv, "select_torrent", %{"hash" => torrent.hash})
+      assert :sys.get_state(lv.pid).socket.assigns.selected_hash == torrent.hash
+
+      # Simulate Poller broadcasting a removal diff
+      send(lv.pid, {:torrent_diffs, [{:removed, torrent.hash}]})
+
+      html = render(lv)
+      assert :sys.get_state(lv.pid).socket.assigns.selected_hash == nil
+      assert html =~ "selected torrent was removed"
+    end
+
+    test "panel stays open when a different torrent is removed", %{conn: conn} do
+      torrent1 = Fixtures.torrent_fixture("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1")
+      torrent2 = Fixtures.torrent_fixture("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2")
+      Store.put_torrent(torrent1)
+      Store.put_torrent(torrent2)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      render_click(lv, "select_torrent", %{"hash" => torrent1.hash})
+      assert :sys.get_state(lv.pid).socket.assigns.selected_hash == torrent1.hash
+
+      # Remove torrent2, not the selected torrent1
+      send(lv.pid, {:torrent_diffs, [{:removed, torrent2.hash}]})
+
+      assert :sys.get_state(lv.pid).socket.assigns.selected_hash == torrent1.hash
+    end
+  end
 end

@@ -190,12 +190,46 @@ defmodule Taniwha.RPC.Client do
   @spec do_request(binary(), state()) :: {:ok, term()} | {:error, term()}
   defp do_request(xml, %{connection: conn, transport: transport, timeout: timeout}) do
     frame = Protocol.encode(xml)
+    max_retries = Application.get_env(:taniwha, :rpc_max_retries, 3)
+    retry_base_ms = Application.get_env(:taniwha, :rpc_retry_base_ms, 100)
 
-    with {:ok, socket} <- conn.connect(transport),
+    with {:ok, socket} <-
+           connect_with_retry(conn, transport, max_retries, max_retries, retry_base_ms),
          :ok <- send_and_close_on_error(conn, socket, frame),
          {:ok, raw} <- recv_and_close(conn, socket, timeout),
          {:ok, xml_body} <- Protocol.decode_response(raw) do
       XMLRPC.decode_response(xml_body)
+    end
+  end
+
+  # Attempts to connect, retrying with exponential backoff on failure.
+  #
+  # Only `connect/1` failures trigger retries; send/receive errors are not
+  # retried. The GenServer is blocked during `Process.sleep/1` — this is
+  # acceptable because the maximum sleep total (100+200+400ms) is well below
+  # the poll interval and avoids the complexity of async retry state machines.
+  @spec connect_with_retry(
+          module(),
+          transport_config(),
+          non_neg_integer(),
+          non_neg_integer(),
+          non_neg_integer()
+        ) ::
+          {:ok, term()} | {:error, :connection_failed}
+  defp connect_with_retry(conn, transport, max_retries, retries_left, retry_base_ms) do
+    case conn.connect(transport) do
+      {:ok, socket} ->
+        {:ok, socket}
+
+      {:error, _reason} when retries_left > 0 ->
+        attempt = max_retries - retries_left
+        delay = min(trunc(retry_base_ms * :math.pow(2, attempt)), 5_000)
+        Tracer.add_event("rpc.retry", %{"rpc.retry_attempt": attempt + 1, "rpc.delay_ms": delay})
+        Process.sleep(delay)
+        connect_with_retry(conn, transport, max_retries, retries_left - 1, retry_base_ms)
+
+      {:error, _reason} ->
+        {:error, :connection_failed}
     end
   end
 

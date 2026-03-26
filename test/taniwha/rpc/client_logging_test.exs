@@ -55,7 +55,7 @@ defmodule Taniwha.RPC.ClientLoggingTest do
 
       event = find_event(events, "RPC call failed")
       assert event != nil
-      assert log_meta(event, :error_reason) == ":econnrefused"
+      assert log_meta(event, :error_reason) == ":connection_failed"
     end
 
     test "call/2 failure emits warning with transport in metadata" do

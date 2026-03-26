@@ -34,7 +34,7 @@ defmodule TaniwhaWeb.TorrentChannel do
   require Logger
   require OpenTelemetry.Tracer, as: Tracer
 
-  alias Taniwha.State.Store
+  alias Taniwha.{State.Store, Validator}
   alias TaniwhaWeb.API.TorrentJSON
 
   @commands Application.compile_env(:taniwha, :commands, Taniwha.Commands)
@@ -91,15 +91,27 @@ defmodule TaniwhaWeb.TorrentChannel do
   """
   @impl true
   def handle_in("start", %{"hash" => hash}, socket) do
-    with_command_span("start", hash, socket, fn -> @commands.start(hash) end)
+    with :ok <- Validator.validate_hash(hash) do
+      with_command_span("start", hash, socket, fn -> @commands.start(hash) end)
+    else
+      {:error, :invalid_hash} -> {:reply, {:error, %{reason: "invalid hash"}}, socket}
+    end
   end
 
   def handle_in("stop", %{"hash" => hash}, socket) do
-    with_command_span("stop", hash, socket, fn -> @commands.stop(hash) end)
+    with :ok <- Validator.validate_hash(hash) do
+      with_command_span("stop", hash, socket, fn -> @commands.stop(hash) end)
+    else
+      {:error, :invalid_hash} -> {:reply, {:error, %{reason: "invalid hash"}}, socket}
+    end
   end
 
   def handle_in("remove", %{"hash" => hash}, socket) do
-    with_command_span("remove", hash, socket, fn -> @commands.erase(hash) end)
+    with :ok <- Validator.validate_hash(hash) do
+      with_command_span("remove", hash, socket, fn -> @commands.erase(hash) end)
+    else
+      {:error, :invalid_hash} -> {:reply, {:error, %{reason: "invalid hash"}}, socket}
+    end
   end
 
   def handle_in(
@@ -107,9 +119,15 @@ defmodule TaniwhaWeb.TorrentChannel do
         %{"hash" => hash, "index" => index, "priority" => priority},
         socket
       ) do
-    with_command_span("set_file_priority", hash, socket, fn ->
-      @commands.set_file_priority(hash, index, priority)
-    end)
+    with :ok <- Validator.validate_hash(hash),
+         :ok <- Validator.validate_priority(priority) do
+      with_command_span("set_file_priority", hash, socket, fn ->
+        @commands.set_file_priority(hash, index, priority)
+      end)
+    else
+      {:error, :invalid_hash} -> {:reply, {:error, %{reason: "invalid hash"}}, socket}
+      {:error, :invalid_priority} -> {:reply, {:error, %{reason: "invalid priority"}}, socket}
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -102,7 +102,7 @@ defmodule Taniwha.RPC.ClientOtelTest do
       Client.call("d.name", ["abc123"])
 
       span = assert_span("taniwha.rpc.call")
-      assert span_attribute(span, "rpc.error_reason") == ":enoent"
+      assert span_attribute(span, "rpc.error_reason") == ":connection_failed"
     end
 
     test "span is nested under parent when parent context is active" do

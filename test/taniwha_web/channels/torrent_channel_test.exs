@@ -95,36 +95,38 @@ defmodule TaniwhaWeb.TorrentChannelTest do
       {:ok, channel: channel}
     end
 
+    @valid_hash String.duplicate("a", 40)
+
     test "start delegates to @commands and replies :ok", %{channel: channel} do
-      expect(MockCommands, :start, fn "abc123" -> :ok end)
-      ref = push(channel, "start", %{"hash" => "abc123"})
+      expect(MockCommands, :start, fn @valid_hash -> :ok end)
+      ref = push(channel, "start", %{"hash" => @valid_hash})
       assert_reply ref, :ok
     end
 
     test "stop delegates to @commands and replies :ok", %{channel: channel} do
-      expect(MockCommands, :stop, fn "abc123" -> :ok end)
-      ref = push(channel, "stop", %{"hash" => "abc123"})
+      expect(MockCommands, :stop, fn @valid_hash -> :ok end)
+      ref = push(channel, "stop", %{"hash" => @valid_hash})
       assert_reply ref, :ok
     end
 
     test "remove delegates to Commands.erase/1 and replies :ok", %{channel: channel} do
-      expect(MockCommands, :erase, fn "abc123" -> :ok end)
-      ref = push(channel, "remove", %{"hash" => "abc123"})
+      expect(MockCommands, :erase, fn @valid_hash -> :ok end)
+      ref = push(channel, "remove", %{"hash" => @valid_hash})
       assert_reply ref, :ok
     end
 
     test "set_file_priority delegates to @commands and replies :ok", %{channel: channel} do
-      expect(MockCommands, :set_file_priority, fn "abc123", 0, 1 -> :ok end)
+      expect(MockCommands, :set_file_priority, fn @valid_hash, 0, 1 -> :ok end)
 
       ref =
-        push(channel, "set_file_priority", %{"hash" => "abc123", "index" => 0, "priority" => 1})
+        push(channel, "set_file_priority", %{"hash" => @valid_hash, "index" => 0, "priority" => 1})
 
       assert_reply ref, :ok
     end
 
     test "command failure replies with {:error, reason}", %{channel: channel} do
       expect(MockCommands, :start, fn _hash -> {:error, :connection_refused} end)
-      ref = push(channel, "start", %{"hash" => "abc123"})
+      ref = push(channel, "start", %{"hash" => @valid_hash})
       assert_reply ref, :error, %{reason: _reason}
     end
   end
@@ -194,6 +196,67 @@ defmodule TaniwhaWeb.TorrentChannelTest do
 
       assert_push "updated", %{torrent: torrent_map}
       assert torrent_map["hash"] == torrent.hash
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch: Input validation
+  # ---------------------------------------------------------------------------
+
+  describe "input validation" do
+    setup %{socket: socket} do
+      {:ok, _reply, channel} = subscribe_and_join(socket, TorrentChannel, "torrents:list")
+      {:ok, channel: channel}
+    end
+
+    test "start with hash shorter than 40 chars is rejected", %{channel: channel} do
+      ref = push(channel, "start", %{"hash" => "tooshort"})
+      assert_reply ref, :error, %{reason: "invalid hash"}
+    end
+
+    test "start with non-hex 40-char hash is rejected", %{channel: channel} do
+      ref = push(channel, "start", %{"hash" => String.duplicate("g", 40)})
+      assert_reply ref, :error, %{reason: "invalid hash"}
+    end
+
+    test "stop with invalid hash is rejected", %{channel: channel} do
+      ref = push(channel, "stop", %{"hash" => "bad"})
+      assert_reply ref, :error, %{reason: "invalid hash"}
+    end
+
+    test "remove with invalid hash is rejected", %{channel: channel} do
+      ref = push(channel, "remove", %{"hash" => "bad"})
+      assert_reply ref, :error, %{reason: "invalid hash"}
+    end
+
+    test "set_file_priority with invalid priority value is rejected", %{channel: channel} do
+      ref =
+        push(channel, "set_file_priority", %{
+          "hash" => String.duplicate("a", 40),
+          "index" => 0,
+          "priority" => 5
+        })
+
+      assert_reply ref, :error, %{reason: "invalid priority"}
+    end
+
+    test "set_file_priority with invalid hash is rejected", %{channel: channel} do
+      ref =
+        push(channel, "set_file_priority", %{
+          "hash" => "short",
+          "index" => 0,
+          "priority" => 1
+        })
+
+      assert_reply ref, :error, %{reason: "invalid hash"}
+    end
+
+    test "start with valid 40-char hex hash is accepted", %{channel: channel} do
+      import Mox
+      expect(MockCommands, :start, fn _hash -> :ok end)
+
+      ref = push(channel, "start", %{"hash" => String.duplicate("a", 40)})
+      assert_reply ref, :ok
     end
   end
 end

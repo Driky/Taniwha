@@ -41,22 +41,24 @@ defmodule TaniwhaWeb.AddTorrentComponent do
   def handle_event("submit_url", %{"url" => url}, socket) do
     url = String.trim(url)
 
-    if url == "" do
-      {:noreply, assign(socket, :error, "Please enter a magnet link or URL.")}
-    else
-      socket = assign(socket, :loading, true)
+    case Taniwha.Validator.validate_url(url) do
+      {:error, :invalid_url} ->
+        {:noreply, assign(socket, :error, "Please enter a valid magnet link or HTTP/HTTPS URL.")}
 
-      case @commands.load_url(url) do
-        :ok ->
-          send(self(), {:add_torrent_success})
-          {:noreply, socket}
+      :ok ->
+        socket = assign(socket, :loading, true)
 
-        {:error, reason} ->
-          {:noreply,
-           socket
-           |> assign(:loading, false)
-           |> assign(:error, format_add_error(reason))}
-      end
+        case @commands.load_url(url) do
+          :ok ->
+            send(self(), {:add_torrent_success})
+            {:noreply, socket}
+
+          {:error, reason} ->
+            {:noreply,
+             socket
+             |> assign(:loading, false)
+             |> assign(:error, format_add_error(reason))}
+        end
     end
   end
 

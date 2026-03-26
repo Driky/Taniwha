@@ -161,4 +161,42 @@ defmodule TaniwhaWeb.TorrentComponents.StatusComponents do
   defp speed_color_style(:down), do: "color: var(--taniwha-speed-dl)"
   defp speed_color_style(:up), do: "color: var(--taniwha-speed-ul)"
   defp speed_color_style(_), do: ""
+
+  # ---------------------------------------------------------------------------
+  # connection_banner/1
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Renders a thin amber banner indicating that rtorrent is unreachable.
+
+  Shown below the topbar when `:connection_status` is `:disconnected`. Hidden
+  (renders nothing) when the connection is `:connected`.
+
+  ## Attributes
+
+  - `:connection_status` (required) — `:connected` or `:disconnected`
+
+  ## Examples
+
+      <.connection_banner connection_status={@connection_status} />
+  """
+  attr :connection_status, :atom, required: true
+
+  def connection_banner(%{connection_status: :connected} = assigns) do
+    ~H"""
+    """
+  end
+
+  def connection_banner(assigns) do
+    ~H"""
+    <div
+      role="alert"
+      aria-live="assertive"
+      class="flex items-center gap-2 px-4 py-2 text-[12px] bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 border-b border-amber-200 dark:border-amber-700/50"
+    >
+      <.icon name="hero-exclamation-triangle-micro" class="size-3 shrink-0" />
+      Connection to rtorrent lost — showing last known state
+    </div>
+    """
+  end
 end

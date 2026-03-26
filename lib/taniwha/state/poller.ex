@@ -12,11 +12,19 @@ defmodule Taniwha.State.Poller do
   - `"torrents:list"` — receives `{:torrent_diffs, diffs}` (full diff list)
   - `"torrents:{hash}"` — receives `{:torrent_updated, torrent}` for each
     `:added` or `:updated` torrent
+  - `"system:status"` — receives `{:connection_status, :connected | :disconnected}`
+    on transitions between reachable and unreachable rtorrent
 
   ## No-overlap guarantee
 
   The next poll is scheduled at the **end** of `handle_info/2` after the
   current poll completes. Polls cannot overlap.
+
+  ## Backoff
+
+  After `@backoff_threshold` consecutive failures the scheduling interval is
+  doubled (capped at `@max_interval_ms`). The interval resets to the configured
+  base on the first successful poll.
 
   ## Dependency injection
 
@@ -45,6 +53,11 @@ defmodule Taniwha.State.Poller do
   @commands Application.compile_env(:taniwha, :commands, Taniwha.Commands)
 
   @diff_fields Torrent.diff_fields()
+
+  # After this many consecutive failures, double the poll interval.
+  @backoff_threshold 5
+  # Maximum scheduling interval regardless of backoff multiplier (60 s).
+  @max_interval_ms 60_000
 
   # ── Public API ────────────────────────────────────────────────────────────
 
@@ -114,16 +127,23 @@ defmodule Taniwha.State.Poller do
       )
 
     schedule_poll(interval)
-    {:ok, %{interval: interval, consecutive_failures: 0}}
+
+    {:ok,
+     %{
+       base_interval: interval,
+       interval: interval,
+       consecutive_failures: 0,
+       connection_status: :connected
+     }}
   end
 
   @impl true
-  def handle_info(:poll, %{interval: interval} = state) do
+  def handle_info(:poll, state) do
     start_ms = System.monotonic_time(:millisecond)
 
     new_state =
       Tracer.with_span "taniwha.poller.cycle",
-                       %{attributes: %{"poller.interval_ms": interval}} do
+                       %{attributes: %{"poller.interval_ms": state.interval}} do
         case @commands.get_all_torrents("") do
           {:ok, torrents} ->
             new_map = Map.new(torrents, &{&1.hash, &1})
@@ -144,28 +164,45 @@ defmodule Taniwha.State.Poller do
               duration_ms: System.monotonic_time(:millisecond) - start_ms
             )
 
-            %{state | consecutive_failures: 0}
+            maybe_broadcast_status_change(state.connection_status, :connected)
+
+            %{
+              state
+              | base_interval: state.base_interval,
+                interval: state.base_interval,
+                consecutive_failures: 0,
+                connection_status: :connected
+            }
 
           {:error, reason} ->
+            failures = state.consecutive_failures + 1
+
             Logger.warning("Poll cycle failed",
               error_reason: inspect(reason),
-              consecutive_failures: state.consecutive_failures + 1
+              consecutive_failures: failures
             )
 
             Tracer.set_status(:error, inspect(reason))
             Tracer.set_attribute(:"poller.error_reason", inspect(reason))
 
-            %{state | consecutive_failures: state.consecutive_failures + 1}
+            maybe_broadcast_status_change(state.connection_status, :disconnected)
+
+            %{
+              state
+              | consecutive_failures: failures,
+                interval: compute_interval(state.base_interval, failures),
+                connection_status: :disconnected
+            }
         end
       end
 
-    schedule_poll(interval)
+    schedule_poll(new_state.interval)
     {:noreply, new_state}
   end
 
   @impl true
   def handle_cast({:set_interval, interval}, state) do
-    {:noreply, %{state | interval: interval}}
+    {:noreply, %{state | interval: interval, base_interval: interval}}
   end
 
   # ── Private helpers ───────────────────────────────────────────────────────
@@ -207,6 +244,35 @@ defmodule Taniwha.State.Poller do
         :ok
     end)
   end
+
+  @spec compute_interval(pos_integer(), non_neg_integer()) :: pos_integer()
+  defp compute_interval(base_interval, failures) when failures >= @backoff_threshold do
+    min(base_interval * 2, @max_interval_ms)
+  end
+
+  defp compute_interval(base_interval, _failures), do: base_interval
+
+  @spec maybe_broadcast_status_change(
+          :connected | :disconnected,
+          :connected | :disconnected
+        ) :: :ok
+  defp maybe_broadcast_status_change(:connected, :disconnected) do
+    Phoenix.PubSub.broadcast(
+      Taniwha.PubSub,
+      "system:status",
+      {:connection_status, :disconnected}
+    )
+  end
+
+  defp maybe_broadcast_status_change(:disconnected, :connected) do
+    Phoenix.PubSub.broadcast(
+      Taniwha.PubSub,
+      "system:status",
+      {:connection_status, :connected}
+    )
+  end
+
+  defp maybe_broadcast_status_change(_old, _new), do: :ok
 
   @spec schedule_poll(pos_integer()) :: reference()
   defp schedule_poll(interval) do

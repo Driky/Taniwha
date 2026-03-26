@@ -280,4 +280,103 @@ defmodule Taniwha.State.PollerTest do
       assert {:ok, ^torrent} = Store.get_torrent("safe")
     end
   end
+
+  # ── Batch 6: backoff and connection status ────────────────────────────────
+
+  describe "GenServer: backoff and connection status broadcast" do
+    test "after 5 consecutive failures, interval doubles" do
+      Taniwha.MockCommands
+      |> expect(:get_all_torrents, 5, fn "" -> {:error, :econnrefused} end)
+
+      pid = start_poller(1_000)
+      Enum.each(1..5, fn _ -> poll_and_wait(pid) end)
+
+      state = :sys.get_state(pid)
+      assert state.interval == 2_000
+      assert state.base_interval == 1_000
+    end
+
+    test "fewer than 5 consecutive failures do not change interval" do
+      Taniwha.MockCommands
+      |> expect(:get_all_torrents, 4, fn "" -> {:error, :econnrefused} end)
+
+      pid = start_poller(1_000)
+      Enum.each(1..4, fn _ -> poll_and_wait(pid) end)
+
+      state = :sys.get_state(pid)
+      assert state.interval == 1_000
+    end
+
+    test "interval resets to base_interval on success after failures" do
+      Taniwha.MockCommands
+      |> expect(:get_all_torrents, 5, fn "" -> {:error, :econnrefused} end)
+      |> expect(:get_all_torrents, fn "" -> {:ok, []} end)
+
+      pid = start_poller(1_000)
+      Enum.each(1..5, fn _ -> poll_and_wait(pid) end)
+      poll_and_wait(pid)
+
+      state = :sys.get_state(pid)
+      assert state.interval == 1_000
+      assert state.consecutive_failures == 0
+    end
+
+    test "broadcasts {:connection_status, :disconnected} on first failure" do
+      Phoenix.PubSub.subscribe(Taniwha.PubSub, "system:status")
+
+      Taniwha.MockCommands
+      |> expect(:get_all_torrents, fn "" -> {:error, :econnrefused} end)
+
+      pid = start_poller()
+      send(pid, :poll)
+
+      assert_receive {:connection_status, :disconnected}, 1_000
+    end
+
+    test "does NOT re-broadcast :disconnected on subsequent failures" do
+      Phoenix.PubSub.subscribe(Taniwha.PubSub, "system:status")
+
+      Taniwha.MockCommands
+      |> expect(:get_all_torrents, 2, fn "" -> {:error, :econnrefused} end)
+
+      pid = start_poller()
+
+      send(pid, :poll)
+      assert_receive {:connection_status, :disconnected}, 1_000
+
+      send(pid, :poll)
+      :sys.get_state(pid)
+
+      refute_receive {:connection_status, _}, 100
+    end
+
+    test "broadcasts {:connection_status, :connected} on recovery after failures" do
+      Phoenix.PubSub.subscribe(Taniwha.PubSub, "system:status")
+
+      Taniwha.MockCommands
+      |> expect(:get_all_torrents, fn "" -> {:error, :econnrefused} end)
+      |> expect(:get_all_torrents, fn "" -> {:ok, []} end)
+
+      pid = start_poller()
+
+      send(pid, :poll)
+      assert_receive {:connection_status, :disconnected}, 1_000
+
+      send(pid, :poll)
+      assert_receive {:connection_status, :connected}, 1_000
+    end
+
+    test "does NOT broadcast :connected on first success (no prior failure)" do
+      Phoenix.PubSub.subscribe(Taniwha.PubSub, "system:status")
+
+      Taniwha.MockCommands
+      |> expect(:get_all_torrents, fn "" -> {:ok, []} end)
+
+      pid = start_poller()
+      send(pid, :poll)
+      :sys.get_state(pid)
+
+      refute_receive {:connection_status, _}, 100
+    end
+  end
 end

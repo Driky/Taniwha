@@ -8,7 +8,7 @@ defmodule TaniwhaWeb.API.TorrentController do
 
   use TaniwhaWeb, :controller
 
-  alias Taniwha.State.Store
+  alias Taniwha.{State.Store, Validator}
 
   @commands Application.compile_env(:taniwha, :commands, Taniwha.Commands)
 
@@ -36,7 +36,10 @@ defmodule TaniwhaWeb.API.TorrentController do
   """
   @spec create(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def create(conn, %{"magnet_url" => url}) do
-    load_reply(conn, @commands.load_url(url))
+    case Validator.validate_url(url) do
+      :ok -> load_reply(conn, @commands.load_url(url))
+      {:error, :invalid_url} -> conn |> put_status(422) |> json(%{error: "invalid_url"})
+    end
   end
 
   def create(conn, %{"torrent" => %Plug.Upload{path: path}}) do
