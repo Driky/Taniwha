@@ -94,10 +94,8 @@ defmodule Taniwha.RPC.Client do
 
   @impl true
   def handle_call({:call, method, params, ctx}, _from, state) do
-    token = :otel_ctx.attach(ctx)
-
     result =
-      try do
+      with_otel_context(ctx, fn ->
         Tracer.with_span "taniwha.rpc.call",
                          %{
                            attributes: %{
@@ -106,31 +104,16 @@ defmodule Taniwha.RPC.Client do
                              "rpc.transport": transport_type(state.transport)
                            }
                          } do
-          xml = XMLRPC.encode_call(method, params)
-
-          case do_request(xml, state) do
-            {:ok, response} = ok ->
-              Tracer.set_attribute(:"rpc.response_size", byte_size(inspect(response)))
-              ok
-
-            {:error, reason} = error ->
-              Tracer.set_status(:error, inspect(reason))
-              Tracer.set_attribute(:"rpc.error_reason", inspect(reason))
-              error
-          end
+          do_request(XMLRPC.encode_call(method, params), state) |> record_rpc_result()
         end
-      after
-        :otel_ctx.detach(token)
-      end
+      end)
 
     {:reply, result, state}
   end
 
   def handle_call({:multicall, calls, ctx}, _from, state) do
-    token = :otel_ctx.attach(ctx)
-
     result =
-      try do
+      with_otel_context(ctx, fn ->
         Tracer.with_span "taniwha.rpc.multicall",
                          %{
                            attributes: %{
@@ -138,22 +121,9 @@ defmodule Taniwha.RPC.Client do
                              "rpc.transport": transport_type(state.transport)
                            }
                          } do
-          xml = XMLRPC.encode_multicall(calls)
-
-          case do_request(xml, state) do
-            {:ok, response} = ok ->
-              Tracer.set_attribute(:"rpc.response_size", byte_size(inspect(response)))
-              ok
-
-            {:error, reason} = error ->
-              Tracer.set_status(:error, inspect(reason))
-              Tracer.set_attribute(:"rpc.error_reason", inspect(reason))
-              error
-          end
+          do_request(XMLRPC.encode_multicall(calls), state) |> record_rpc_result()
         end
-      after
-        :otel_ctx.detach(token)
-      end
+      end)
 
     {:reply, result, state}
   end
@@ -161,6 +131,29 @@ defmodule Taniwha.RPC.Client do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  @spec with_otel_context(:otel_ctx.t(), (-> term())) :: term()
+  defp with_otel_context(ctx, fun) do
+    token = :otel_ctx.attach(ctx)
+
+    try do
+      fun.()
+    after
+      :otel_ctx.detach(token)
+    end
+  end
+
+  @spec record_rpc_result({:ok, term()} | {:error, term()}) :: {:ok, term()} | {:error, term()}
+  defp record_rpc_result({:ok, response} = ok) do
+    Tracer.set_attribute(:"rpc.response_size", :erlang.external_size(response))
+    ok
+  end
+
+  defp record_rpc_result({:error, reason} = error) do
+    Tracer.set_status(:error, inspect(reason))
+    Tracer.set_attribute(:"rpc.error_reason", inspect(reason))
+    error
+  end
 
   @spec transport_type(transport_config()) :: String.t()
   defp transport_type({type, _}), do: to_string(type)

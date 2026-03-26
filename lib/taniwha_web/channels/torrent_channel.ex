@@ -90,62 +90,15 @@ defmodule TaniwhaWeb.TorrentChannel do
   """
   @impl true
   def handle_in("start", %{"hash" => hash}, socket) do
-    span_name = "taniwha.channel.start"
-
-    result =
-      Tracer.with_span span_name,
-                       %{
-                         attributes: %{
-                           "channel.topic": socket.topic,
-                           "channel.event": "start",
-                           "torrent.hash": hash
-                         }
-                       } do
-        case @commands.start(hash) do
-          :ok -> :ok
-          {:error, _reason} = err -> set_error_status(err)
-        end
-      end
-
-    do_reply(result, socket)
+    with_command_span("start", hash, socket, fn -> @commands.start(hash) end)
   end
 
   def handle_in("stop", %{"hash" => hash}, socket) do
-    result =
-      Tracer.with_span "taniwha.channel.stop",
-                       %{
-                         attributes: %{
-                           "channel.topic": socket.topic,
-                           "channel.event": "stop",
-                           "torrent.hash": hash
-                         }
-                       } do
-        case @commands.stop(hash) do
-          :ok -> :ok
-          {:error, _reason} = err -> set_error_status(err)
-        end
-      end
-
-    do_reply(result, socket)
+    with_command_span("stop", hash, socket, fn -> @commands.stop(hash) end)
   end
 
   def handle_in("remove", %{"hash" => hash}, socket) do
-    result =
-      Tracer.with_span "taniwha.channel.remove",
-                       %{
-                         attributes: %{
-                           "channel.topic": socket.topic,
-                           "channel.event": "remove",
-                           "torrent.hash": hash
-                         }
-                       } do
-        case @commands.erase(hash) do
-          :ok -> :ok
-          {:error, _reason} = err -> set_error_status(err)
-        end
-      end
-
-    do_reply(result, socket)
+    with_command_span("remove", hash, socket, fn -> @commands.erase(hash) end)
   end
 
   def handle_in(
@@ -153,22 +106,9 @@ defmodule TaniwhaWeb.TorrentChannel do
         %{"hash" => hash, "index" => index, "priority" => priority},
         socket
       ) do
-    result =
-      Tracer.with_span "taniwha.channel.set_file_priority",
-                       %{
-                         attributes: %{
-                           "channel.topic": socket.topic,
-                           "channel.event": "set_file_priority",
-                           "torrent.hash": hash
-                         }
-                       } do
-        case @commands.set_file_priority(hash, index, priority) do
-          :ok -> :ok
-          {:error, _reason} = err -> set_error_status(err)
-        end
-      end
-
-    do_reply(result, socket)
+    with_command_span("set_file_priority", hash, socket, fn ->
+      @commands.set_file_priority(hash, index, priority)
+    end)
   end
 
   # ---------------------------------------------------------------------------
@@ -195,6 +135,27 @@ defmodule TaniwhaWeb.TorrentChannel do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  @spec with_command_span(String.t(), String.t(), Phoenix.Socket.t(), (-> :ok | {:error, term()})) ::
+          {:reply, :ok | {:error, map()}, Phoenix.Socket.t()}
+  defp with_command_span(event, hash, socket, command_fn) do
+    result =
+      Tracer.with_span "taniwha.channel.#{event}",
+                       %{
+                         attributes: %{
+                           "channel.topic": socket.topic,
+                           "channel.event": event,
+                           "torrent.hash": hash
+                         }
+                       } do
+        case command_fn.() do
+          :ok -> :ok
+          {:error, _reason} = err -> set_error_status(err)
+        end
+      end
+
+    do_reply(result, socket)
+  end
 
   @spec set_error_status({:error, term()}) :: {:error, term()}
   defp set_error_status({:error, reason} = error) do
