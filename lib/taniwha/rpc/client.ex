@@ -13,9 +13,20 @@ defmodule Taniwha.RPC.Client do
         scgi_connection: Taniwha.SCGI.UnixConnection,
         scgi_transport: {:unix, "/var/run/rtorrent.sock"},
         scgi_timeout: 5_000
+
+  ## Observability
+
+  Each `call/2` and `multicall/1` produces a `taniwha.rpc.call` /
+  `taniwha.rpc.multicall` OpenTelemetry span. The caller's OTel context is
+  captured before the GenServer dispatch so that spans are correctly nested
+  under the caller's parent span. See `docs/observability.md` for the full
+  span and attribute catalogue.
   """
 
   use GenServer
+
+  require Logger
+  require OpenTelemetry.Tracer, as: Tracer
 
   @behaviour Taniwha.RPC.ClientBehaviour
 
@@ -51,7 +62,8 @@ defmodule Taniwha.RPC.Client do
   @impl true
   @spec call(String.t(), [term()]) :: {:ok, term()} | {:error, term()}
   def call(method, params) when is_binary(method) and is_list(params) do
-    GenServer.call(__MODULE__, {:call, method, params}, :infinity)
+    ctx = :otel_ctx.get_current()
+    GenServer.call(__MODULE__, {:call, method, params, ctx}, :infinity)
   end
 
   @doc """
@@ -63,7 +75,8 @@ defmodule Taniwha.RPC.Client do
   @impl true
   @spec multicall([{String.t(), [term()]}]) :: {:ok, [term()]} | {:error, term()}
   def multicall(calls) when is_list(calls) do
-    GenServer.call(__MODULE__, {:multicall, calls}, :infinity)
+    ctx = :otel_ctx.get_current()
+    GenServer.call(__MODULE__, {:multicall, calls, ctx}, :infinity)
   end
 
   # ---------------------------------------------------------------------------
@@ -80,21 +93,78 @@ defmodule Taniwha.RPC.Client do
   end
 
   @impl true
-  def handle_call({:call, method, params}, _from, state) do
-    xml = XMLRPC.encode_call(method, params)
-    result = do_request(xml, state)
+  def handle_call({:call, method, params, ctx}, _from, state) do
+    token = :otel_ctx.attach(ctx)
+
+    result =
+      try do
+        Tracer.with_span "taniwha.rpc.call",
+                         %{
+                           attributes: %{
+                             "rpc.method": method,
+                             "rpc.param_count": length(params),
+                             "rpc.transport": transport_type(state.transport)
+                           }
+                         } do
+          xml = XMLRPC.encode_call(method, params)
+
+          case do_request(xml, state) do
+            {:ok, response} = ok ->
+              Tracer.set_attribute(:"rpc.response_size", byte_size(inspect(response)))
+              ok
+
+            {:error, reason} = error ->
+              Tracer.set_status(:error, inspect(reason))
+              Tracer.set_attribute(:"rpc.error_reason", inspect(reason))
+              error
+          end
+        end
+      after
+        :otel_ctx.detach(token)
+      end
+
     {:reply, result, state}
   end
 
-  def handle_call({:multicall, calls}, _from, state) do
-    xml = XMLRPC.encode_multicall(calls)
-    result = do_request(xml, state)
+  def handle_call({:multicall, calls, ctx}, _from, state) do
+    token = :otel_ctx.attach(ctx)
+
+    result =
+      try do
+        Tracer.with_span "taniwha.rpc.multicall",
+                         %{
+                           attributes: %{
+                             "rpc.call_count": length(calls),
+                             "rpc.transport": transport_type(state.transport)
+                           }
+                         } do
+          xml = XMLRPC.encode_multicall(calls)
+
+          case do_request(xml, state) do
+            {:ok, response} = ok ->
+              Tracer.set_attribute(:"rpc.response_size", byte_size(inspect(response)))
+              ok
+
+            {:error, reason} = error ->
+              Tracer.set_status(:error, inspect(reason))
+              Tracer.set_attribute(:"rpc.error_reason", inspect(reason))
+              error
+          end
+        end
+      after
+        :otel_ctx.detach(token)
+      end
+
     {:reply, result, state}
   end
 
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  @spec transport_type(transport_config()) :: String.t()
+  defp transport_type({type, _}), do: to_string(type)
+  defp transport_type({type, _, _}), do: to_string(type)
 
   @spec do_request(binary(), state()) :: {:ok, term()} | {:error, term()}
   defp do_request(xml, %{connection: conn, transport: transport, timeout: timeout}) do

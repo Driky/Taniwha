@@ -10,9 +10,23 @@ defmodule Taniwha.Commands do
 
       # config/test.exs
       config :taniwha, rpc_client: Taniwha.RPC.MockClient
+
+  ## Observability
+
+  Each public function wraps its work in an OpenTelemetry span named
+  `taniwha.commands.{function_name}`. Hash-bearing functions also set the
+  `torrent.hash` attribute. Because this module is a plain module (not a
+  GenServer), all spans automatically inherit the caller's OTel context,
+  forming a clean trace hierarchy:
+
+      HTTP span → taniwha.commands.start → taniwha.rpc.call
+
+  See `docs/observability.md` for the full attribute catalogue.
   """
 
   @behaviour Taniwha.CommandsBehaviour
+
+  require OpenTelemetry.Tracer, as: Tracer
 
   alias Taniwha.Peer
   alias Taniwha.Torrent
@@ -59,7 +73,10 @@ defmodule Taniwha.Commands do
   """
   @spec list_hashes(String.t()) :: {:ok, [String.t()]} | {:error, term()}
   def list_hashes(view \\ "") do
-    @rpc_client.call("download_list", [view])
+    Tracer.with_span "taniwha.commands.list_hashes",
+                     %{attributes: %{"command.name": "list_hashes"}} do
+      @rpc_client.call("download_list", [view])
+    end
   end
 
   @doc """
@@ -70,11 +87,14 @@ defmodule Taniwha.Commands do
   """
   @spec get_torrent(String.t()) :: {:ok, Torrent.t()} | {:error, term()}
   def get_torrent(hash) do
-    calls = Enum.map(Torrent.rpc_fields(), fn field -> {field, [hash]} end)
+    Tracer.with_span "taniwha.commands.get_torrent",
+                     %{attributes: %{"command.name": "get_torrent", "torrent.hash": hash}} do
+      calls = Enum.map(Torrent.rpc_fields(), fn field -> {field, [hash]} end)
 
-    with {:ok, results} <- @rpc_client.multicall(calls) do
-      values = Enum.map(results, fn [v] -> v end)
-      {:ok, Torrent.from_rpc_values(hash, values)}
+      with {:ok, results} <- @rpc_client.multicall(calls) do
+        values = Enum.map(results, fn [v] -> v end)
+        {:ok, Torrent.from_rpc_values(hash, values)}
+      end
     end
   end
 
@@ -87,9 +107,12 @@ defmodule Taniwha.Commands do
   @impl Taniwha.CommandsBehaviour
   @spec get_all_torrents(String.t()) :: {:ok, [Torrent.t()]} | {:error, term()}
   def get_all_torrents(view \\ "") do
-    with {:ok, hashes} <- list_hashes(view),
-         {:ok, results} <- fetch_all_torrent_data(hashes) do
-      {:ok, build_torrents(hashes, results)}
+    Tracer.with_span "taniwha.commands.get_all_torrents",
+                     %{attributes: %{"command.name": "get_all_torrents"}} do
+      with {:ok, hashes} <- list_hashes(view),
+           {:ok, results} <- fetch_all_torrent_data(hashes) do
+        {:ok, build_torrents(hashes, results)}
+      end
     end
   end
 
@@ -100,30 +123,60 @@ defmodule Taniwha.Commands do
   @doc "Starts a torrent. Returns `:ok` on success."
   @impl Taniwha.CommandsBehaviour
   @spec start(String.t()) :: :ok | {:error, term()}
-  def start(hash), do: run_lifecycle("d.start", hash)
+  def start(hash) do
+    Tracer.with_span "taniwha.commands.start",
+                     %{attributes: %{"command.name": "start", "torrent.hash": hash}} do
+      run_lifecycle("d.start", hash)
+    end
+  end
 
   @doc "Stops a torrent. Returns `:ok` on success."
   @impl Taniwha.CommandsBehaviour
   @spec stop(String.t()) :: :ok | {:error, term()}
-  def stop(hash), do: run_lifecycle("d.stop", hash)
+  def stop(hash) do
+    Tracer.with_span "taniwha.commands.stop",
+                     %{attributes: %{"command.name": "stop", "torrent.hash": hash}} do
+      run_lifecycle("d.stop", hash)
+    end
+  end
 
   @doc "Closes a torrent (releases tracker connections). Returns `:ok` on success."
   @spec close(String.t()) :: :ok | {:error, term()}
-  def close(hash), do: run_lifecycle("d.close", hash)
+  def close(hash) do
+    Tracer.with_span "taniwha.commands.close",
+                     %{attributes: %{"command.name": "close", "torrent.hash": hash}} do
+      run_lifecycle("d.close", hash)
+    end
+  end
 
   @doc "Erases a torrent from rtorrent. Returns `:ok` on success."
   @impl Taniwha.CommandsBehaviour
   @spec erase(String.t()) :: :ok | {:error, term()}
-  def erase(hash), do: run_lifecycle("d.erase", hash)
+  def erase(hash) do
+    Tracer.with_span "taniwha.commands.erase",
+                     %{attributes: %{"command.name": "erase", "torrent.hash": hash}} do
+      run_lifecycle("d.erase", hash)
+    end
+  end
 
   @impl Taniwha.CommandsBehaviour
   @doc "Pauses a torrent. Returns `:ok` on success."
   @spec pause(String.t()) :: :ok | {:error, term()}
-  def pause(hash), do: run_lifecycle("d.pause", hash)
+  def pause(hash) do
+    Tracer.with_span "taniwha.commands.pause",
+                     %{attributes: %{"command.name": "pause", "torrent.hash": hash}} do
+      run_lifecycle("d.pause", hash)
+    end
+  end
 
   @doc "Resumes a paused torrent. Returns `:ok` on success."
   @spec resume(String.t()) :: :ok | {:error, term()}
-  def resume(hash), do: run_lifecycle("d.resume", hash)
+  def resume(hash) do
+    Tracer.with_span "taniwha.commands.resume",
+                     %{attributes: %{"command.name": "resume", "torrent.hash": hash}} do
+      run_lifecycle("d.resume", hash)
+    end
+  end
 
   # ---------------------------------------------------------------------------
   # Load commands
@@ -138,7 +191,10 @@ defmodule Taniwha.Commands do
   @impl Taniwha.CommandsBehaviour
   @spec load_url(String.t()) :: :ok | {:error, term()}
   def load_url(url) do
-    @rpc_client.call("load.start", ["", url]) |> ok_on_zero()
+    Tracer.with_span "taniwha.commands.load_url",
+                     %{attributes: %{"command.name": "load_url"}} do
+      @rpc_client.call("load.start", ["", url]) |> ok_on_zero()
+    end
   end
 
   @doc """
@@ -151,7 +207,10 @@ defmodule Taniwha.Commands do
   @impl Taniwha.CommandsBehaviour
   @spec load_raw(binary()) :: :ok | {:error, term()}
   def load_raw(data) do
-    @rpc_client.call("load.raw_start", ["", {:base64, data}]) |> ok_on_zero()
+    Tracer.with_span "taniwha.commands.load_raw",
+                     %{attributes: %{"command.name": "load_raw"}} do
+      @rpc_client.call("load.raw_start", ["", {:base64, data}]) |> ok_on_zero()
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -167,19 +226,22 @@ defmodule Taniwha.Commands do
   @impl Taniwha.CommandsBehaviour
   @spec list_files(String.t()) :: {:ok, [TorrentFile.t()]} | {:error, term()}
   def list_files(hash) do
-    with {:ok, files} <- @rpc_client.call("f.multicall", [hash, "" | @file_fields]) do
-      result =
-        Enum.map(files, fn [path, size, priority, completed, total] ->
-          %TorrentFile{
-            path: path,
-            size: size,
-            priority: priority,
-            completed_chunks: completed,
-            total_chunks: total
-          }
-        end)
+    Tracer.with_span "taniwha.commands.list_files",
+                     %{attributes: %{"command.name": "list_files", "torrent.hash": hash}} do
+      with {:ok, files} <- @rpc_client.call("f.multicall", [hash, "" | @file_fields]) do
+        result =
+          Enum.map(files, fn [path, size, priority, completed, total] ->
+            %TorrentFile{
+              path: path,
+              size: size,
+              priority: priority,
+              completed_chunks: completed,
+              total_chunks: total
+            }
+          end)
 
-      {:ok, result}
+        {:ok, result}
+      end
     end
   end
 
@@ -192,20 +254,23 @@ defmodule Taniwha.Commands do
   @impl Taniwha.CommandsBehaviour
   @spec list_peers(String.t()) :: {:ok, [Peer.t()]} | {:error, term()}
   def list_peers(hash) do
-    with {:ok, peers} <- @rpc_client.call("p.multicall", [hash, "" | @peer_fields]) do
-      result =
-        Enum.map(peers, fn [addr, port, client, down, up, pct] ->
-          %Peer{
-            address: addr,
-            port: port,
-            client_version: client,
-            down_rate: down,
-            up_rate: up,
-            completed_percent: pct * 1.0
-          }
-        end)
+    Tracer.with_span "taniwha.commands.list_peers",
+                     %{attributes: %{"command.name": "list_peers", "torrent.hash": hash}} do
+      with {:ok, peers} <- @rpc_client.call("p.multicall", [hash, "" | @peer_fields]) do
+        result =
+          Enum.map(peers, fn [addr, port, client, down, up, pct] ->
+            %Peer{
+              address: addr,
+              port: port,
+              client_version: client,
+              down_rate: down,
+              up_rate: up,
+              completed_percent: pct * 1.0
+            }
+          end)
 
-      {:ok, result}
+        {:ok, result}
+      end
     end
   end
 
@@ -218,19 +283,22 @@ defmodule Taniwha.Commands do
   @impl Taniwha.CommandsBehaviour
   @spec list_trackers(String.t()) :: {:ok, [Tracker.t()]} | {:error, term()}
   def list_trackers(hash) do
-    with {:ok, trackers} <- @rpc_client.call("t.multicall", [hash, "" | @tracker_fields]) do
-      result =
-        Enum.map(trackers, fn [url, enabled, complete, incomplete, interval] ->
-          %Tracker{
-            url: url,
-            is_enabled: enabled == 1,
-            scrape_complete: complete,
-            scrape_incomplete: incomplete,
-            normal_interval: interval
-          }
-        end)
+    Tracer.with_span "taniwha.commands.list_trackers",
+                     %{attributes: %{"command.name": "list_trackers", "torrent.hash": hash}} do
+      with {:ok, trackers} <- @rpc_client.call("t.multicall", [hash, "" | @tracker_fields]) do
+        result =
+          Enum.map(trackers, fn [url, enabled, complete, incomplete, interval] ->
+            %Tracker{
+              url: url,
+              is_enabled: enabled == 1,
+              scrape_complete: complete,
+              scrape_incomplete: incomplete,
+              normal_interval: interval
+            }
+          end)
 
-      {:ok, result}
+        {:ok, result}
+      end
     end
   end
 
@@ -244,7 +312,10 @@ defmodule Taniwha.Commands do
   @spec set_file_priority(String.t(), non_neg_integer(), non_neg_integer()) ::
           :ok | {:error, term()}
   def set_file_priority(hash, index, priority) do
-    @rpc_client.call("f.priority.set", ["#{hash}:f#{index}", priority]) |> ok_on_zero()
+    Tracer.with_span "taniwha.commands.set_file_priority",
+                     %{attributes: %{"command.name": "set_file_priority", "torrent.hash": hash}} do
+      @rpc_client.call("f.priority.set", ["#{hash}:f#{index}", priority]) |> ok_on_zero()
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -254,13 +325,19 @@ defmodule Taniwha.Commands do
   @doc "Returns the current global upload rate in bytes per second."
   @spec global_up_rate() :: {:ok, non_neg_integer()} | {:error, term()}
   def global_up_rate do
-    @rpc_client.call("throttle.global_up.rate", [])
+    Tracer.with_span "taniwha.commands.global_up_rate",
+                     %{attributes: %{"command.name": "global_up_rate"}} do
+      @rpc_client.call("throttle.global_up.rate", [])
+    end
   end
 
   @doc "Returns the current global download rate in bytes per second."
   @spec global_down_rate() :: {:ok, non_neg_integer()} | {:error, term()}
   def global_down_rate do
-    @rpc_client.call("throttle.global_down.rate", [])
+    Tracer.with_span "taniwha.commands.global_down_rate",
+                     %{attributes: %{"command.name": "global_down_rate"}} do
+      @rpc_client.call("throttle.global_down.rate", [])
+    end
   end
 
   # ---------------------------------------------------------------------------

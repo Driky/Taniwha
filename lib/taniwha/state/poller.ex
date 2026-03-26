@@ -25,11 +25,19 @@ defmodule Taniwha.State.Poller do
 
       # config/test.exs
       config :taniwha, commands: Taniwha.MockCommands
+
+  ## Observability
+
+  Each poll cycle produces a `taniwha.poller.cycle` OpenTelemetry span with
+  `poller.torrent_count`, `poller.diff_count`, and `poller.interval_ms`
+  attributes. Error paths set the span status to `:error`. See
+  `docs/observability.md` for the full attribute catalogue.
   """
 
   use GenServer
 
   require Logger
+  require OpenTelemetry.Tracer, as: Tracer
 
   alias Taniwha.State.Store
   alias Taniwha.Torrent
@@ -112,18 +120,28 @@ defmodule Taniwha.State.Poller do
   @impl true
   def handle_info(:poll, %{interval: interval} = state) do
     new_state =
-      case @commands.get_all_torrents("") do
-        {:ok, torrents} ->
-          new_map = Map.new(torrents, &{&1.hash, &1})
-          old_map = Map.new(Store.get_all_torrents(), &{&1.hash, &1})
-          diffs = compute_diffs(old_map, new_map)
-          apply_diffs(diffs)
-          maybe_broadcast(diffs)
-          %{state | consecutive_failures: 0}
+      Tracer.with_span "taniwha.poller.cycle",
+                       %{attributes: %{"poller.interval_ms": interval}} do
+        case @commands.get_all_torrents("") do
+          {:ok, torrents} ->
+            new_map = Map.new(torrents, &{&1.hash, &1})
+            old_map = Map.new(Store.get_all_torrents(), &{&1.hash, &1})
+            diffs = compute_diffs(old_map, new_map)
+            apply_diffs(diffs)
+            maybe_broadcast(diffs)
 
-        {:error, reason} ->
-          Logger.warning("Poller: failed to fetch torrents: #{inspect(reason)}")
-          %{state | consecutive_failures: state.consecutive_failures + 1}
+            Tracer.set_attribute(:"poller.torrent_count", length(torrents))
+            Tracer.set_attribute(:"poller.diff_count", length(diffs))
+
+            %{state | consecutive_failures: 0}
+
+          {:error, reason} ->
+            Logger.warning("Poller: failed to fetch torrents: #{inspect(reason)}")
+            Tracer.set_status(:error, inspect(reason))
+            Tracer.set_attribute(:"poller.error_reason", inspect(reason))
+
+            %{state | consecutive_failures: state.consecutive_failures + 1}
+        end
       end
 
     schedule_poll(interval)

@@ -19,9 +19,19 @@ defmodule TaniwhaWeb.TorrentChannel do
 
     * `"diffs"` – list of changes to the torrent list (`%{diffs: [...]}`)
     * `"updated"` – single torrent updated (`%{torrent: %{...}}`)
+
+  ## Observability
+
+  Each `handle_in` callback wraps its work in a `taniwha.channel.{event}`
+  OpenTelemetry span with `channel.topic`, `channel.event`, and `torrent.hash`
+  attributes. Error paths set the span status to `:error`. The WebSocket
+  connections gauge in `Taniwha.Telemetry.Metrics` is updated on join and
+  terminate. See `docs/observability.md` for the full catalogue.
   """
 
   use TaniwhaWeb, :channel
+
+  require OpenTelemetry.Tracer, as: Tracer
 
   alias Taniwha.State.Store
   alias TaniwhaWeb.API.TorrentJSON
@@ -42,6 +52,7 @@ defmodule TaniwhaWeb.TorrentChannel do
   @impl true
   def join("torrents:list", _payload, socket) do
     :ok = Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:list")
+    Taniwha.Telemetry.Metrics.inc_websocket_connections()
     torrents = Enum.map(Store.get_all_torrents(), &TorrentJSON.torrent/1)
     {:ok, %{torrents: torrents}, socket}
   end
@@ -50,11 +61,22 @@ defmodule TaniwhaWeb.TorrentChannel do
     case Store.get_torrent(hash) do
       {:ok, torrent} ->
         :ok = Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:#{hash}")
+        Taniwha.Telemetry.Metrics.inc_websocket_connections()
         {:ok, %{torrent: TorrentJSON.torrent(torrent)}, socket}
 
       {:error, :not_found} ->
         {:error, %{reason: "torrent_not_found"}}
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Terminate
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def terminate(_reason, _socket) do
+    Taniwha.Telemetry.Metrics.dec_websocket_connections()
+    :ok
   end
 
   # ---------------------------------------------------------------------------
@@ -67,21 +89,87 @@ defmodule TaniwhaWeb.TorrentChannel do
   `{:error, %{reason: reason}}`.
   """
   @impl true
-  def handle_in("start", %{"hash" => hash}, socket),
-    do: do_reply(@commands.start(hash), socket)
+  def handle_in("start", %{"hash" => hash}, socket) do
+    span_name = "taniwha.channel.start"
 
-  def handle_in("stop", %{"hash" => hash}, socket),
-    do: do_reply(@commands.stop(hash), socket)
+    result =
+      Tracer.with_span span_name,
+                       %{
+                         attributes: %{
+                           "channel.topic": socket.topic,
+                           "channel.event": "start",
+                           "torrent.hash": hash
+                         }
+                       } do
+        case @commands.start(hash) do
+          :ok -> :ok
+          {:error, _reason} = err -> set_error_status(err)
+        end
+      end
 
-  def handle_in("remove", %{"hash" => hash}, socket),
-    do: do_reply(@commands.erase(hash), socket)
+    do_reply(result, socket)
+  end
+
+  def handle_in("stop", %{"hash" => hash}, socket) do
+    result =
+      Tracer.with_span "taniwha.channel.stop",
+                       %{
+                         attributes: %{
+                           "channel.topic": socket.topic,
+                           "channel.event": "stop",
+                           "torrent.hash": hash
+                         }
+                       } do
+        case @commands.stop(hash) do
+          :ok -> :ok
+          {:error, _reason} = err -> set_error_status(err)
+        end
+      end
+
+    do_reply(result, socket)
+  end
+
+  def handle_in("remove", %{"hash" => hash}, socket) do
+    result =
+      Tracer.with_span "taniwha.channel.remove",
+                       %{
+                         attributes: %{
+                           "channel.topic": socket.topic,
+                           "channel.event": "remove",
+                           "torrent.hash": hash
+                         }
+                       } do
+        case @commands.erase(hash) do
+          :ok -> :ok
+          {:error, _reason} = err -> set_error_status(err)
+        end
+      end
+
+    do_reply(result, socket)
+  end
 
   def handle_in(
         "set_file_priority",
         %{"hash" => hash, "index" => index, "priority" => priority},
         socket
-      ),
-      do: do_reply(@commands.set_file_priority(hash, index, priority), socket)
+      ) do
+    result =
+      Tracer.with_span "taniwha.channel.set_file_priority",
+                       %{
+                         attributes: %{
+                           "channel.topic": socket.topic,
+                           "channel.event": "set_file_priority",
+                           "torrent.hash": hash
+                         }
+                       } do
+        case @commands.set_file_priority(hash, index, priority) do
+          :ok -> :ok
+          {:error, _reason} = err -> set_error_status(err)
+        end
+      end
+
+    do_reply(result, socket)
+  end
 
   # ---------------------------------------------------------------------------
   # PubSub handle_info
@@ -107,6 +195,12 @@ defmodule TaniwhaWeb.TorrentChannel do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  @spec set_error_status({:error, term()}) :: {:error, term()}
+  defp set_error_status({:error, reason} = error) do
+    Tracer.set_status(:error, inspect(reason))
+    error
+  end
 
   @spec do_reply(:ok | {:error, term()}, Phoenix.Socket.t()) ::
           {:reply, :ok | {:error, map()}, Phoenix.Socket.t()}

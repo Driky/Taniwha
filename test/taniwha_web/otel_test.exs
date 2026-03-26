@@ -25,25 +25,13 @@ defmodule TaniwhaWeb.OtelTest do
   use TaniwhaWeb.ConnCase, async: false
 
   import Mox
+  import Taniwha.OtelTestHelper
 
   require OpenTelemetry.Tracer
-  require Record
-
-  # Pull in the span record so we can read span fields in assertions.
-  @span_fields Record.extract(:span, from_lib: "opentelemetry/include/otel_span.hrl")
-  Record.defrecordp(:span, @span_fields)
 
   setup :set_mox_from_context
   setup :verify_on_exit!
-
-  setup do
-    # Route exported spans to this test process for the duration of the test.
-    # on_exit restores the exporter so spans after this test are silently dropped
-    # (sent to the exiting cleanup process) rather than leaking into other modules.
-    :otel_simple_processor.set_exporter(:otel_exporter_pid, self())
-    on_exit(fn -> :otel_simple_processor.set_exporter(:otel_exporter_pid, self()) end)
-    :ok
-  end
+  setup :setup_otel_exporter
 
   describe "OTel pipeline" do
     test "a manually created span is exported to the configured exporter" do
@@ -51,8 +39,7 @@ defmodule TaniwhaWeb.OtelTest do
         OpenTelemetry.Tracer.set_attributes([{:"test.key", "hello"}])
       end
 
-      assert_receive {:span, span}, 2_000
-      assert span(span, :name) == "taniwha.test.pipeline"
+      span = assert_span("taniwha.test.pipeline")
       assert span_attribute(span, "test.key") == "hello"
     end
   end
@@ -65,26 +52,9 @@ defmodule TaniwhaWeb.OtelTest do
         # in this process and calls Tracer.set_attributes on the current span.
       end
 
-      assert_receive {:span, span}, 2_000
       # The router dispatch handler updates the span name to "METHOD ROUTE"
-      assert span(span, :name) == "GET /api/v1/torrents"
+      span = assert_span("GET /api/v1/torrents")
       assert span_attribute(span, "http.route") == "/api/v1/torrents"
     end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Helpers
-  # ---------------------------------------------------------------------------
-
-  # Attribute keys in OTel spans are atoms (e.g. :"http.route").
-  # Accept both string and atom keys for convenience.
-  defp span_attribute(span_record, key) when is_binary(key),
-    do: span_attribute(span_record, String.to_atom(key))
-
-  defp span_attribute(span_record, key) when is_atom(key) do
-    span_record
-    |> span(:attributes)
-    |> :otel_attributes.map()
-    |> Map.get(key)
   end
 end
