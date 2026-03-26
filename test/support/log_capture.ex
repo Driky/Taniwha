@@ -86,18 +86,7 @@ defmodule Taniwha.LogCapture do
 
   # ── Private helpers ────────────────────────────────────────────────────────
 
-  # Returns :lt if level_a is less severe than level_b (e.g. :debug < :warning).
-  @levels [:debug, :info, :notice, :warning, :error, :critical, :alert, :emergency]
-  defp compare_levels(a, b) do
-    ia = Enum.find_index(@levels, &(&1 == a)) || 0
-    ib = Enum.find_index(@levels, &(&1 == b)) || 0
-
-    cond do
-      ia < ib -> :lt
-      ia > ib -> :gt
-      true -> :eq
-    end
-  end
+  defp compare_levels(a, b), do: :logger.compare_levels(a, b)
 
   defp collect_events(acc \\ []) do
     receive do

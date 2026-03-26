@@ -132,12 +132,15 @@ defmodule Taniwha.State.Poller do
             apply_diffs(diffs)
             maybe_broadcast(diffs)
 
-            Tracer.set_attribute(:"poller.torrent_count", length(torrents))
-            Tracer.set_attribute(:"poller.diff_count", length(diffs))
+            torrent_count = length(torrents)
+            diff_count = length(diffs)
+
+            Tracer.set_attribute(:"poller.torrent_count", torrent_count)
+            Tracer.set_attribute(:"poller.diff_count", diff_count)
 
             Logger.debug("Poll cycle completed",
-              torrent_count: length(torrents),
-              diff_count: length(diffs),
+              torrent_count: torrent_count,
+              diff_count: diff_count,
               duration_ms: System.monotonic_time(:millisecond) - start_ms
             )
 

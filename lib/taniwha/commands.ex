@@ -170,6 +170,7 @@ defmodule Taniwha.Commands do
   def pause(hash) do
     Tracer.with_span "taniwha.commands.pause",
                      %{attributes: %{"command.name": "pause", "torrent.hash": hash}} do
+      Logger.info("Command executed", command: "pause", torrent_hash: hash)
       run_lifecycle("d.pause", hash)
     end
   end
@@ -179,6 +180,7 @@ defmodule Taniwha.Commands do
   def resume(hash) do
     Tracer.with_span "taniwha.commands.resume",
                      %{attributes: %{"command.name": "resume", "torrent.hash": hash}} do
+      Logger.info("Command executed", command: "resume", torrent_hash: hash)
       run_lifecycle("d.resume", hash)
     end
   end

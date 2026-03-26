@@ -94,6 +94,8 @@ defmodule Taniwha.RPC.Client do
 
   @impl true
   def handle_call({:call, method, params, ctx}, _from, state) do
+    transport = transport_type(state.transport)
+
     result =
       with_otel_context(ctx, fn ->
         Tracer.with_span "taniwha.rpc.call",
@@ -101,7 +103,7 @@ defmodule Taniwha.RPC.Client do
                            attributes: %{
                              "rpc.method": method,
                              "rpc.param_count": length(params),
-                             "rpc.transport": transport_type(state.transport)
+                             "rpc.transport": transport
                            }
                          } do
           case do_request(XMLRPC.encode_call(method, params), state) do
@@ -109,7 +111,7 @@ defmodule Taniwha.RPC.Client do
               Logger.warning("RPC call failed",
                 rpc_method: method,
                 error_reason: inspect(reason),
-                transport: transport_type(state.transport)
+                transport: transport
               )
 
               record_rpc_result(error)
@@ -124,16 +126,30 @@ defmodule Taniwha.RPC.Client do
   end
 
   def handle_call({:multicall, calls, ctx}, _from, state) do
+    transport = transport_type(state.transport)
+
     result =
       with_otel_context(ctx, fn ->
         Tracer.with_span "taniwha.rpc.multicall",
                          %{
                            attributes: %{
                              "rpc.call_count": length(calls),
-                             "rpc.transport": transport_type(state.transport)
+                             "rpc.transport": transport
                            }
                          } do
-          do_request(XMLRPC.encode_multicall(calls), state) |> record_rpc_result()
+          case do_request(XMLRPC.encode_multicall(calls), state) do
+            {:error, reason} = error ->
+              Logger.warning("RPC multicall failed",
+                rpc_call_count: length(calls),
+                error_reason: inspect(reason),
+                transport: transport
+              )
+
+              record_rpc_result(error)
+
+            result ->
+              record_rpc_result(result)
+          end
         end
       end)
 
