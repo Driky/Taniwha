@@ -24,4 +24,5 @@ defmodule Taniwha.CommandsBehaviour do
   @callback list_trackers(String.t()) :: {:ok, [Tracker.t()]} | {:error, term()}
   @callback load_url(String.t()) :: :ok | {:error, term()}
   @callback load_raw(binary()) :: :ok | {:error, term()}
+  @callback system_pid() :: {:ok, term()} | {:error, term()}
 end

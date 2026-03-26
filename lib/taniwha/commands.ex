@@ -350,6 +350,21 @@ defmodule Taniwha.Commands do
     end
   end
 
+  @doc """
+  Returns the rtorrent process ID.
+
+  Used by the health check endpoint to verify rtorrent connectivity. Returns
+  `{:ok, pid}` when rtorrent responds, or `{:error, reason}` when unreachable.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec system_pid() :: {:ok, term()} | {:error, term()}
+  def system_pid do
+    Tracer.with_span "taniwha.commands.system_pid",
+                     %{attributes: %{"command.name": "system_pid"}} do
+      @rpc_client.call("system.pid", [])
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------

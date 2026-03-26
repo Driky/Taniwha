@@ -128,6 +128,7 @@ When defining `Telemetry.Metrics` specs the `name` option uses dot-notation stri
 | `taniwha.commands.list_peers` | Domain | `Taniwha.Commands` | `command.name`, `torrent.hash` | — |
 | `taniwha.commands.list_trackers` | Domain | `Taniwha.Commands` | `command.name`, `torrent.hash` | — |
 | `taniwha.commands.set_file_priority` | Domain | `Taniwha.Commands` | `command.name`, `torrent.hash` | `taniwha.channel.set_file_priority` |
+| `taniwha.commands.system_pid` | Domain | `Taniwha.Commands` | `command.name` | `GET /health` HTTP span |
 | `taniwha.channel.start` | Channel | `TaniwhaWeb.TorrentChannel` | `channel.topic`, `channel.event`, `torrent.hash` | HTTP upgrade (auto) |
 | `taniwha.channel.stop` | Channel | `TaniwhaWeb.TorrentChannel` | `channel.topic`, `channel.event`, `torrent.hash` | HTTP upgrade (auto) |
 | `taniwha.channel.remove` | Channel | `TaniwhaWeb.TorrentChannel` | `channel.topic`, `channel.event`, `torrent.hash` | HTTP upgrade (auto) |
@@ -256,3 +257,80 @@ Key points:
 4. Add the public update function to `Taniwha.Telemetry.Metrics` and its `@spec`.
 5. Write a test that attaches a `:telemetry` handler, calls the function under test,
    and asserts the event was received.
+
+---
+
+## Backend configuration
+
+### SigNoz Cloud
+
+```bash
+OTEL_SERVICE_NAME=taniwha
+OTEL_EXPORTER_OTLP_ENDPOINT=https://ingest.us.signoz.cloud:443
+OTEL_EXPORTER_OTLP_HEADERS=signoz-ingestion-key=<your-key>
+OTEL_EXPORTER_OTLP_PROTOCOL=http_protobuf
+```
+
+### Self-hosted SigNoz
+
+```bash
+OTEL_SERVICE_NAME=taniwha
+OTEL_EXPORTER_OTLP_ENDPOINT=http://<signoz-host>:4318
+OTEL_EXPORTER_OTLP_PROTOCOL=http_protobuf
+```
+
+### Jaeger (all-in-one)
+
+```bash
+OTEL_SERVICE_NAME=taniwha
+OTEL_EXPORTER_OTLP_ENDPOINT=http://<jaeger-host>:4318
+OTEL_EXPORTER_OTLP_PROTOCOL=http_protobuf
+```
+
+### Grafana Tempo
+
+```bash
+OTEL_SERVICE_NAME=taniwha
+OTEL_EXPORTER_OTLP_ENDPOINT=http://<tempo-host>:4318
+OTEL_EXPORTER_OTLP_PROTOCOL=http_protobuf
+# If using Grafana Cloud:
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <base64-encoded-user:token>
+```
+
+---
+
+## Disabling telemetry
+
+**Disable tracing entirely** (metrics still collected locally):
+
+```bash
+OTEL_TRACES_SAMPLER=always_off
+```
+
+**Disable trace export** (leave `OTEL_EXPORTER_OTLP_ENDPOINT` unset or point to a no-op collector):
+
+The application will warn at startup if `OTEL_EXPORTER_OTLP_ENDPOINT` is not set, then default to `http://localhost:4318`. If no collector is running there, spans are silently dropped.
+
+---
+
+## Local development (stdout exporter)
+
+In `dev` mode, spans are printed to stdout via the OTel `:simple_span_processor` and
+`:otel_exporter_stdout` exporter (configured in `config/dev.exs`). No env vars are needed.
+
+```bash
+iex -S mix phx.server
+# Spans appear as Erlang term output in the console
+```
+
+---
+
+## Log correlation with traces
+
+Logs emitted inside an active OTel span automatically include `trace_id` and `span_id`
+in their Erlang `:logger` metadata (via `opentelemetry_logger_metadata`). These fields
+appear in console output and in any downstream log shipper.
+
+Native OTLP log export (`otel_exporter_logs_otlp`) is not yet implemented in the
+OTel Erlang SDK 1.7.x. Use a log shipper (Vector, Fluentd, Fluent Bit) or the
+SigNoz collector's file input to forward stdout logs to your backend.

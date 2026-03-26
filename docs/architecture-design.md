@@ -49,16 +49,16 @@ Taniwha is a Phoenix application that wraps rtorrent's SCGI/XML-RPC interface be
 
 ```
 Taniwha.Application
-├── Taniwha.State.Store            # ETS table owner (GenServer)
+├── Phoenix.PubSub                 # Broadcast infrastructure (name: Taniwha.PubSub)
+├── Taniwha.RateLimiter            # ETS-backed rate limiter (GenServer)
 ├── Taniwha.RPC.Client             # SCGI/XML-RPC command dispatch (GenServer)
+├── Taniwha.State.Store            # ETS table owner (GenServer)
 ├── Taniwha.State.Poller           # Periodic polling + diff engine (GenServer)
-├── TaniwhaWeb.Endpoint            # Phoenix endpoint
-│   ├── Phoenix.PubSub             # Broadcast infrastructure (name: Taniwha.PubSub)
-│   └── TaniwhaWeb.UserSocket      # WebSocket entry point
-└── Taniwha.Auth.TokenManager      # API key / JWT config
+└── TaniwhaWeb.Endpoint            # Phoenix endpoint (Bandit HTTP server)
+    └── TaniwhaWeb.UserSocket      # WebSocket entry point
 ```
 
-**Startup order matters:** Store must start before Poller (ETS table must exist). RPC.Client must start before Poller (Poller calls RPC). The order in the supervisor child list enforces this naturally via `one_for_one` strategy.
+**Startup order matters:** `Taniwha.RateLimiter` must be up before `TaniwhaWeb.Endpoint` (the first HTTP request must never arrive before the ETS table is ready). Store must start before Poller (ETS table must exist). RPC.Client must start before Poller (Poller calls RPC). The order in the supervisor child list enforces this naturally via the `one_for_one` strategy.
 
 ---
 
@@ -238,8 +238,11 @@ end
 | `load_raw(binary)` | `load.raw_start` | `:ok \| {:error, term()}` |
 | `list_files(hash)` | `f.multicall` | `{:ok, [TorrentFile.t()]}` |
 | `set_file_priority(hash, index, priority)` | `f.priority.set` | `:ok \| {:error, term()}` |
+| `list_peers(hash)` | `p.multicall` | `{:ok, [Peer.t()]}` |
+| `list_trackers(hash)` | `t.multicall` | `{:ok, [Tracker.t()]}` |
 | `global_up_rate()` | `throttle.global_up.rate` | `{:ok, non_neg_integer()}` |
 | `global_down_rate()` | `throttle.global_down.rate` | `{:ok, non_neg_integer()}` |
+| `system_pid()` | `system.pid` | `{:ok, term()} \| {:error, term()}` |
 
 ---
 
@@ -550,7 +553,36 @@ config :taniwha,
 
 ---
 
-## 15. Deployment architecture
+## 15. Rate limiting
+
+Taniwha rate-limits the two attack surfaces that an unauthenticated actor can reach.
+
+### REST auth endpoint (`POST /api/v1/auth/token`)
+
+A sliding-window ETS counter implemented in `Taniwha.RateLimiter` (GenServer) prevents brute-force enumeration of `TANIWHA_API_KEY`. The plug `TaniwhaWeb.Plugs.RateLimit` is applied in the `:api_auth` pipeline. When the limit is exceeded the request is halted with **429 Too Many Requests** and a `Retry-After` header.
+
+Defaults: 10 requests per 60 seconds per client IP. Configurable via application config (`:rate_limit_max`, `:rate_limit_window_ms`).
+
+### WebSocket commands
+
+`TaniwhaWeb.TorrentChannel` enforces a **500 ms minimum interval** between commands on any single socket connection. The timestamp is stored in socket assigns (`last_command_at`). Commands that arrive too quickly are rejected with `{:error, %{reason: "rate_limited"}}` without calling rtorrent. This prevents socket-level spam without per-IP coordination.
+
+---
+
+## 16. Health check
+
+`GET /health` is an unauthenticated endpoint that always returns **HTTP 200**. It calls `Taniwha.Commands.system_pid/0` (the `system.pid` rtorrent RPC method) to probe real connectivity. The response body indicates the actual status:
+
+```json
+{"status": "ok", "rtorrent": "connected"}
+{"status": "ok", "rtorrent": "disconnected"}
+```
+
+Returning 200 in both cases keeps load balancers and process supervisors happy. Monitoring tools read the `rtorrent` field for alerting.
+
+---
+
+## 17. Deployment architecture
 
 **Production deployment:** Docker image built via multi-stage Dockerfile, pushed to GitHub Container Registry (ghcr.io), pulled to an Ubuntu server via SSH. rtorrent runs on the same machine — its Unix socket is mounted into the container as a volume.
 

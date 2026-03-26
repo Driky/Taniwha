@@ -330,3 +330,42 @@ sudo systemctl start taniwha
 During a deployment the sequence is: stop → remove → pull → start.
 This causes a brief downtime of approximately 2–10 seconds (depending on network speed and startup time).
 This is acceptable for v1. Zero-downtime deployments (e.g., blue/green) can be added in a future iteration.
+
+---
+
+## OpenTelemetry configuration
+
+Taniwha ships with built-in OTel tracing, metrics, and structured logging. In production the OTLP exporter is active; in development the stdout exporter is used.
+
+### Environment variables
+
+Add these to your `.env` file:
+
+```bash
+# Required — URL of your OTLP collector (HTTP/protobuf endpoint)
+OTEL_EXPORTER_OTLP_ENDPOINT=http://your-collector:4318
+
+# Optional
+OTEL_SERVICE_NAME=taniwha
+OTEL_EXPORTER_OTLP_PROTOCOL=http_protobuf   # or grpc
+OTEL_EXPORTER_OTLP_HEADERS=signoz-ingestion-key=<key>   # for SigNoz Cloud
+OTEL_TRACES_SAMPLER=always_off              # to disable tracing
+```
+
+If `OTEL_EXPORTER_OTLP_ENDPOINT` is not set, Taniwha will warn at startup and default to `http://localhost:4318` (which will silently drop spans if no collector is running there).
+
+### SigNoz Cloud example
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=https://ingest.us.signoz.cloud:443
+OTEL_EXPORTER_OTLP_HEADERS=signoz-ingestion-key=<your-key>
+OTEL_EXPORTER_OTLP_PROTOCOL=http_protobuf
+```
+
+### Verifying traces arrive
+
+1. Start the app and make a request (e.g., `curl http://your-server:4000/health`).
+2. In your backend UI (SigNoz → Traces, Jaeger UI, Grafana Explore), search for service `taniwha`.
+3. You should see an HTTP span for `GET /health` with a child `taniwha.commands.system_pid` span.
+
+For the full catalogue of custom spans and metrics see [`docs/observability.md`](observability.md).

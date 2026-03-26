@@ -135,6 +135,72 @@ defmodule TaniwhaWeb.TorrentChannelTest do
   # Batch 4: PubSub handle_info
   # ---------------------------------------------------------------------------
 
+  # ---------------------------------------------------------------------------
+  # Batch: Rate limiting (500 ms per socket)
+  # ---------------------------------------------------------------------------
+
+  describe "rate limiting" do
+    setup %{socket: socket} do
+      {:ok, _reply, channel} = subscribe_and_join(socket, TorrentChannel, "torrents:list")
+      {:ok, channel: channel}
+    end
+
+    @valid_hash String.duplicate("b", 40)
+
+    test "first command within a socket is allowed", %{channel: channel} do
+      expect(MockCommands, :start, fn @valid_hash -> :ok end)
+      ref = push(channel, "start", %{"hash" => @valid_hash})
+      assert_reply ref, :ok
+    end
+
+    test "second command within 500 ms is rate limited", %{channel: channel} do
+      expect(MockCommands, :start, fn @valid_hash -> :ok end)
+      ref1 = push(channel, "start", %{"hash" => @valid_hash})
+      assert_reply ref1, :ok
+
+      # Immediate second push — well within the 500 ms window
+      ref2 = push(channel, "start", %{"hash" => @valid_hash})
+      assert_reply ref2, :error, %{reason: "rate_limited"}
+    end
+
+    test "command after 500+ ms cooldown is allowed again", %{channel: channel} do
+      expect(MockCommands, :start, 2, fn @valid_hash -> :ok end)
+
+      ref1 = push(channel, "start", %{"hash" => @valid_hash})
+      assert_reply ref1, :ok
+
+      Process.sleep(600)
+
+      ref2 = push(channel, "start", %{"hash" => @valid_hash})
+      assert_reply ref2, :ok
+    end
+
+    test "rate limit is per-socket — a second socket is not affected", %{socket: socket} do
+      {:ok, socket2} =
+        connect(UserSocket, %{
+          "token" => elem(Taniwha.Auth.issue_token("test-api-key-for-tests"), 1)
+        })
+
+      {:ok, _reply, channel2} = subscribe_and_join(socket2, TorrentChannel, "torrents:list")
+
+      # Exhaust the rate limit on socket 2
+      expect(MockCommands, :start, fn @valid_hash -> :ok end)
+      ref1 = push(channel2, "start", %{"hash" => @valid_hash})
+      assert_reply ref1, :ok
+
+      ref2 = push(channel2, "start", %{"hash" => @valid_hash})
+      assert_reply ref2, :error, %{reason: "rate_limited"}
+
+      # Now join the original socket's channel — it should still be allowed
+      {:ok, _reply, channel1} = subscribe_and_join(socket, TorrentChannel, "torrents:list")
+      expect(MockCommands, :start, fn @valid_hash -> :ok end)
+      ref3 = push(channel1, "start", %{"hash" => @valid_hash})
+      assert_reply ref3, :ok
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+
   describe "handle_info PubSub messages on torrents:list" do
     setup %{socket: socket} do
       {:ok, _reply, channel} = subscribe_and_join(socket, TorrentChannel, "torrents:list")

@@ -96,6 +96,34 @@ defmodule Taniwha.TorrentTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Batch 4b — eta/1
+  # ---------------------------------------------------------------------------
+
+  describe "eta/1" do
+    test "returns 0 when torrent is complete" do
+      torrent = %Torrent{hash: "a", name: "b", complete: true}
+      assert Torrent.eta(torrent) == 0
+    end
+
+    test "returns calculated seconds when download_rate > 0" do
+      torrent = %Torrent{
+        hash: "a",
+        name: "b",
+        size: 1_000,
+        completed_bytes: 500,
+        download_rate: 100
+      }
+
+      assert Torrent.eta(torrent) == 5
+    end
+
+    test "returns nil when download_rate is 0" do
+      torrent = %Torrent{hash: "a", name: "b", size: 1_000, completed_bytes: 0, download_rate: 0}
+      assert Torrent.eta(torrent) == nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Batch 5 — from_rpc_values/2 + rpc_fields/0
   # ---------------------------------------------------------------------------
 

@@ -41,6 +41,7 @@ state/store.ex       ← ETS cache (read by web layer directly)
 | `Taniwha.SCGI.TcpConnection` | Impl | TCP socket |
 | `Taniwha.SCGI.Protocol` | Module | SCGI framing (encode/decode) |
 | `Taniwha.XMLRPC` | Module | XML-RPC codec |
+| `Taniwha.RateLimiter` | GenServer | ETS-backed sliding-window rate limiter |
 | `Taniwha.RPC.Client` | GenServer | Sends RPC calls over SCGI transport |
 | `Taniwha.State.Store` | GenServer | ETS table owner |
 | `Taniwha.State.Poller` | GenServer | Periodic poll + diff + broadcast |

@@ -27,10 +27,12 @@ Both Channels and LiveView subscribe to the **same PubSub topics**, ensuring con
 | Module | Purpose |
 |---|---|
 | `TaniwhaWeb.Endpoint` | Phoenix endpoint configuration |
-| `TaniwhaWeb.Router` | Route definitions (REST + LiveView) |
+| `TaniwhaWeb.Router` | Route definitions (REST + LiveView + health) |
 | `TaniwhaWeb.UserSocket` | WebSocket entry point, JWT verification |
-| `TaniwhaWeb.TorrentChannel` | Channel for real-time torrent data |
+| `TaniwhaWeb.TorrentChannel` | Channel for real-time torrent data (500 ms rate limit per socket) |
 | `TaniwhaWeb.Plugs.AuthenticateToken` | REST API JWT plug |
+| `TaniwhaWeb.Plugs.RateLimit` | ETS-backed sliding-window rate limit plug (auth endpoint) |
+| `TaniwhaWeb.HealthController` | Unauthenticated health check (`GET /health`) |
 | `TaniwhaWeb.API.AuthController` | JWT token exchange endpoint |
 | `TaniwhaWeb.API.TorrentController` | REST torrent operations |
 | `TaniwhaWeb.DashboardLive` | Main torrent list UI |
@@ -38,12 +40,14 @@ Both Channels and LiveView subscribe to the **same PubSub topics**, ensuring con
 | `TaniwhaWeb.AddTorrentLive` | Add torrent form |
 | `TaniwhaWeb.SettingsLive` | Settings view |
 | `TaniwhaWeb.TorrentComponents` | Reusable UI function components |
+| `Taniwha.RateLimiter` | ETS GenServer powering `Plugs.RateLimit` (lives in core, not web) |
 
 ## Channel protocol summary
 
 **Topics:** `torrents:list`, `torrents:{hash}`
 
 **Client → Server:** `start`, `stop`, `remove`, `set_file_priority`
+— Rate limited to one command per 500 ms per socket. Excess commands receive `{:error, %{reason: "rate_limited"}}`.
 
 **Server → Client:** `diffs` (list of changes), `updated` (single torrent)
 

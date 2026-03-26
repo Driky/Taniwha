@@ -14,6 +14,13 @@ defmodule TaniwhaWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Rate-limited pipeline for the token exchange endpoint. Prevents brute-force
+  # enumeration of the TANIWHA_API_KEY by capping attempts per client IP.
+  pipeline :api_auth do
+    plug :accepts, ["json"]
+    plug TaniwhaWeb.Plugs.RateLimit
+  end
+
   pipeline :api_authenticated do
     plug :accepts, ["json"]
     plug TaniwhaWeb.Plugs.AuthenticateToken
@@ -28,8 +35,14 @@ defmodule TaniwhaWeb.Router do
     live "/settings", SettingsLive, :index
   end
 
+  # Health check — unauthenticated, no CSRF, no session. Intended for load
+  # balancers and monitoring. Always returns 200 with rtorrent connectivity status.
+  scope "/", TaniwhaWeb do
+    get "/health", HealthController, :show
+  end
+
   scope "/api/v1", TaniwhaWeb.API do
-    pipe_through :api
+    pipe_through :api_auth
 
     post "/auth/token", AuthController, :create
   end

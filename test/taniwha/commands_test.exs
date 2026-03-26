@@ -491,4 +491,23 @@ defmodule Taniwha.CommandsTest do
       assert Commands.get_all_torrents() == {:error, :timeout}
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Batch — system_pid/0
+  # ---------------------------------------------------------------------------
+
+  describe "system_pid/0" do
+    test "returns the rtorrent process ID on success" do
+      expect(Taniwha.RPC.MockClient, :call, fn "system.pid", [] -> {:ok, 12_345} end)
+      assert Commands.system_pid() == {:ok, 12_345}
+    end
+
+    test "propagates RPC error" do
+      expect(Taniwha.RPC.MockClient, :call, fn "system.pid", [] ->
+        {:error, :connection_refused}
+      end)
+
+      assert Commands.system_pid() == {:error, :connection_refused}
+    end
+  end
 end

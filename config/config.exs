@@ -12,6 +12,7 @@ config :mime, :types, %{
 }
 
 config :taniwha,
+  env: config_env(),
   generators: [timestamp_type: :utc_datetime],
   scgi_connection: Taniwha.SCGI.UnixConnection,
   scgi_transport: {:unix, "/var/run/rtorrent.sock"},

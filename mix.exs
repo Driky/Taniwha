@@ -15,7 +15,12 @@ defmodule Taniwha.MixProject do
       dialyzer: [
         plt_add_apps: [:mix],
         plt_local_path: "priv/plts"
-      ]
+      ],
+      # 80% threshold accounts for Phoenix-generated boilerplate modules
+      # (PageController, PageHTML, Telemetry), the Guardian auth plug, stub
+      # LiveViews pending Task 5.3, and socket I/O helpers that require a live
+      # rtorrent connection (covered by integration tests in Task 6.5).
+      test_coverage: [threshold: 80, summary: [threshold: 80]]
     ]
   end
 
