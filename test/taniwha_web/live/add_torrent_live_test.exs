@@ -5,7 +5,7 @@ defmodule TaniwhaWeb.AddTorrentLiveTest do
 
   describe "GET /add" do
     test "redirects to the dashboard", %{conn: conn} do
-      {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/add")
+      {:error, {:live_redirect, %{to: "/"}}} = live(conn, ~p"/add")
     end
   end
 end
