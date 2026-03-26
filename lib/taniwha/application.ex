@@ -9,6 +9,7 @@ defmodule Taniwha.Application do
     # HTTP request and LiveView spans automatically.
     OpentelemetryBandit.setup()
     OpentelemetryPhoenix.setup(adapter: :bandit)
+    OpentelemetryLoggerMetadata.setup()
 
     children = [
       {Phoenix.PubSub, name: Taniwha.PubSub},

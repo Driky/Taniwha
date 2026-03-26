@@ -26,6 +26,7 @@ defmodule Taniwha.Commands do
 
   @behaviour Taniwha.CommandsBehaviour
 
+  require Logger
   require OpenTelemetry.Tracer, as: Tracer
 
   alias Taniwha.Peer
@@ -126,6 +127,7 @@ defmodule Taniwha.Commands do
   def start(hash) do
     Tracer.with_span "taniwha.commands.start",
                      %{attributes: %{"command.name": "start", "torrent.hash": hash}} do
+      Logger.info("Command executed", command: "start", torrent_hash: hash)
       run_lifecycle("d.start", hash)
     end
   end
@@ -136,6 +138,7 @@ defmodule Taniwha.Commands do
   def stop(hash) do
     Tracer.with_span "taniwha.commands.stop",
                      %{attributes: %{"command.name": "stop", "torrent.hash": hash}} do
+      Logger.info("Command executed", command: "stop", torrent_hash: hash)
       run_lifecycle("d.stop", hash)
     end
   end
@@ -145,6 +148,7 @@ defmodule Taniwha.Commands do
   def close(hash) do
     Tracer.with_span "taniwha.commands.close",
                      %{attributes: %{"command.name": "close", "torrent.hash": hash}} do
+      Logger.info("Command executed", command: "close", torrent_hash: hash)
       run_lifecycle("d.close", hash)
     end
   end
@@ -155,6 +159,7 @@ defmodule Taniwha.Commands do
   def erase(hash) do
     Tracer.with_span "taniwha.commands.erase",
                      %{attributes: %{"command.name": "erase", "torrent.hash": hash}} do
+      Logger.info("Command executed", command: "erase", torrent_hash: hash)
       run_lifecycle("d.erase", hash)
     end
   end
@@ -193,6 +198,7 @@ defmodule Taniwha.Commands do
   def load_url(url) do
     Tracer.with_span "taniwha.commands.load_url",
                      %{attributes: %{"command.name": "load_url"}} do
+      Logger.info("Command executed", command: "load_url")
       @rpc_client.call("load.start", ["", url]) |> ok_on_zero()
     end
   end
@@ -209,6 +215,7 @@ defmodule Taniwha.Commands do
   def load_raw(data) do
     Tracer.with_span "taniwha.commands.load_raw",
                      %{attributes: %{"command.name": "load_raw"}} do
+      Logger.info("Command executed", command: "load_raw")
       @rpc_client.call("load.raw_start", ["", {:base64, data}]) |> ok_on_zero()
     end
   end
@@ -314,6 +321,7 @@ defmodule Taniwha.Commands do
   def set_file_priority(hash, index, priority) do
     Tracer.with_span "taniwha.commands.set_file_priority",
                      %{attributes: %{"command.name": "set_file_priority", "torrent.hash": hash}} do
+      Logger.info("Command executed", command: "set_file_priority", torrent_hash: hash)
       @rpc_client.call("f.priority.set", ["#{hash}:f#{index}", priority]) |> ok_on_zero()
     end
   end

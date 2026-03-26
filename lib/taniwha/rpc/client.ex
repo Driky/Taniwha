@@ -104,7 +104,19 @@ defmodule Taniwha.RPC.Client do
                              "rpc.transport": transport_type(state.transport)
                            }
                          } do
-          do_request(XMLRPC.encode_call(method, params), state) |> record_rpc_result()
+          case do_request(XMLRPC.encode_call(method, params), state) do
+            {:error, reason} = error ->
+              Logger.warning("RPC call failed",
+                rpc_method: method,
+                error_reason: inspect(reason),
+                transport: transport_type(state.transport)
+              )
+
+              record_rpc_result(error)
+
+            result ->
+              record_rpc_result(result)
+          end
         end
       end)
 

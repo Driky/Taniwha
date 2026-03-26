@@ -30,12 +30,27 @@ if config_env() == :prod do
   # Test uses the simple processor with no exporter (see config/test.exs).
   # All settings are driven by environment variables; no values are hardcoded.
   #
-  # Supported OTEL_* environment variables:
+  # Trace + metrics export (active):
   #   OTEL_SERVICE_NAME             Service name in traces (default: "taniwha")
   #   OTEL_EXPORTER_OTLP_ENDPOINT   Collector URL (default: http://localhost:4318)
   #   OTEL_EXPORTER_OTLP_PROTOCOL   "http_protobuf" or "grpc" (default: http_protobuf)
   #   OTEL_EXPORTER_OTLP_HEADERS    Auth headers, e.g. "signoz-ingestion-key=<key>"
   #   OTEL_TRACES_SAMPLER           Set "always_off" to disable tracing entirely
+  #
+  # Log correlation (active via opentelemetry_logger_metadata):
+  #   Logs emitted within an active OTel span automatically include trace_id
+  #   and span_id in their Erlang :logger metadata. These appear in console
+  #   output (configured in config/config.exs) and any downstream log shipper.
+  #
+  #   OTEL_LOG_LEVEL                Minimum Logger level shipped via external log
+  #                                 shippers (info/warning/error). The Elixir Logger
+  #                                 primary level is set by config/prod.exs (:info).
+  #                                 This variable is for reference by ops tooling.
+  #                                 Default: info
+  #
+  # Note: Native OTLP log export (otel_exporter_logs_otlp) is not yet
+  # implemented in the OTel Erlang SDK 1.7.x. Use a log shipper (e.g. Vector,
+  # Fluentd) or the SigNoz collector's file input to forward stdout logs.
   # ---------------------------------------------------------------------------
   otel_endpoint = System.get_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
 

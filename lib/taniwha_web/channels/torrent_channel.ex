@@ -31,6 +31,7 @@ defmodule TaniwhaWeb.TorrentChannel do
 
   use TaniwhaWeb, :channel
 
+  require Logger
   require OpenTelemetry.Tracer, as: Tracer
 
   alias Taniwha.State.Store
@@ -148,6 +149,12 @@ defmodule TaniwhaWeb.TorrentChannel do
                            "torrent.hash": hash
                          }
                        } do
+        Logger.info("Channel command received",
+          channel_topic: socket.topic,
+          event: event,
+          torrent_hash: hash
+        )
+
         case command_fn.() do
           :ok -> :ok
           {:error, _reason} = err -> set_error_status(err)

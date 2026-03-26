@@ -119,6 +119,8 @@ defmodule Taniwha.State.Poller do
 
   @impl true
   def handle_info(:poll, %{interval: interval} = state) do
+    start_ms = System.monotonic_time(:millisecond)
+
     new_state =
       Tracer.with_span "taniwha.poller.cycle",
                        %{attributes: %{"poller.interval_ms": interval}} do
@@ -133,10 +135,20 @@ defmodule Taniwha.State.Poller do
             Tracer.set_attribute(:"poller.torrent_count", length(torrents))
             Tracer.set_attribute(:"poller.diff_count", length(diffs))
 
+            Logger.debug("Poll cycle completed",
+              torrent_count: length(torrents),
+              diff_count: length(diffs),
+              duration_ms: System.monotonic_time(:millisecond) - start_ms
+            )
+
             %{state | consecutive_failures: 0}
 
           {:error, reason} ->
-            Logger.warning("Poller: failed to fetch torrents: #{inspect(reason)}")
+            Logger.warning("Poll cycle failed",
+              error_reason: inspect(reason),
+              consecutive_failures: state.consecutive_failures + 1
+            )
+
             Tracer.set_status(:error, inspect(reason))
             Tracer.set_attribute(:"poller.error_reason", inspect(reason))
 

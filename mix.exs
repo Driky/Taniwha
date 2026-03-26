@@ -75,6 +75,7 @@ defmodule Taniwha.MixProject do
       {:opentelemetry_semantic_conventions, "~> 1.27.0"},
       {:opentelemetry_phoenix, "~> 2.0.1"},
       {:opentelemetry_bandit, "~> 0.3.0"},
+      {:opentelemetry_logger_metadata, "~> 0.2.0"},
       {:mox, "~> 1.0", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
