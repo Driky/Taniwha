@@ -64,6 +64,15 @@ defmodule Taniwha.Auth.CredentialStore do
           updated_at: String.t()
         }
 
+  @type passkey_map() :: %{
+          id: String.t(),
+          credential_id: binary(),
+          cose_key: binary(),
+          sign_count: non_neg_integer(),
+          label: String.t(),
+          created_at: String.t()
+        }
+
   @type state() :: %{
           data_dir: String.t(),
           secret_key_base: String.t(),
@@ -154,6 +163,56 @@ defmodule Taniwha.Auth.CredentialStore do
   @spec list_users(GenServer.server()) :: [map()]
   def list_users(server \\ __MODULE__) do
     GenServer.call(server, :list_users)
+  end
+
+  @doc """
+  Adds `passkey` to the passkeys list of the user with `user_id`.
+
+  The passkey map must contain at least `:credential_id`, `:cose_key`,
+  `:sign_count`, `:label`, and `:created_at`. A unique `:id` is generated
+  automatically and prepended to the list (newest first).
+
+  Returns `{:ok, updated_user}` or `{:error, :not_found}`.
+  """
+  @spec add_passkey(String.t(), map(), GenServer.server()) ::
+          {:ok, user_map()} | {:error, :not_found}
+  def add_passkey(user_id, passkey, server \\ __MODULE__) do
+    GenServer.call(server, {:add_passkey, user_id, passkey})
+  end
+
+  @doc """
+  Finds a passkey by its raw `credential_id` binary across all users.
+
+  Returns `{:ok, {user_map(), passkey_map()}}` or `{:error, :not_found}`.
+  """
+  @spec get_passkey_by_credential_id(binary(), GenServer.server()) ::
+          {:ok, {user_map(), passkey_map()}} | {:error, :not_found}
+  def get_passkey_by_credential_id(credential_id, server \\ __MODULE__) do
+    GenServer.call(server, {:get_passkey_by_credential_id, credential_id})
+  end
+
+  @doc """
+  Updates the `sign_count` on the passkey identified by `passkey_id`
+  within the user identified by `user_id`.
+
+  Returns `:ok` or `{:error, :not_found}` when user or passkey is absent.
+  """
+  @spec update_passkey_sign_count(String.t(), String.t(), non_neg_integer(), GenServer.server()) ::
+          :ok | {:error, :not_found}
+  def update_passkey_sign_count(user_id, passkey_id, new_count, server \\ __MODULE__) do
+    GenServer.call(server, {:update_passkey_sign_count, user_id, passkey_id, new_count})
+  end
+
+  @doc """
+  Removes the passkey with `passkey_id` from the user's list.
+
+  Returns `:ok` even if `passkey_id` is not found in the user's list (idempotent).
+  Returns `{:error, :not_found}` if `user_id` does not exist.
+  """
+  @spec delete_passkey(String.t(), String.t(), GenServer.server()) ::
+          :ok | {:error, :not_found}
+  def delete_passkey(user_id, passkey_id, server \\ __MODULE__) do
+    GenServer.call(server, {:delete_passkey, user_id, passkey_id})
   end
 
   # ── GenServer callbacks ───────────────────────────────────────────────────
@@ -267,16 +326,95 @@ defmodule Taniwha.Auth.CredentialStore do
     {:reply, sanitized, state}
   end
 
+  def handle_call({:add_passkey, user_id, passkey}, _from, state) do
+    case Enum.find_index(state.users, &(&1.id == user_id)) do
+      nil ->
+        {:reply, {:error, :not_found}, state}
+
+      index ->
+        passkey_with_id = Map.put(passkey, :id, generate_id())
+        user = Enum.at(state.users, index)
+        updated_user = %{user | passkeys: [passkey_with_id | user.passkeys]}
+        new_state = %{state | users: List.replace_at(state.users, index, updated_user)}
+        persist(new_state)
+        {:reply, {:ok, updated_user}, new_state}
+    end
+  end
+
+  def handle_call({:get_passkey_by_credential_id, credential_id}, _from, state) do
+    result =
+      Enum.find_value(state.users, fn user ->
+        case Enum.find(user.passkeys, &(&1.credential_id == credential_id)) do
+          nil -> nil
+          pk -> {user, pk}
+        end
+      end)
+
+    case result do
+      nil -> {:reply, {:error, :not_found}, state}
+      {user, pk} -> {:reply, {:ok, {user, pk}}, state}
+    end
+  end
+
+  def handle_call({:update_passkey_sign_count, user_id, passkey_id, new_count}, _from, state) do
+    case Enum.find_index(state.users, &(&1.id == user_id)) do
+      nil ->
+        {:reply, {:error, :not_found}, state}
+
+      user_index ->
+        user = Enum.at(state.users, user_index)
+
+        case Enum.find_index(user.passkeys, &(&1.id == passkey_id)) do
+          nil ->
+            {:reply, {:error, :not_found}, state}
+
+          pk_index ->
+            updated_pk = Map.put(Enum.at(user.passkeys, pk_index), :sign_count, new_count)
+            updated_passkeys = List.replace_at(user.passkeys, pk_index, updated_pk)
+            updated_user = %{user | passkeys: updated_passkeys}
+            new_state = %{state | users: List.replace_at(state.users, user_index, updated_user)}
+            persist(new_state)
+            {:reply, :ok, new_state}
+        end
+    end
+  end
+
+  def handle_call({:delete_passkey, user_id, passkey_id}, _from, state) do
+    case Enum.find_index(state.users, &(&1.id == user_id)) do
+      nil ->
+        {:reply, {:error, :not_found}, state}
+
+      user_index ->
+        user = Enum.at(state.users, user_index)
+        updated_user = %{user | passkeys: Enum.reject(user.passkeys, &(&1.id == passkey_id))}
+        new_state = %{state | users: List.replace_at(state.users, user_index, updated_user)}
+        persist(new_state)
+        {:reply, :ok, new_state}
+    end
+  end
+
   # ── Private helpers ───────────────────────────────────────────────────────
 
   @spec persist(state()) :: :ok
   defp persist(state) do
-    payload = Jason.encode!(%{version: 1, users: state.users})
+    payload = Jason.encode!(%{version: 1, users: serialize_users(state.users)})
     encrypted = Encryption.encrypt(payload, state.secret_key_base)
     tmp = cred_file(state) <> ".tmp"
     File.write!(tmp, encrypted)
     File.rename!(tmp, cred_file(state))
     :ok
+  end
+
+  @spec serialize_users([user_map()]) :: [map()]
+  defp serialize_users(users) do
+    Enum.map(users, fn user ->
+      %{user | passkeys: Enum.map(user.passkeys, &serialize_passkey/1)}
+    end)
+  end
+
+  @spec serialize_passkey(passkey_map()) :: map()
+  defp serialize_passkey(pk) do
+    %{pk | credential_id: Base.encode64(pk.credential_id), cose_key: Base.encode64(pk.cose_key)}
   end
 
   @spec load_from_disk(state()) :: state()
@@ -323,9 +461,28 @@ defmodule Taniwha.Auth.CredentialStore do
       username: username,
       password_hash: password_hash,
       role: role,
-      passkeys: passkeys || [],
+      passkeys: Enum.map(passkeys || [], &atomize_passkey/1),
       created_at: created_at,
       updated_at: updated_at
+    }
+  end
+
+  @spec atomize_passkey(map()) :: passkey_map()
+  defp atomize_passkey(%{
+         "id" => id,
+         "credential_id" => cid_b64,
+         "cose_key" => key_b64,
+         "sign_count" => sign_count,
+         "label" => label,
+         "created_at" => created_at
+       }) do
+    %{
+      id: id,
+      credential_id: Base.decode64!(cid_b64),
+      cose_key: Base.decode64!(key_b64),
+      sign_count: sign_count,
+      label: label,
+      created_at: created_at
     }
   end
 

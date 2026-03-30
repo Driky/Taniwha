@@ -50,3 +50,9 @@ config :phoenix,
 
 # bcrypt: reduce work factor for faster tests (default is 12)
 config :bcrypt_elixir, log_rounds: 4
+
+config :taniwha, :webauthn,
+  rp_id: "localhost",
+  origin: "http://localhost:4000"
+
+config :taniwha, :wax_module, Taniwha.Auth.MockWax

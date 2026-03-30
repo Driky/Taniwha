@@ -74,6 +74,7 @@ defmodule Taniwha.MixProject do
       {:bandit, "~> 1.5"},
       {:bcrypt_elixir, "~> 3.1"},
       {:guardian, "~> 2.3"},
+      {:wax_, "~> 0.6"},
       {:sweet_xml, "~> 0.7"},
       {:opentelemetry, "~> 1.7.0"},
       {:opentelemetry_api, "~> 1.5.0"},

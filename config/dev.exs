@@ -80,6 +80,12 @@ config :phoenix_live_view,
 
 config :taniwha, api_key: "dev-api-key"
 
+config :taniwha, :webauthn,
+  rp_id: "localhost",
+  origin: "http://localhost:4000"
+
+config :taniwha, :wax_module, Wax
+
 # OpenTelemetry: print spans to the terminal in development.
 # To silence: set OTEL_TRACES_SAMPLER=always_off in your shell.
 # To send to a local collector: set OTEL_EXPORTER_OTLP_ENDPOINT in your shell

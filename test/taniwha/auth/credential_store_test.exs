@@ -201,6 +201,148 @@ defmodule Taniwha.Auth.CredentialStoreTest do
     end
   end
 
+  # ── Batch B10: passkey CRUD ──────────────────────────────────────────────────
+
+  defp make_passkey(attrs \\ %{}) do
+    Map.merge(
+      %{
+        credential_id: :crypto.strong_rand_bytes(32),
+        cose_key: :crypto.strong_rand_bytes(64),
+        sign_count: 0,
+        label: "Device passkey · Jan 01, 2026",
+        created_at: "2026-01-01T00:00:00Z"
+      },
+      attrs
+    )
+  end
+
+  describe "add_passkey/3" do
+    test "adds a passkey to the user", %{store: store} do
+      {:ok, user} = CredentialStore.create_user("alice", "pass", store)
+      passkey = make_passkey()
+      assert {:ok, updated} = CredentialStore.add_passkey(user.id, passkey, store)
+      assert length(updated.passkeys) == 1
+      [stored] = updated.passkeys
+      assert stored.credential_id == passkey.credential_id
+      assert stored.label == passkey.label
+      assert is_binary(stored.id) and byte_size(stored.id) > 0
+    end
+
+    test "assigns a unique :id to each passkey", %{store: store} do
+      {:ok, user} = CredentialStore.create_user("alice", "pass", store)
+      {:ok, _} = CredentialStore.add_passkey(user.id, make_passkey(), store)
+      {:ok, updated} = CredentialStore.add_passkey(user.id, make_passkey(), store)
+      ids = Enum.map(updated.passkeys, & &1.id)
+      assert length(Enum.uniq(ids)) == length(ids)
+    end
+
+    test "returns {:error, :not_found} for unknown user_id", %{store: store} do
+      assert {:error, :not_found} =
+               CredentialStore.add_passkey("nonexistent_id", make_passkey(), store)
+    end
+  end
+
+  describe "get_passkey_by_credential_id/2" do
+    test "returns {:ok, {user, passkey}} when credential matches", %{store: store} do
+      {:ok, user} = CredentialStore.create_user("alice", "pass", store)
+      passkey = make_passkey()
+      CredentialStore.add_passkey(user.id, passkey, store)
+
+      assert {:ok, {found_user, found_pk}} =
+               CredentialStore.get_passkey_by_credential_id(passkey.credential_id, store)
+
+      assert found_user.id == user.id
+      assert found_pk.credential_id == passkey.credential_id
+    end
+
+    test "returns {:error, :not_found} when no passkey matches", %{store: store} do
+      assert {:error, :not_found} =
+               CredentialStore.get_passkey_by_credential_id(
+                 :crypto.strong_rand_bytes(32),
+                 store
+               )
+    end
+
+    test "works across multiple users", %{store: store} do
+      {:ok, _u1} = CredentialStore.create_user("alice", "pass", store)
+      {:ok, u2} = CredentialStore.create_user("bob", "pass", store)
+      pk = make_passkey()
+      CredentialStore.add_passkey(u2.id, pk, store)
+
+      assert {:ok, {found_user, _}} =
+               CredentialStore.get_passkey_by_credential_id(pk.credential_id, store)
+
+      assert found_user.id == u2.id
+    end
+  end
+
+  describe "update_passkey_sign_count/4" do
+    test "updates the sign_count for a matching passkey", %{store: store} do
+      {:ok, user} = CredentialStore.create_user("alice", "pass", store)
+      {:ok, updated} = CredentialStore.add_passkey(user.id, make_passkey(), store)
+      [pk] = updated.passkeys
+
+      assert :ok = CredentialStore.update_passkey_sign_count(user.id, pk.id, 42, store)
+
+      {:ok, refreshed} = CredentialStore.get_user(user.id, store)
+      [updated_pk] = refreshed.passkeys
+      assert updated_pk.sign_count == 42
+    end
+
+    test "returns {:error, :not_found} for unknown user_id", %{store: store} do
+      assert {:error, :not_found} =
+               CredentialStore.update_passkey_sign_count("bad_id", "bad_pk_id", 1, store)
+    end
+  end
+
+  describe "delete_passkey/3" do
+    test "removes the passkey from the user", %{store: store} do
+      {:ok, user} = CredentialStore.create_user("alice", "pass", store)
+      {:ok, updated} = CredentialStore.add_passkey(user.id, make_passkey(), store)
+      [pk] = updated.passkeys
+
+      assert :ok = CredentialStore.delete_passkey(user.id, pk.id, store)
+
+      {:ok, refreshed} = CredentialStore.get_user(user.id, store)
+      assert refreshed.passkeys == []
+    end
+
+    test "is idempotent (returns :ok for non-existent passkey id)", %{store: store} do
+      {:ok, user} = CredentialStore.create_user("alice", "pass", store)
+      assert :ok = CredentialStore.delete_passkey(user.id, "nonexistent_pk_id", store)
+    end
+
+    test "returns {:error, :not_found} for unknown user_id", %{store: store} do
+      assert {:error, :not_found} =
+               CredentialStore.delete_passkey("bad_user_id", "pk_id", store)
+    end
+  end
+
+  describe "passkey persistence" do
+    test "passkey (including binary fields) survives GenServer restart",
+         %{store: store, tmp_dir: tmp_dir} do
+      {:ok, user} = CredentialStore.create_user("alice", "pass", store)
+      passkey = make_passkey()
+      CredentialStore.add_passkey(user.id, passkey, store)
+
+      :ok = stop_supervised(CredentialStore)
+
+      new_store =
+        start_supervised!(
+          {CredentialStore, data_dir: tmp_dir, secret_key_base: @secret, name: false},
+          id: :restarted_store_passkey
+        )
+
+      assert {:ok, {_user, found_pk}} =
+               CredentialStore.get_passkey_by_credential_id(passkey.credential_id, new_store)
+
+      assert found_pk.credential_id == passkey.credential_id
+      assert found_pk.cose_key == passkey.cose_key
+      assert found_pk.sign_count == passkey.sign_count
+      assert found_pk.label == passkey.label
+    end
+  end
+
   # ── Batch B9: atomic write ────────────────────────────────────────────────
 
   describe "atomic write" do

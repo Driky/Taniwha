@@ -8,13 +8,20 @@ defmodule TaniwhaWeb.LoginLive do
   encrypted session cookie over HTTP while LiveView handles validation
   feedback without a page reload.
 
+  Also supports passkey (WebAuthn) login: the `use_passkey` event generates an
+  assertion challenge and pushes it to the `PasskeyLogin` JS hook. On
+  successful assertion the hook sends `passkey_asserted` back, LiveView
+  validates via `Taniwha.Auth.WebAuthn` and — on success — signs a short-lived
+  `Phoenix.Token`, then triggers a form POST to `POST /session/passkey` which
+  writes the session cookie.
+
   Already-authenticated users are redirected to `/` via the
   `TaniwhaWeb.UserAuth.redirect_if_authenticated` `on_mount` callback.
   """
 
   use TaniwhaWeb, :live_view
 
-  alias Taniwha.Auth.CredentialStore
+  alias Taniwha.Auth.{CredentialStore, WebAuthn}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -23,6 +30,10 @@ defmodule TaniwhaWeb.LoginLive do
       |> assign(:trigger_submit, false)
       |> assign(:error, nil)
       |> assign(:page_title, "Sign in")
+      |> assign(:webauthn_challenge, nil)
+      |> assign(:passkey_token, nil)
+      |> assign(:trigger_submit_passkey, false)
+      |> assign(:passkey_error, nil)
 
     {:ok, socket}
   end
@@ -39,7 +50,64 @@ defmodule TaniwhaWeb.LoginLive do
   end
 
   def handle_event("use_passkey", _params, socket) do
-    {:noreply, put_flash(socket, :info, "Passkeys are not yet available. Stay tuned!")}
+    opts = WebAuthn.assertion_options()
+
+    socket =
+      socket
+      |> assign(:webauthn_challenge, opts.challenge_raw)
+      |> assign(:passkey_error, nil)
+      |> push_event("start-passkey-login", Map.delete(opts, :challenge_raw))
+
+    {:noreply, socket}
+  end
+
+  def handle_event(
+        "passkey_asserted",
+        %{
+          "credential_id" => cred_id_b64,
+          "authenticator_data" => auth_data_b64,
+          "client_data_json" => cdj_b64,
+          "signature" => sig_b64
+        },
+        socket
+      ) do
+    challenge_raw = socket.assigns.webauthn_challenge
+    credential_id = Base.decode64!(cred_id_b64)
+    auth_data_bin = Base.decode64!(auth_data_b64)
+    client_data_json = Base.decode64!(cdj_b64)
+    signature = Base.decode64!(sig_b64)
+
+    socket = assign(socket, :webauthn_challenge, nil)
+
+    case CredentialStore.get_passkey_by_credential_id(credential_id) do
+      {:ok, {user, stored_passkey}} ->
+        case WebAuthn.verify_assertion(auth_data_bin, client_data_json, signature, challenge_raw, stored_passkey) do
+          {:ok, new_count} ->
+            :ok = CredentialStore.update_passkey_sign_count(user.id, stored_passkey.id, new_count)
+            token = Phoenix.Token.sign(TaniwhaWeb.Endpoint, "passkey_login", user.id)
+
+            {:noreply,
+             socket
+             |> assign(:passkey_token, token)
+             |> assign(:passkey_error, nil)
+             |> assign(:trigger_submit_passkey, true)}
+
+          {:error, _reason} ->
+            {:noreply,
+             assign(socket, :passkey_error, "Passkey verification failed. Please try again.")}
+        end
+
+      {:error, :not_found} ->
+        {:noreply,
+         assign(socket, :passkey_error, "Passkey not recognized. Please try again.")}
+    end
+  end
+
+  def handle_event("passkey_login_error", %{"message" => _msg}, socket) do
+    {:noreply,
+     socket
+     |> assign(:passkey_error, "Passkey sign-in was cancelled or failed. Please try again.")
+     |> assign(:webauthn_challenge, nil)}
   end
 
   @impl true
@@ -59,15 +127,6 @@ defmodule TaniwhaWeb.LoginLive do
         <%!-- Subtitle --%>
         <p style="font-size: 13px; color: #6b7280; text-align: center; margin: 0 0 24px;">
           Sign in to your account
-        </p>
-
-        <%!-- Inline info flash (layout flash is not reachable in LiveView inner renders) --%>
-        <p
-          :if={@flash["info"]}
-          role="status"
-          style="font-size: 12px; color: #059669; background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; text-align: center;"
-        >
-          {@flash["info"]}
         </p>
 
         <%!-- Login form — phx-trigger-action submits to POST /session when trigger_submit is true --%>
@@ -134,6 +193,20 @@ defmodule TaniwhaWeb.LoginLive do
           </button>
         </form>
 
+        <%!-- Hidden passkey form — phx-trigger-action fires POST /session/passkey after assertion --%>
+        <form
+          id="passkey-form"
+          action={~p"/session/passkey"}
+          method="post"
+          phx-trigger-action={@trigger_submit_passkey}
+        >
+          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+          <input type="hidden" name="passkey_token" value={@passkey_token} />
+        </form>
+
+        <%!-- PasskeyLogin hook anchor (invisible) --%>
+        <div id="passkey-login-hook" phx-hook="PasskeyLogin" style="display:none" />
+
         <%!-- Divider --%>
         <div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
           <div style="flex: 1; height: 1px; background: #e5e7eb;"></div>
@@ -163,6 +236,14 @@ defmodule TaniwhaWeb.LoginLive do
           </svg>
           Use a passkey
         </button>
+        <%!-- Passkey error --%>
+        <p
+          :if={@passkey_error}
+          role="alert"
+          style="font-size: 11px; color: #ef4444; margin-top: 6px; text-align: center;"
+        >
+          {@passkey_error}
+        </p>
       </div>
     </div>
     """

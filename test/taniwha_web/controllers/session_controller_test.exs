@@ -45,6 +45,58 @@ defmodule TaniwhaWeb.SessionControllerTest do
     end
   end
 
+  describe "POST /session/passkey (create_from_passkey)" do
+    test "valid token sets user_id in session and redirects to /",
+         %{conn: conn, user: user} do
+      token = Phoenix.Token.sign(TaniwhaWeb.Endpoint, "passkey_login", user.id)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> post(~p"/session/passkey", %{passkey_token: token})
+
+      assert redirected_to(conn) == ~p"/"
+      assert get_session(conn, "user_id") == user.id
+    end
+
+    test "invalid token (wrong salt) redirects to /login with error flash",
+         %{conn: conn} do
+      bad_token = Phoenix.Token.sign(TaniwhaWeb.Endpoint, "wrong_salt", "user123")
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> post(~p"/session/passkey", %{passkey_token: bad_token})
+
+      assert redirected_to(conn) == ~p"/login"
+      assert get_session(conn, "user_id") == nil
+    end
+
+    test "missing token redirects to /login",
+         %{conn: conn} do
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> post(~p"/session/passkey", %{})
+
+      assert redirected_to(conn) == ~p"/login"
+      assert get_session(conn, "user_id") == nil
+    end
+
+    test "valid token for unknown user_id redirects to /login",
+         %{conn: conn} do
+      token = Phoenix.Token.sign(TaniwhaWeb.Endpoint, "passkey_login", "nonexistent_id")
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> post(~p"/session/passkey", %{passkey_token: token})
+
+      assert redirected_to(conn) == ~p"/login"
+      assert get_session(conn, "user_id") == nil
+    end
+  end
+
   describe "DELETE /session (delete)" do
     test "clears session and redirects to /login", %{conn: conn, user: user} do
       conn =

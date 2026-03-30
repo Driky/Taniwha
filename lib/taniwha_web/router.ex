@@ -45,6 +45,7 @@ defmodule TaniwhaWeb.Router do
     live "/setup", SetupLive, :index
 
     post "/session", SessionController, :create
+    post "/session/passkey", SessionController, :create_from_passkey
     delete "/session", SessionController, :delete
   end
 

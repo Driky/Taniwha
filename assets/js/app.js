@@ -52,11 +52,108 @@ const UserMenu = {
   }
 }
 
+// ---------------------------------------------------------------------------
+// WebAuthn helpers
+// ---------------------------------------------------------------------------
+
+function base64urlToBuffer(b64url) {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/")
+  const padded = b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, "=")
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes.buffer
+}
+
+function bufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer)
+  let binary = ""
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  return btoa(binary)
+}
+
+function formatPasskeyDate(date) {
+  return date.toLocaleString("en-US", {month: "short", day: "numeric", year: "numeric"})
+}
+
+// ---------------------------------------------------------------------------
+// PasskeyRegister hook — Settings page passkey registration
+// ---------------------------------------------------------------------------
+
+const PasskeyRegister = {
+  mounted() {
+    this.handleEvent("start-passkey-registration", async (opts) => {
+      const publicKey = {
+        challenge: base64urlToBuffer(opts.challenge),
+        rp: opts.rp,
+        user: {
+          id: base64urlToBuffer(opts.user.id),
+          name: opts.user.name,
+          displayName: opts.user.displayName,
+        },
+        pubKeyCredParams: opts.pubKeyCredParams,
+        authenticatorSelection: opts.authenticatorSelection,
+        timeout: opts.timeout,
+        attestation: opts.attestation,
+      }
+
+      try {
+        const credential = await navigator.credentials.create({publicKey})
+        const transports = credential.response.getTransports
+          ? credential.response.getTransports()
+          : []
+        const date = formatPasskeyDate(new Date())
+        const label = transports.includes("internal")
+          ? `Device passkey · ${date}`
+          : `Security key · ${date}`
+
+        this.pushEvent("passkey_registered", {
+          credential_id: bufferToBase64(credential.rawId),
+          client_data_json: bufferToBase64(credential.response.clientDataJSON),
+          attestation_object: bufferToBase64(credential.response.attestationObject),
+          label: label,
+        })
+      } catch (err) {
+        this.pushEvent("passkey_registration_error", {message: err.message || String(err)})
+      }
+    })
+  },
+}
+
+// ---------------------------------------------------------------------------
+// PasskeyLogin hook — Login page passkey authentication
+// ---------------------------------------------------------------------------
+
+const PasskeyLogin = {
+  mounted() {
+    this.handleEvent("start-passkey-login", async (opts) => {
+      const publicKey = {
+        challenge: base64urlToBuffer(opts.challenge),
+        rpId: opts.rpId,
+        userVerification: opts.userVerification,
+        timeout: opts.timeout,
+      }
+
+      try {
+        const assertion = await navigator.credentials.get({publicKey})
+        this.pushEvent("passkey_asserted", {
+          credential_id: bufferToBase64(assertion.rawId),
+          authenticator_data: bufferToBase64(assertion.response.authenticatorData),
+          client_data_json: bufferToBase64(assertion.response.clientDataJSON),
+          signature: bufferToBase64(assertion.response.signature),
+        })
+      } catch (err) {
+        this.pushEvent("passkey_login_error", {message: err.message || String(err)})
+      }
+    })
+  },
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, UserMenu},
+  hooks: {...colocatedHooks, UserMenu, PasskeyRegister, PasskeyLogin},
 })
 
 // Show progress bar on live navigation and form submits

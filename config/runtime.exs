@@ -110,6 +110,12 @@ if config_env() == :prod do
   socket_path = System.get_env("RTORRENT_SOCKET", "/var/run/rtorrent.sock")
   config :taniwha, scgi_transport: {:unix, socket_path}
 
+  config :taniwha, :webauthn,
+    rp_id: host,
+    origin: "https://#{host}"
+
+  config :taniwha, :wax_module, Wax
+
   config :taniwha, TaniwhaWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
