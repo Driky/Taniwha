@@ -12,6 +12,11 @@ defmodule TaniwhaWeb.Plugs.AuthenticateSession do
 
   @behaviour Plug
 
+  use Phoenix.VerifiedRoutes,
+    endpoint: TaniwhaWeb.Endpoint,
+    router: TaniwhaWeb.Router,
+    statics: TaniwhaWeb.static_paths()
+
   import Plug.Conn
   import Phoenix.Controller, only: [redirect: 2]
 
@@ -26,7 +31,7 @@ defmodule TaniwhaWeb.Plugs.AuthenticateSession do
     else
       _ ->
         conn
-        |> redirect(to: "/login")
+        |> redirect(to: ~p"/login")
         |> halt()
     end
   end

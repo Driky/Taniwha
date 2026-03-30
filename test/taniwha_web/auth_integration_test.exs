@@ -9,7 +9,6 @@ defmodule TaniwhaWeb.AuthIntegrationTest do
   import Phoenix.LiveViewTest
   import Mox
 
-  alias Taniwha.Auth.CredentialStore
   alias Taniwha.MockCommands
 
   setup :verify_on_exit!
@@ -32,9 +31,6 @@ defmodule TaniwhaWeb.AuthIntegrationTest do
 
   describe "authenticated access to protected routes" do
     setup %{conn: conn} do
-      username = "auth_integration_#{System.unique_integer([:positive])}"
-      {:ok, user} = CredentialStore.create_user(username, "Test_password_123!")
-      on_exit(fn -> CredentialStore.delete_user(user.id) end)
       {conn, _user} = register_and_log_in_user(conn)
       {:ok, conn: conn}
     end
@@ -70,7 +66,7 @@ defmodule TaniwhaWeb.AuthIntegrationTest do
 
       case result do
         {:ok, _lv, html} -> assert html =~ "Create admin account"
-        {:error, {:redirect, %{to: "/login"}}} -> :ok
+        {:error, {:live_redirect, %{to: "/login"}}} -> :ok
       end
     end
   end

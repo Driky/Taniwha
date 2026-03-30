@@ -26,6 +26,11 @@ defmodule TaniwhaWeb.UserAuth do
       end
   """
 
+  use Phoenix.VerifiedRoutes,
+    endpoint: TaniwhaWeb.Endpoint,
+    router: TaniwhaWeb.Router,
+    statics: TaniwhaWeb.static_paths()
+
   import Phoenix.LiveView, only: [redirect: 2]
   import Phoenix.Component, only: [assign: 3]
 
@@ -50,14 +55,14 @@ defmodule TaniwhaWeb.UserAuth do
         {:cont, assign(socket, :current_user, user)}
 
       :error ->
-        {:halt, redirect(socket, to: "/login")}
+        {:halt, redirect(socket, to: ~p"/login")}
     end
   end
 
   def on_mount(:redirect_if_authenticated, _params, session, socket) do
     case authenticate_from_session(session) do
       {:ok, _user} ->
-        {:halt, redirect(socket, to: "/")}
+        {:halt, redirect(socket, to: ~p"/")}
 
       :error ->
         {:cont, socket}
