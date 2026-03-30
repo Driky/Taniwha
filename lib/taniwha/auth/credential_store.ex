@@ -365,7 +365,11 @@ defmodule Taniwha.Auth.CredentialStore do
       user_index ->
         user = Enum.at(state.users, user_index)
 
-        case update_in_list(user.passkeys, &(&1.id == passkey_id), &Map.put(&1, :sign_count, new_count)) do
+        case update_in_list(
+               user.passkeys,
+               &(&1.id == passkey_id),
+               &Map.put(&1, :sign_count, new_count)
+             ) do
           {:error, :not_found} ->
             {:reply, {:error, :not_found}, state}
 

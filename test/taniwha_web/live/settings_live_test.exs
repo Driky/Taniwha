@@ -152,6 +152,7 @@ defmodule TaniwhaWeb.SettingsLiveTest do
   describe "passkey_registered event (JS hook response)" do
     test "adds the passkey to the displayed list", %{conn: conn, user: user} do
       cred_id = :crypto.strong_rand_bytes(32)
+
       stub(MockWax, :register, fn _attest, _cdj, _challenge ->
         {:ok,
          {%{

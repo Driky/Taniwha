@@ -73,7 +73,8 @@ defmodule TaniwhaWeb.SettingsLive do
          |> assign(:passkey_error, nil)}
 
       {:error, :registration_failed} ->
-        {:noreply, assign(socket, :passkey_error, "Passkey registration failed. Please try again.")}
+        {:noreply,
+         assign(socket, :passkey_error, "Passkey registration failed. Please try again.")}
     end
   end
 
@@ -202,7 +203,13 @@ defmodule TaniwhaWeb.SettingsLive do
           <%!-- Empty state --%>
           <div :if={@passkeys == []} class="p-4 flex items-start gap-3">
             <div style="width:36px;height:36px;border-radius:8px;background:#eff6ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg style="width:18px;height:18px;" fill="none" stroke="#2563eb" viewBox="0 0 24 24" aria-hidden="true">
+              <svg
+                style="width:18px;height:18px;"
+                fill="none"
+                stroke="#2563eb"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -225,16 +232,37 @@ defmodule TaniwhaWeb.SettingsLive do
               style="display:flex;align-items:center;gap:4px;height:28px;padding:0 10px;font-size:11px;font-weight:500;border:1px solid #2563eb;color:#2563eb;border-radius:6px;background:transparent;cursor:pointer;white-space:nowrap;"
               aria-label="Add a passkey for passwordless sign-in"
             >
-              <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              <svg
+                style="width:12px;height:12px;"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
               Add passkey
             </button>
           </div>
           <%!-- Passkey list --%>
           <div :if={@passkeys != []}>
-            <div :for={pk <- @passkeys} class="flex items-center gap-2 px-4 py-2.5 border-b" style="border-color: #f3f4f6;">
-              <svg style="width:14px;height:14px;flex-shrink:0;" fill="none" stroke="#6b7280" viewBox="0 0 24 24" aria-hidden="true">
+            <div
+              :for={pk <- @passkeys}
+              class="flex items-center gap-2 px-4 py-2.5 border-b"
+              style="border-color: #f3f4f6;"
+            >
+              <svg
+                style="width:14px;height:14px;flex-shrink:0;"
+                fill="none"
+                stroke="#6b7280"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -255,7 +283,13 @@ defmodule TaniwhaWeb.SettingsLive do
                 style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:4px;border:none;background:transparent;cursor:pointer;"
                 aria-label={"Remove passkey: #{pk.label}"}
               >
-                <svg style="width:13px;height:13px;" fill="none" stroke="#ef4444" viewBox="0 0 24 24" aria-hidden="true">
+                <svg
+                  style="width:13px;height:13px;"
+                  fill="none"
+                  stroke="#ef4444"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
                   <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
