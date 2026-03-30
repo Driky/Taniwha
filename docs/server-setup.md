@@ -195,13 +195,13 @@ sudo mkdir -p /srv/taniwha/data
 sudo chown 1001:1001 /srv/taniwha/data   # uid/gid of the taniwha runtime user
 ```
 
-### Add the volume mount to your `docker run` command
+### Install the updated service file
 
-Edit `/home/taniwha-deploy/taniwha/taniwha.service` and add this flag to the
-`ExecStart` line (alongside the existing `--volume` flags):
+The volume mount is already present in `deploy/taniwha.service`. Re-copy it
+to the server after pulling the latest code:
 
-```
---volume /srv/taniwha/data:/data/taniwha \
+```bash
+sudo cp deploy/taniwha.service /etc/systemd/system/taniwha.service
 ```
 
 ### Add `TANIWHA_DATA_DIR` to `.env`
