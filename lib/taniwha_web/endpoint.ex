@@ -8,6 +8,7 @@ defmodule TaniwhaWeb.Endpoint do
     store: :cookie,
     key: "_taniwha_key",
     signing_salt: "S9bDCmac",
+    encryption_salt: "T4n1wh4_enc_s4lt",
     same_site: "Lax"
   ]
 

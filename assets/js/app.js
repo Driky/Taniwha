@@ -25,11 +25,38 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/taniwha"
 import topbar from "../vendor/topbar"
 
+// UserMenu hook: toggles the dropdown open/close and closes on click-outside.
+// Avoids a LiveView round-trip for purely client-side UI state.
+const UserMenu = {
+  mounted() {
+    this.button = this.el.querySelector("#user-menu-button")
+    this.dropdown = this.el.querySelector("#user-menu-dropdown")
+
+    this.button.addEventListener("click", (e) => {
+      e.stopPropagation()
+      const isOpen = !this.dropdown.classList.contains("hidden")
+      this.dropdown.classList.toggle("hidden", isOpen)
+      this.button.setAttribute("aria-expanded", String(!isOpen))
+    })
+
+    this.outsideClick = (e) => {
+      if (!this.el.contains(e.target)) {
+        this.dropdown.classList.add("hidden")
+        this.button.setAttribute("aria-expanded", "false")
+      }
+    }
+    document.addEventListener("click", this.outsideClick)
+  },
+  destroyed() {
+    document.removeEventListener("click", this.outsideClick)
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, UserMenu},
 })
 
 // Show progress bar on live navigation and form submits

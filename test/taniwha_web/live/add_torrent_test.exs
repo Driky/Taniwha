@@ -14,6 +14,11 @@ defmodule TaniwhaWeb.AddTorrentTest do
     :ok
   end
 
+  setup %{conn: conn} do
+    {conn, _user} = register_and_log_in_user(conn)
+    {:ok, conn: conn}
+  end
+
   # ---------------------------------------------------------------------------
   # Batch 5 — Modal open/close skeleton
   # ---------------------------------------------------------------------------

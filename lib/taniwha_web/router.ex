@@ -26,13 +26,39 @@ defmodule TaniwhaWeb.Router do
     plug TaniwhaWeb.Plugs.AuthenticateToken
   end
 
+  # Authenticates browser requests via session cookie. Applied only to the
+  # protected browser scope below — not to the API or health check pipelines.
+  pipeline :browser_auth do
+    plug TaniwhaWeb.Plugs.AuthenticateSession
+  end
+
+  # Unauthenticated browser routes: login, setup, session management.
   scope "/", TaniwhaWeb do
     pipe_through :browser
 
-    live "/", DashboardLive, :index
-    live "/torrents/:hash", TorrentDetailLive, :show
-    live "/add", AddTorrentLive, :new
-    live "/settings", SettingsLive, :index
+    live_session :unauthenticated,
+      on_mount: [{TaniwhaWeb.UserAuth, :redirect_if_authenticated}] do
+      live "/login", LoginLive, :index
+    end
+
+    # Setup does its own redirect check in mount (guarded against race conditions).
+    live "/setup", SetupLive, :index
+
+    post "/session", SessionController, :create
+    delete "/session", SessionController, :delete
+  end
+
+  # Protected browser routes — require a valid session cookie.
+  scope "/", TaniwhaWeb do
+    pipe_through [:browser, :browser_auth]
+
+    live_session :authenticated,
+      on_mount: [{TaniwhaWeb.UserAuth, :require_authenticated_user}] do
+      live "/", DashboardLive, :index
+      live "/torrents/:hash", TorrentDetailLive, :show
+      live "/add", AddTorrentLive, :new
+      live "/settings", SettingsLive, :index
+    end
   end
 
   # Health check — unauthenticated, no CSRF, no session. Intended for load

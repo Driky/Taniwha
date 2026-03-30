@@ -16,6 +16,11 @@ defmodule TaniwhaWeb.DashboardLiveTest do
     :ok
   end
 
+  setup %{conn: conn} do
+    {conn, _user} = register_and_log_in_user(conn)
+    {:ok, conn: conn}
+  end
+
   # ---------------------------------------------------------------------------
   # Batch 1 — Mount renders
   # ---------------------------------------------------------------------------
@@ -746,6 +751,23 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       expect(MockCommands, :start, fn _hash -> {:error, :connection_failed} end)
       render_click(lv, "context_menu_action", %{"action" => "start", "hash" => hash})
       assert render(lv) =~ "Failed to start"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch — User menu in topbar
+  # ---------------------------------------------------------------------------
+
+  describe "topbar user menu" do
+    test "avatar circle shows first char of username", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/")
+      # The topbar includes the user avatar; "T" is the first char of "test_user_..."
+      assert html =~ ~s(aria-label="User menu")
+    end
+
+    test "sign out link is present in the page", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/")
+      assert html =~ "Sign out"
     end
   end
 

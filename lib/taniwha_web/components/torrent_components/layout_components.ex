@@ -31,11 +31,13 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
         upload_rate={@global_upload_rate}
         download_rate={@global_download_rate}
         search={@search}
+        current_user={@current_user}
       />
   """
   attr :upload_rate, :integer, default: 0
   attr :download_rate, :integer, default: 0
   attr :search, :string, default: ""
+  attr :current_user, :map, default: nil
 
   def topbar(assigns) do
     ~H"""
@@ -103,7 +105,82 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
 
       <%!-- Theme toggle --%>
       <TaniwhaWeb.Layouts.theme_toggle />
+
+      <%!-- User menu --%>
+      <.user_menu :if={@current_user} username={@current_user.username} />
     </header>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # user_menu/1
+  # ---------------------------------------------------------------------------
+
+  # Renders the 26px avatar circle and dropdown for the authenticated user.
+  # The dropdown is toggled by the UserMenu JS hook (click-outside aware).
+  # Sign out submits a hidden DELETE /session form to avoid a full navigation.
+  attr :username, :string, required: true
+
+  defp user_menu(assigns) do
+    ~H"""
+    <div class="relative shrink-0" id="user-menu-container" phx-hook="UserMenu">
+      <%!-- Avatar circle --%>
+      <button
+        type="button"
+        id="user-menu-button"
+        aria-label="User menu"
+        aria-haspopup="true"
+        aria-expanded="false"
+        class="flex items-center justify-center rounded-full text-[11px] font-semibold cursor-pointer border-none"
+        style="width: 26px; height: 26px; background: var(--taniwha-avatar-bg, #e0e7ff); color: var(--taniwha-avatar-text, #4338ca);"
+      >
+        {String.first(@username) |> String.upcase()}
+      </button>
+
+      <%!-- Dropdown (hidden until toggled by UserMenu hook) --%>
+      <div
+        id="user-menu-dropdown"
+        role="menu"
+        aria-labelledby="user-menu-button"
+        class="absolute right-0 mt-1 rounded-lg border shadow-lg z-50 hidden"
+        style="min-width: 160px; background: var(--taniwha-topbar-bg); border-color: var(--taniwha-topbar-border); top: 100%;"
+      >
+        <%!-- Username display row --%>
+        <div
+          class="px-3 py-2 text-[11px] border-b"
+          style="color: var(--taniwha-sidebar-section); border-color: var(--taniwha-topbar-border);"
+        >
+          {@username}
+        </div>
+        <%!-- Settings link --%>
+        <a
+          href={~p"/settings"}
+          role="menuitem"
+          class="block px-3 py-2 text-[12px] hover:bg-black/5"
+          style="color: var(--taniwha-cell-name);"
+        >
+          Settings
+        </a>
+        <%!-- Sign out form (uses DELETE method override) --%>
+        <form
+          action={~p"/session"}
+          method="post"
+          class="border-t"
+          style="border-color: var(--taniwha-topbar-border);"
+        >
+          <input type="hidden" name="_method" value="delete" />
+          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+          <button
+            type="submit"
+            role="menuitem"
+            class="w-full text-left px-3 py-2 text-[12px] hover:bg-black/5 cursor-pointer border-none bg-transparent"
+            style="color: var(--taniwha-cell-name);"
+          >
+            Sign out
+          </button>
+        </form>
+      </div>
+    </div>
     """
   end
 

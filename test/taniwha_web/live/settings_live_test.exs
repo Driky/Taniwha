@@ -1,7 +1,12 @@
 defmodule TaniwhaWeb.SettingsLiveTest do
-  use TaniwhaWeb.ConnCase
+  use TaniwhaWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+
+  setup %{conn: conn} do
+    {conn, _user} = register_and_log_in_user(conn)
+    {:ok, conn: conn}
+  end
 
   # ---------------------------------------------------------------------------
   # Batch 8 — SettingsLive mount + display

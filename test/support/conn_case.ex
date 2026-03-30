@@ -45,4 +45,27 @@ defmodule TaniwhaWeb.ConnCase do
     {:ok, token} = Taniwha.Auth.issue_token("test-api-key-for-tests")
     Plug.Conn.put_req_header(conn, "authorization", "Bearer #{token}")
   end
+
+  @doc """
+  Creates a test user in `Taniwha.Auth.CredentialStore` and returns a conn
+  with `user_id` set in the session.
+
+  Registers an `on_exit` callback to delete the user after the test. Use this
+  in tests that need an authenticated browser session.
+
+  Returns `{conn, user}`.
+  """
+  @spec register_and_log_in_user(Plug.Conn.t()) :: {Plug.Conn.t(), map()}
+  def register_and_log_in_user(conn) do
+    username = "test_user_#{System.unique_integer([:positive, :monotonic])}"
+    {:ok, user} = Taniwha.Auth.CredentialStore.create_user(username, "Test_password_123!")
+    ExUnit.Callbacks.on_exit(fn -> Taniwha.Auth.CredentialStore.delete_user(user.id) end)
+    {log_in_user(conn, user), user}
+  end
+
+  @doc "Sets the given user's id in the conn session (for tests)."
+  @spec log_in_user(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def log_in_user(conn, user) do
+    Plug.Test.init_test_session(conn, %{"user_id" => user.id})
+  end
 end

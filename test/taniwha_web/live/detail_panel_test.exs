@@ -16,6 +16,11 @@ defmodule TaniwhaWeb.DetailPanelTest do
     :ok
   end
 
+  setup %{conn: conn} do
+    {conn, _user} = register_and_log_in_user(conn)
+    {:ok, conn: conn}
+  end
+
   # ---------------------------------------------------------------------------
   # Batch 1 — Panel visibility
   # ---------------------------------------------------------------------------
