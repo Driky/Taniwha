@@ -49,7 +49,7 @@ defmodule TaniwhaWeb.SettingsLive do
   def handle_event(
         "passkey_registered",
         %{
-          "credential_id" => cred_id_b64,
+          "credential_id" => _,
           "client_data_json" => cdj_b64,
           "attestation_object" => attest_b64,
           "label" => label
@@ -58,7 +58,6 @@ defmodule TaniwhaWeb.SettingsLive do
       ) do
     challenge_raw = socket.assigns.reg_challenge
 
-    _cred_id = Base.decode64!(cred_id_b64)
     client_data_json = Base.decode64!(cdj_b64)
     attestation_object = Base.decode64!(attest_b64)
 

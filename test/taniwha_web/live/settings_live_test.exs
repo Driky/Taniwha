@@ -103,7 +103,7 @@ defmodule TaniwhaWeb.SettingsLiveTest do
   # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
-  # Batch B5 — Passkeys section
+  # Batch 11 — Passkeys section
   # ---------------------------------------------------------------------------
 
   describe "passkeys section — empty state" do
@@ -164,10 +164,8 @@ defmodule TaniwhaWeb.SettingsLiveTest do
       end)
 
       {:ok, lv, _html} = live(conn, ~p"/settings")
-      # trigger challenge generation first
       render_click(lv, "add_passkey", %{})
 
-      # simulate JS hook response
       render_hook(lv, "passkey_registered", %{
         "credential_id" => Base.encode64(cred_id),
         "client_data_json" => Base.encode64("{}"),

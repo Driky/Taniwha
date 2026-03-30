@@ -327,15 +327,16 @@ defmodule Taniwha.Auth.CredentialStore do
   end
 
   def handle_call({:add_passkey, user_id, passkey}, _from, state) do
-    case Enum.find_index(state.users, &(&1.id == user_id)) do
-      nil ->
+    passkey_with_id = Map.put(passkey, :id, generate_id())
+
+    case update_in_list(state.users, &(&1.id == user_id), fn user ->
+           %{user | passkeys: [passkey_with_id | user.passkeys]}
+         end) do
+      {:error, :not_found} ->
         {:reply, {:error, :not_found}, state}
 
-      index ->
-        passkey_with_id = Map.put(passkey, :id, generate_id())
-        user = Enum.at(state.users, index)
-        updated_user = %{user | passkeys: [passkey_with_id | user.passkeys]}
-        new_state = %{state | users: List.replace_at(state.users, index, updated_user)}
+      {:ok, updated_users, updated_user} ->
+        new_state = %{state | users: updated_users}
         persist(new_state)
         {:reply, {:ok, updated_user}, new_state}
     end
@@ -364,13 +365,11 @@ defmodule Taniwha.Auth.CredentialStore do
       user_index ->
         user = Enum.at(state.users, user_index)
 
-        case Enum.find_index(user.passkeys, &(&1.id == passkey_id)) do
-          nil ->
+        case update_in_list(user.passkeys, &(&1.id == passkey_id), &Map.put(&1, :sign_count, new_count)) do
+          {:error, :not_found} ->
             {:reply, {:error, :not_found}, state}
 
-          pk_index ->
-            updated_pk = Map.put(Enum.at(user.passkeys, pk_index), :sign_count, new_count)
-            updated_passkeys = List.replace_at(user.passkeys, pk_index, updated_pk)
+          {:ok, updated_passkeys, _pk} ->
             updated_user = %{user | passkeys: updated_passkeys}
             new_state = %{state | users: List.replace_at(state.users, user_index, updated_user)}
             persist(new_state)
@@ -380,20 +379,35 @@ defmodule Taniwha.Auth.CredentialStore do
   end
 
   def handle_call({:delete_passkey, user_id, passkey_id}, _from, state) do
-    case Enum.find_index(state.users, &(&1.id == user_id)) do
-      nil ->
+    case update_in_list(state.users, &(&1.id == user_id), fn user ->
+           %{user | passkeys: Enum.reject(user.passkeys, &(&1.id == passkey_id))}
+         end) do
+      {:error, :not_found} ->
         {:reply, {:error, :not_found}, state}
 
-      user_index ->
-        user = Enum.at(state.users, user_index)
-        updated_user = %{user | passkeys: Enum.reject(user.passkeys, &(&1.id == passkey_id))}
-        new_state = %{state | users: List.replace_at(state.users, user_index, updated_user)}
+      {:ok, updated_users, _user} ->
+        new_state = %{state | users: updated_users}
         persist(new_state)
         {:reply, :ok, new_state}
     end
   end
 
   # ── Private helpers ───────────────────────────────────────────────────────
+
+  # Finds the first element matching `predicate`, applies `updater`, and returns
+  # the updated list together with the updated element.
+  @spec update_in_list([term()], (term() -> boolean()), (term() -> term())) ::
+          {:ok, [term()], term()} | {:error, :not_found}
+  defp update_in_list(list, predicate, updater) do
+    case Enum.find_index(list, predicate) do
+      nil ->
+        {:error, :not_found}
+
+      index ->
+        updated = updater.(Enum.at(list, index))
+        {:ok, List.replace_at(list, index, updated), updated}
+    end
+  end
 
   @spec persist(state()) :: :ok
   defp persist(state) do

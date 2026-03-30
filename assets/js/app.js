@@ -66,10 +66,7 @@ function base64urlToBuffer(b64url) {
 }
 
 function bufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer)
-  let binary = ""
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-  return btoa(binary)
+  return btoa(Array.from(new Uint8Array(buffer), b => String.fromCharCode(b)).join(""))
 }
 
 function formatPasskeyDate(date) {
