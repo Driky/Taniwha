@@ -81,7 +81,13 @@ defmodule TaniwhaWeb.LoginLive do
 
     case CredentialStore.get_passkey_by_credential_id(credential_id) do
       {:ok, {user, stored_passkey}} ->
-        case WebAuthn.verify_assertion(auth_data_bin, client_data_json, signature, challenge_raw, stored_passkey) do
+        case WebAuthn.verify_assertion(
+               auth_data_bin,
+               client_data_json,
+               signature,
+               challenge_raw,
+               stored_passkey
+             ) do
           {:ok, new_count} ->
             :ok = CredentialStore.update_passkey_sign_count(user.id, stored_passkey.id, new_count)
             token = Phoenix.Token.sign(TaniwhaWeb.Endpoint, "passkey_login", user.id)
@@ -98,8 +104,7 @@ defmodule TaniwhaWeb.LoginLive do
         end
 
       {:error, :not_found} ->
-        {:noreply,
-         assign(socket, :passkey_error, "Passkey not recognized. Please try again.")}
+        {:noreply, assign(socket, :passkey_error, "Passkey not recognized. Please try again.")}
     end
   end
 
