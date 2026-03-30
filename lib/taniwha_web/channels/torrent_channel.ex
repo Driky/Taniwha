@@ -14,6 +14,8 @@ defmodule TaniwhaWeb.TorrentChannel do
     * `"remove"` – erase a torrent from rtorrent (`%{"hash" => hash}`)
     * `"set_file_priority"` – set file priority
       (`%{"hash" => hash, "index" => index, "priority" => priority}`)
+    * `"set_label"` – set the label for a torrent
+      (`%{"hash" => hash, "label" => label}`)
 
   ## Server → Client events
 
@@ -114,6 +116,16 @@ defmodule TaniwhaWeb.TorrentChannel do
     with {:ok, socket} <- check_and_update_rate_limit(socket),
          :ok <- Validator.validate_hash(hash) do
       with_command_span("remove", hash, socket, fn -> @commands.erase(hash) end)
+    else
+      {:error, :rate_limited} -> {:reply, {:error, %{reason: "rate_limited"}}, socket}
+      {:error, :invalid_hash} -> {:reply, {:error, %{reason: "invalid hash"}}, socket}
+    end
+  end
+
+  def handle_in("set_label", %{"hash" => hash, "label" => label}, socket) do
+    with {:ok, socket} <- check_and_update_rate_limit(socket),
+         :ok <- Validator.validate_hash(hash) do
+      with_command_span("set_label", hash, socket, fn -> @commands.set_label(hash, label) end)
     else
       {:error, :rate_limited} -> {:reply, {:error, %{reason: "rate_limited"}}, socket}
       {:error, :invalid_hash} -> {:reply, {:error, %{reason: "invalid hash"}}, socket}

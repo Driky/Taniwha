@@ -72,7 +72,7 @@ defmodule TaniwhaWeb.API.TorrentControllerTest do
 
   describe "POST /api/v1/torrents with magnet_url" do
     test "returns 201 queued when load_url succeeds", %{conn: conn} do
-      expect(MockCommands, :load_url, fn _url -> :ok end)
+      expect(MockCommands, :load_url, fn _url, _opts -> :ok end)
 
       conn =
         conn
@@ -83,7 +83,7 @@ defmodule TaniwhaWeb.API.TorrentControllerTest do
     end
 
     test "returns 422 when load_url fails", %{conn: conn} do
-      expect(MockCommands, :load_url, fn _url -> {:error, :connection_refused} end)
+      expect(MockCommands, :load_url, fn _url, _opts -> {:error, :connection_refused} end)
 
       conn =
         conn
@@ -104,7 +104,7 @@ defmodule TaniwhaWeb.API.TorrentControllerTest do
       File.write!(path, "fake torrent data")
       on_exit(fn -> File.rm(path) end)
 
-      expect(MockCommands, :load_raw, fn _binary -> :ok end)
+      expect(MockCommands, :load_raw, fn _binary, _opts -> :ok end)
 
       upload = %Plug.Upload{
         path: path,
@@ -122,7 +122,7 @@ defmodule TaniwhaWeb.API.TorrentControllerTest do
       File.write!(path, "bad data")
       on_exit(fn -> File.rm(path) end)
 
-      expect(MockCommands, :load_raw, fn _binary -> {:error, :invalid_torrent} end)
+      expect(MockCommands, :load_raw, fn _binary, _opts -> {:error, :invalid_torrent} end)
 
       upload = %Plug.Upload{
         path: path,
@@ -168,7 +168,7 @@ defmodule TaniwhaWeb.API.TorrentControllerTest do
     end
 
     test "accepts a valid magnet link", %{conn: conn} do
-      expect(MockCommands, :load_url, fn _url -> :ok end)
+      expect(MockCommands, :load_url, fn _url, _opts -> :ok end)
 
       conn =
         conn
@@ -181,7 +181,7 @@ defmodule TaniwhaWeb.API.TorrentControllerTest do
     end
 
     test "accepts a valid https URL", %{conn: conn} do
-      expect(MockCommands, :load_url, fn _url -> :ok end)
+      expect(MockCommands, :load_url, fn _url, _opts -> :ok end)
 
       conn =
         conn
@@ -189,6 +189,70 @@ defmodule TaniwhaWeb.API.TorrentControllerTest do
         |> post("/api/v1/torrents", %{"magnet_url" => "https://example.com/file.torrent"})
 
       assert json_response(conn, 201)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # POST /api/v1/torrents — label and directory opts
+  # ---------------------------------------------------------------------------
+
+  describe "POST /api/v1/torrents with label and directory opts" do
+    test "passes label opt to load_url when label is in params", %{conn: conn} do
+      expect(MockCommands, :load_url, fn _url, opts ->
+        assert Keyword.get(opts, :label) == "Linux"
+        :ok
+      end)
+
+      conn =
+        conn
+        |> with_auth()
+        |> post("/api/v1/torrents", %{
+          "magnet_url" => "magnet:?xt=urn:btih:abc123",
+          "label" => "Linux"
+        })
+
+      assert %{"status" => "queued"} = json_response(conn, 201)
+    end
+
+    test "passes directory opt to load_url when directory is in params", %{conn: conn} do
+      expect(MockCommands, :load_url, fn _url, opts ->
+        assert Keyword.get(opts, :directory) == "/downloads/linux"
+        :ok
+      end)
+
+      conn =
+        conn
+        |> with_auth()
+        |> post("/api/v1/torrents", %{
+          "magnet_url" => "magnet:?xt=urn:btih:abc123",
+          "directory" => "/downloads/linux"
+        })
+
+      assert %{"status" => "queued"} = json_response(conn, 201)
+    end
+
+    test "passes label opt to load_raw for file upload", %{conn: conn} do
+      path = Path.join(System.tmp_dir!(), "test_#{System.unique_integer([:positive])}.torrent")
+      File.write!(path, "fake torrent data")
+      on_exit(fn -> File.rm(path) end)
+
+      expect(MockCommands, :load_raw, fn _binary, opts ->
+        assert Keyword.get(opts, :label) == "Work"
+        :ok
+      end)
+
+      upload = %Plug.Upload{
+        path: path,
+        filename: "test.torrent",
+        content_type: "application/x-bittorrent"
+      }
+
+      conn =
+        conn
+        |> with_auth()
+        |> post("/api/v1/torrents", %{"torrent" => upload, "label" => "Work"})
+
+      assert %{"status" => "queued"} = json_response(conn, 201)
     end
   end
 end

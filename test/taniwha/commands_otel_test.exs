@@ -84,7 +84,9 @@ defmodule Taniwha.CommandsOtelTest do
         # d.timestamp.finished
         [0],
         # d.base_path
-        ["/downloads"]
+        ["/downloads"],
+        # d.custom1 (label)
+        [""]
       ]
 
       Taniwha.RPC.MockClient

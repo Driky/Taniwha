@@ -48,7 +48,7 @@ defmodule TaniwhaWeb.AddTorrentComponent do
       :ok ->
         socket = assign(socket, :loading, true)
 
-        case @commands.load_url(url) do
+        case @commands.load_url(url, []) do
           :ok ->
             send(self(), {:add_torrent_success})
             {:noreply, socket}

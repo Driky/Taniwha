@@ -30,6 +30,7 @@ defmodule Taniwha.Commands do
   require OpenTelemetry.Tracer, as: Tracer
 
   alias Taniwha.Peer
+  alias Taniwha.State.Store
   alias Taniwha.Torrent
   alias Taniwha.Tracker
   alias Taniwha.TorrentFile
@@ -193,15 +194,19 @@ defmodule Taniwha.Commands do
   Loads and starts a torrent from a URL.
 
   Passes an empty string as the target (uses rtorrent's default download
-  directory).
+  directory). Accepts an optional keyword list:
+
+    * `:label` — sets `d.custom1` via a post-load command
+    * `:directory` — sets `d.directory_base` via a post-load command
   """
   @impl Taniwha.CommandsBehaviour
-  @spec load_url(String.t()) :: :ok | {:error, term()}
-  def load_url(url) do
+  @spec load_url(String.t(), keyword()) :: :ok | {:error, term()}
+  def load_url(url, opts \\ []) do
     Tracer.with_span "taniwha.commands.load_url",
                      %{attributes: %{"command.name": "load_url"}} do
       Logger.info("Command executed", command: "load_url")
-      @rpc_client.call("load.start", ["", url]) |> ok_on_zero()
+      post_cmds = build_post_load_commands(opts)
+      @rpc_client.call("load.start", ["", url | post_cmds]) |> ok_on_zero()
     end
   end
 
@@ -210,16 +215,75 @@ defmodule Taniwha.Commands do
   file).
 
   Passes an empty string as the target (uses rtorrent's default download
-  directory).
+  directory). Accepts an optional keyword list:
+
+    * `:label` — sets `d.custom1` via a post-load command
+    * `:directory` — sets `d.directory_base` via a post-load command
   """
   @impl Taniwha.CommandsBehaviour
-  @spec load_raw(binary()) :: :ok | {:error, term()}
-  def load_raw(data) do
+  @spec load_raw(binary(), keyword()) :: :ok | {:error, term()}
+  def load_raw(data, opts \\ []) do
     Tracer.with_span "taniwha.commands.load_raw",
                      %{attributes: %{"command.name": "load_raw"}} do
       Logger.info("Command executed", command: "load_raw")
-      @rpc_client.call("load.raw_start", ["", {:base64, data}]) |> ok_on_zero()
+      post_cmds = build_post_load_commands(opts)
+      @rpc_client.call("load.raw_start", ["", {:base64, data} | post_cmds]) |> ok_on_zero()
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Label commands
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Sets the label for a torrent.
+
+  rtorrent stores labels in the `d.custom1` field — the de facto standard
+  established by ruTorrent. Labels set here will be visible in ruTorrent and
+  vice versa.
+
+  **Note:** Labels are stored as plain strings in the post-load command syntax
+  `d.custom1.set=<label>`. Labels containing `=` or `,` may not round-trip
+  correctly through that syntax — avoid those characters when setting labels
+  at load time.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec set_label(String.t(), String.t()) :: :ok | {:error, term()}
+  def set_label(hash, label) do
+    Tracer.with_span "taniwha.commands.set_label",
+                     %{attributes: %{"command.name": "set_label", "torrent.hash": hash}} do
+      Logger.info("Command executed", command: "set_label", torrent_hash: hash)
+      @rpc_client.call("d.custom1.set", [hash, label]) |> ok_on_zero()
+    end
+  end
+
+  @doc """
+  Removes the label from a torrent by setting `d.custom1` to an empty string.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec remove_label(String.t()) :: :ok | {:error, term()}
+  def remove_label(hash) do
+    Tracer.with_span "taniwha.commands.remove_label",
+                     %{attributes: %{"command.name": "remove_label", "torrent.hash": hash}} do
+      Logger.info("Command executed", command: "remove_label", torrent_hash: hash)
+      @rpc_client.call("d.custom1.set", [hash, ""]) |> ok_on_zero()
+    end
+  end
+
+  @doc """
+  Returns a sorted list of unique labels currently assigned to any torrent.
+
+  Derived from the ETS cache — no RPC call is made. Returns `[]` when no
+  torrents have labels.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec get_all_labels() :: [String.t()]
+  def get_all_labels do
+    Store.get_all_torrents()
+    |> Enum.map(& &1.label)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> Enum.sort()
   end
 
   # ---------------------------------------------------------------------------
@@ -368,6 +432,21 @@ defmodule Taniwha.Commands do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  @spec build_post_load_commands(keyword()) :: [String.t()]
+  defp build_post_load_commands(opts) do
+    []
+    |> maybe_add_label_cmd(Keyword.get(opts, :label))
+    |> maybe_add_directory_cmd(Keyword.get(opts, :directory))
+  end
+
+  @spec maybe_add_label_cmd([String.t()], String.t() | nil) :: [String.t()]
+  defp maybe_add_label_cmd(cmds, nil), do: cmds
+  defp maybe_add_label_cmd(cmds, label), do: cmds ++ ["d.custom1.set=#{label}"]
+
+  @spec maybe_add_directory_cmd([String.t()], String.t() | nil) :: [String.t()]
+  defp maybe_add_directory_cmd(cmds, nil), do: cmds
+  defp maybe_add_directory_cmd(cmds, dir), do: cmds ++ ["d.directory_base.set=#{dir}"]
 
   @spec run_lifecycle(String.t(), String.t()) :: :ok | {:error, term()}
   defp run_lifecycle(method, hash) do

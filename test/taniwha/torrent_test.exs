@@ -132,7 +132,8 @@ defmodule Taniwha.TorrentTest do
 
     # Field order: name, size_bytes, completed_bytes, up.rate, down.rate,
     #              ratio, state, is_active, complete, is_hash_checking,
-    #              peers_connected, timestamp.started, timestamp.finished, base_path
+    #              peers_connected, timestamp.started, timestamp.finished, base_path,
+    #              custom1 (label)
     @values [
       "Ubuntu 22.04",
       1_000_000,
@@ -147,7 +148,8 @@ defmodule Taniwha.TorrentTest do
       5,
       1_700_000_000,
       0,
-      "/downloads/ubuntu"
+      "/downloads/ubuntu",
+      ""
     ]
 
     setup do
@@ -203,10 +205,10 @@ defmodule Taniwha.TorrentTest do
   end
 
   describe "rpc_fields/0" do
-    test "returns a list of 14 strings" do
+    test "returns a list of 15 strings" do
       fields = Torrent.rpc_fields()
       assert is_list(fields)
-      assert length(fields) == 14
+      assert length(fields) == 15
       assert Enum.all?(fields, &is_binary/1)
     end
   end

@@ -80,9 +80,9 @@ defmodule TaniwhaWeb.AddTorrentTest do
       {:ok, lv: lv}
     end
 
-    test "submitting valid magnet URL calls Commands.load_url/1", %{lv: lv} do
+    test "submitting valid magnet URL calls Commands.load_url/2", %{lv: lv} do
       url = "magnet:?xt=urn:btih:abc123"
-      expect(Taniwha.MockCommands, :load_url, fn ^url -> :ok end)
+      expect(Taniwha.MockCommands, :load_url, fn ^url, _opts -> :ok end)
 
       lv
       |> element("form[phx-submit=submit_url]")
@@ -90,7 +90,7 @@ defmodule TaniwhaWeb.AddTorrentTest do
     end
 
     test "on :ok closes modal and shows success flash", %{lv: lv} do
-      stub(Taniwha.MockCommands, :load_url, fn _url -> :ok end)
+      stub(Taniwha.MockCommands, :load_url, fn _url, _opts -> :ok end)
 
       lv
       |> element("form[phx-submit=submit_url]")
@@ -102,7 +102,7 @@ defmodule TaniwhaWeb.AddTorrentTest do
     end
 
     test "on {:error, _} stays open and shows error", %{lv: lv} do
-      stub(Taniwha.MockCommands, :load_url, fn _url -> {:error, :timeout} end)
+      stub(Taniwha.MockCommands, :load_url, fn _url, _opts -> {:error, :timeout} end)
 
       lv
       |> element("form[phx-submit=submit_url]")
@@ -158,7 +158,7 @@ defmodule TaniwhaWeb.AddTorrentTest do
       conn: conn
     } do
       content = "torrent file binary content"
-      expect(Taniwha.MockCommands, :load_raw, fn ^content -> :ok end)
+      expect(Taniwha.MockCommands, :load_raw, fn ^content, _opts -> :ok end)
 
       lv
       |> file_input("#add-torrent-modal form", :torrent_file, [

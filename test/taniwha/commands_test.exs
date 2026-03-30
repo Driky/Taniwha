@@ -27,7 +27,8 @@ defmodule Taniwha.CommandsTest do
       peers_connected: 3,
       ts_started: 1_609_459_200,
       ts_finished: 0,
-      base_path: "/downloads"
+      base_path: "/downloads",
+      label: ""
     }
 
     m = Map.merge(defaults, overrides)
@@ -46,7 +47,8 @@ defmodule Taniwha.CommandsTest do
       m.peers_connected,
       m.ts_started,
       m.ts_finished,
-      m.base_path
+      m.base_path,
+      m.label
     ]
   end
 
@@ -198,10 +200,10 @@ defmodule Taniwha.CommandsTest do
   end
 
   # ---------------------------------------------------------------------------
-  # Batch 4 — load_url/1 and load_raw/1
+  # Batch 4 — load_url/2 and load_raw/2 (no-opts paths)
   # ---------------------------------------------------------------------------
 
-  describe "load_url/1" do
+  describe "load_url/2" do
     test "calls load.start with empty target and url" do
       url = "http://example.com/file.torrent"
 
@@ -216,7 +218,7 @@ defmodule Taniwha.CommandsTest do
     end
   end
 
-  describe "load_raw/1" do
+  describe "load_raw/2" do
     test "calls load.raw_start with empty target and base64-wrapped data" do
       data = <<0, 1, 2, 3>>
 

@@ -25,6 +25,7 @@ defmodule Taniwha.Torrent do
           started_at: DateTime.t() | nil,
           finished_at: DateTime.t() | nil,
           base_path: String.t() | nil,
+          label: String.t() | nil,
           files: list() | nil
         }
 
@@ -44,6 +45,7 @@ defmodule Taniwha.Torrent do
     started_at: nil,
     finished_at: nil,
     base_path: nil,
+    label: nil,
     files: nil
   ]
 
@@ -61,10 +63,11 @@ defmodule Taniwha.Torrent do
     "d.peers_connected",
     "d.timestamp.started",
     "d.timestamp.finished",
-    "d.base_path"
+    "d.base_path",
+    "d.custom1"
   ]
 
-  @diff_fields ~w(upload_rate download_rate completed_bytes state is_active is_hash_checking peers_connected ratio complete)a
+  @diff_fields ~w(upload_rate download_rate completed_bytes state is_active is_hash_checking peers_connected ratio complete label)a
 
   @doc """
   Returns the ordered list of rtorrent RPC field names used to build a Torrent
@@ -156,7 +159,8 @@ defmodule Taniwha.Torrent do
         peers_connected,
         ts_started,
         ts_finished,
-        base_path
+        base_path,
+        label
       ]) do
     %__MODULE__{
       hash: hash,
@@ -173,7 +177,8 @@ defmodule Taniwha.Torrent do
       peers_connected: peers_connected,
       started_at: decode_timestamp(ts_started),
       finished_at: decode_timestamp(ts_finished),
-      base_path: decode_base_path(base_path)
+      base_path: decode_base_path(base_path),
+      label: decode_label(label)
     }
   end
 
@@ -188,4 +193,8 @@ defmodule Taniwha.Torrent do
   @spec decode_base_path(String.t()) :: String.t() | nil
   defp decode_base_path(""), do: nil
   defp decode_base_path(path), do: path
+
+  @spec decode_label(String.t()) :: String.t() | nil
+  defp decode_label(""), do: nil
+  defp decode_label(label), do: label
 end

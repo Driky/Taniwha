@@ -40,6 +40,7 @@ defmodule TaniwhaWeb.API.TorrentJSON do
       "startedAt" => maybe_iso8601(t.started_at),
       "finishedAt" => maybe_iso8601(t.finished_at),
       "basePath" => t.base_path,
+      "label" => t.label,
       "progress" => Torrent.progress(t),
       "status" => Atom.to_string(Torrent.status(t))
     }

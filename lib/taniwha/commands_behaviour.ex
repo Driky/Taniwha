@@ -22,7 +22,10 @@ defmodule Taniwha.CommandsBehaviour do
               :ok | {:error, term()}
   @callback list_peers(String.t()) :: {:ok, [Peer.t()]} | {:error, term()}
   @callback list_trackers(String.t()) :: {:ok, [Tracker.t()]} | {:error, term()}
-  @callback load_url(String.t()) :: :ok | {:error, term()}
-  @callback load_raw(binary()) :: :ok | {:error, term()}
+  @callback load_url(String.t(), keyword()) :: :ok | {:error, term()}
+  @callback load_raw(binary(), keyword()) :: :ok | {:error, term()}
+  @callback set_label(String.t(), String.t()) :: :ok | {:error, term()}
+  @callback remove_label(String.t()) :: :ok | {:error, term()}
+  @callback get_all_labels() :: [String.t()]
   @callback system_pid() :: {:ok, term()} | {:error, term()}
 end

@@ -286,7 +286,7 @@ defmodule TaniwhaWeb.DashboardLive do
 
     case results do
       [binary] when is_binary(binary) ->
-        case @commands.load_raw(binary) do
+        case @commands.load_raw(binary, []) do
           :ok ->
             {:noreply,
              socket

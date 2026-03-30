@@ -129,6 +129,28 @@ defmodule TaniwhaWeb.TorrentChannelTest do
       ref = push(channel, "start", %{"hash" => @valid_hash})
       assert_reply ref, :error, %{reason: _reason}
     end
+
+    test "set_label delegates to @commands and replies :ok", %{channel: channel} do
+      expect(MockCommands, :set_label, fn @valid_hash, "Linux" -> :ok end)
+
+      ref = push(channel, "set_label", %{"hash" => @valid_hash, "label" => "Linux"})
+      assert_reply ref, :ok
+    end
+
+    test "set_label with invalid hash is rejected", %{channel: channel} do
+      ref = push(channel, "set_label", %{"hash" => "short", "label" => "Linux"})
+      assert_reply ref, :error, %{reason: "invalid hash"}
+    end
+
+    test "set_label is subject to rate limiting", %{channel: channel} do
+      expect(MockCommands, :set_label, fn @valid_hash, _label -> :ok end)
+
+      ref1 = push(channel, "set_label", %{"hash" => @valid_hash, "label" => "first"})
+      assert_reply ref1, :ok
+
+      ref2 = push(channel, "set_label", %{"hash" => @valid_hash, "label" => "second"})
+      assert_reply ref2, :error, %{reason: "rate_limited"}
+    end
   end
 
   # ---------------------------------------------------------------------------
