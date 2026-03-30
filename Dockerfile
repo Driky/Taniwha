@@ -57,9 +57,13 @@ ENV LC_ALL=en_US.UTF-8
 
 WORKDIR /app
 
-# Create non-root user
+# Create non-root user and default data directory.
+# When a volume is mounted at /data/taniwha at runtime, Docker's mount
+# takes precedence and credentials land on the persistent volume.
 RUN groupadd --gid 1001 taniwha && \
-    useradd --uid 1001 --gid taniwha --no-create-home taniwha
+    useradd --uid 1001 --gid taniwha --no-create-home taniwha && \
+    mkdir -p /data/taniwha && \
+    chown taniwha:taniwha /data/taniwha
 
 # Copy release from builder
 COPY --from=builder --chown=taniwha:taniwha /app/_build/prod/rel/taniwha ./

@@ -20,6 +20,9 @@ defmodule Taniwha.Application do
       # RateLimiter must start before TaniwhaWeb.Endpoint so the first HTTP
       # request can never arrive before the ETS table is ready.
       Taniwha.RateLimiter,
+      # CredentialStore must start before TaniwhaWeb.Endpoint so auth routes
+      # are operational from the first HTTP request.
+      Taniwha.Auth.CredentialStore,
       Taniwha.RPC.Client,
       Taniwha.State.Store,
       Taniwha.State.Poller,

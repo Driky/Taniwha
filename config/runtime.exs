@@ -23,6 +23,17 @@ end
 config :taniwha, TaniwhaWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# Data directory for the encrypted credential store.
+# Only set when TANIWHA_DATA_DIR is present so that env-specific configs
+# (e.g. config/test.exs) are not overridden when the var is absent.
+# Mount a persistent volume at TANIWHA_DATA_DIR in Docker/systemd deployments.
+# Default when unset: /data/taniwha (hardcoded in CredentialStore.init/1).
+# WARNING: rotating SECRET_KEY_BASE makes the credential file unreadable —
+# delete credentials.enc and re-create users after a key rotation.
+if data_dir = System.get_env("TANIWHA_DATA_DIR") do
+  config :taniwha, data_dir: data_dir
+end
+
 if config_env() == :prod do
   # ---------------------------------------------------------------------------
   # OpenTelemetry — vendor-agnostic tracing via OTLP (production only).

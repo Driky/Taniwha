@@ -182,6 +182,53 @@ The Collector forwards to your backend(s) per its own pipeline config.
 
 ---
 
+## 4c. Data volume (credential store)
+
+Taniwha stores encrypted user credentials at `TANIWHA_DATA_DIR/credentials.enc`
+(default `/data/taniwha`). Mount a persistent host directory so credentials
+survive container restarts and image upgrades.
+
+### Create the host directory
+
+```bash
+sudo mkdir -p /srv/taniwha/data
+sudo chown 1001:1001 /srv/taniwha/data   # uid/gid of the taniwha runtime user
+```
+
+### Add the volume mount to your `docker run` command
+
+Edit `/home/taniwha-deploy/taniwha/taniwha.service` and add this flag to the
+`ExecStart` line (alongside the existing `--volume` flags):
+
+```
+--volume /srv/taniwha/data:/data/taniwha \
+```
+
+### Add `TANIWHA_DATA_DIR` to `.env`
+
+```
+TANIWHA_DATA_DIR=/data/taniwha
+```
+
+### Reload systemd
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart taniwha
+```
+
+### Key rotation warning
+
+The credential file is encrypted with a key derived from `SECRET_KEY_BASE`.
+**If `SECRET_KEY_BASE` is rotated**, the credential file becomes permanently
+unreadable — there is no automatic migration. After rotating the key:
+
+1. Delete `/srv/taniwha/data/credentials.enc`.
+2. Restart the container — Taniwha starts with no users.
+3. Navigate to the setup page to create the admin account again.
+
+---
+
 ## 5. rtorrent socket permissions
 
 The `taniwha-deploy` user (who runs the Docker daemon client) must be able to read/write the rtorrent socket that is bind-mounted into the container.

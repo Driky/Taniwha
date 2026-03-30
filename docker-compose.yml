@@ -16,6 +16,13 @@ services:
       PORT: "4000"
       # Substitute with the path to your rtorrent SCGI socket on the host:
       RTORRENT_SOCKET: /var/run/rtorrent/rpc.socket
+      # Credentials are stored encrypted in this directory.
+      # WARNING: rotating SECRET_KEY_BASE makes credentials unreadable.
+      TANIWHA_DATA_DIR: /data/taniwha
     volumes:
       - .:/app
       - /var/run/driky/.rtorrent.sock:/var/run/rtorrent/rpc.socket
+      - taniwha_data:/data/taniwha
+
+volumes:
+  taniwha_data:

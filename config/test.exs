@@ -35,6 +35,10 @@ config :taniwha,
 
 config :taniwha, api_key: "test-api-key-for-tests"
 
+# Use system temp dir so CredentialStore doesn't try to create /data/taniwha
+# (which is read-only in CI and local test environments).
+config :taniwha, data_dir: System.tmp_dir!()
+
 # OpenTelemetry: run the simple processor (required for span-capture tests to call
 # set_exporter/2) but set no exporter, so spans are dropped by default.
 # Individual tests override via :otel_simple_processor.set_exporter/2.
@@ -43,3 +47,6 @@ config :opentelemetry, processors: [{:otel_simple_processor, %{}}]
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+# bcrypt: reduce work factor for faster tests (default is 12)
+config :bcrypt_elixir, log_rounds: 4
