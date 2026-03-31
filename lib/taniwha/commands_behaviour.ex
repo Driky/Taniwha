@@ -17,6 +17,9 @@ defmodule Taniwha.CommandsBehaviour do
   @callback stop(String.t()) :: :ok | {:error, term()}
   @callback pause(String.t()) :: :ok | {:error, term()}
   @callback erase(String.t()) :: :ok | {:error, term()}
+  @callback erase_with_data(String.t()) :: :ok | {:error, term()}
+  @callback erase_many([String.t()]) :: {:ok, [String.t()], [String.t()]}
+  @callback erase_many_with_data([String.t()]) :: {:ok, [String.t()], [String.t()]}
   @callback list_files(String.t()) :: {:ok, [TorrentFile.t()]} | {:error, term()}
   @callback set_file_priority(String.t(), non_neg_integer(), non_neg_integer()) ::
               :ok | {:error, term()}

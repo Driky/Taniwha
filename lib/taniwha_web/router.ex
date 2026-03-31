@@ -80,6 +80,7 @@ defmodule TaniwhaWeb.Router do
     get "/torrents", TorrentController, :index
     get "/torrents/:hash", TorrentController, :show
     post "/torrents", TorrentController, :create
+    delete "/torrents/:hash", TorrentController, :delete
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

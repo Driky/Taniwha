@@ -34,6 +34,13 @@ if data_dir = System.get_env("TANIWHA_DATA_DIR") do
   config :taniwha, data_dir: data_dir
 end
 
+# Optional: base directory for downloads (required for "delete files" feature).
+# Mount this directory as a Docker volume at the same path as rtorrent sees it.
+# When unset, Commands.erase_with_data/1 returns {:error, :downloads_dir_not_configured}.
+if downloads_dir = System.get_env("TANIWHA_DOWNLOADS_DIR") do
+  config :taniwha, downloads_dir: downloads_dir
+end
+
 if config_env() == :prod do
   # ---------------------------------------------------------------------------
   # OpenTelemetry — vendor-agnostic tracing via OTLP (production only).

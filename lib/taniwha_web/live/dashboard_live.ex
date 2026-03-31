@@ -205,6 +205,24 @@ defmodule TaniwhaWeb.DashboardLive do
     {:noreply, assign(socket, :confirm_action, {:bulk_erase, hashes})}
   end
 
+  def handle_event(
+        "context_menu_action",
+        %{"action" => "erase_with_data", "hashes" => [hash]},
+        socket
+      ) do
+    base_path = find_base_path(socket.assigns.torrents, hash)
+    {:noreply, assign(socket, :confirm_action, {:erase_with_data, hash, base_path})}
+  end
+
+  def handle_event(
+        "context_menu_action",
+        %{"action" => "erase_with_data", "hashes" => hashes},
+        socket
+      ) do
+    paths = Enum.map(hashes, &find_base_path(socket.assigns.torrents, &1))
+    {:noreply, assign(socket, :confirm_action, {:bulk_erase_with_data, hashes, paths})}
+  end
+
   def handle_event("context_menu_action", %{"action" => "set_label_prompt"}, socket) do
     {:noreply, assign(socket, :show_label_manager, true)}
   end
@@ -288,6 +306,12 @@ defmodule TaniwhaWeb.DashboardLive do
     {:noreply, assign(socket, :confirm_action, {:bulk_erase, hashes})}
   end
 
+  def handle_event("bulk_remove_with_data", _params, socket) do
+    hashes = MapSet.to_list(socket.assigns.selected_hashes)
+    paths = Enum.map(hashes, &find_base_path(socket.assigns.torrents, &1))
+    {:noreply, assign(socket, :confirm_action, {:bulk_erase_with_data, hashes, paths})}
+  end
+
   def handle_event("confirm_action", _params, socket) do
     case socket.assigns.confirm_action do
       {:erase, hash} ->
@@ -337,6 +361,56 @@ defmodule TaniwhaWeb.DashboardLive do
             put_flash(socket, :error, "Some torrents failed to remove")
           else
             put_flash(socket, :info, "Torrents removed")
+          end
+
+        {:noreply, socket}
+
+      {:erase_with_data, hash, _path} ->
+        case @commands.erase_with_data(hash) do
+          :ok ->
+            torrents = Enum.reject(socket.assigns.torrents, &(&1.hash == hash))
+            selected = MapSet.delete(socket.assigns.selected_hashes, hash)
+
+            socket =
+              socket
+              |> assign(:torrents, torrents)
+              |> assign(:selected_hashes, selected)
+              |> assign(:confirm_action, nil)
+              |> assign_global_stats(torrents)
+              |> assign(:status_counts, status_counts(torrents))
+              |> put_flash(:info, "Torrent removed and files deleted")
+
+            {:noreply, socket}
+
+          {:error, reason} ->
+            socket =
+              socket
+              |> assign(:confirm_action, nil)
+              |> put_flash(:error, "Failed to remove: #{inspect(reason)}")
+
+            {:noreply, socket}
+        end
+
+      {:bulk_erase_with_data, hashes, _paths} ->
+        {:ok, succeeded, _failed} = @commands.erase_many_with_data(hashes)
+        any_failed = length(succeeded) < length(hashes)
+
+        succeeded_set = MapSet.new(succeeded)
+        torrents = Enum.reject(socket.assigns.torrents, &MapSet.member?(succeeded_set, &1.hash))
+
+        socket =
+          socket
+          |> assign(:torrents, torrents)
+          |> assign(:selected_hashes, MapSet.new())
+          |> assign(:confirm_action, nil)
+          |> assign_global_stats(torrents)
+          |> assign(:status_counts, status_counts(torrents))
+
+        socket =
+          if any_failed do
+            put_flash(socket, :error, "Some torrents failed to remove")
+          else
+            put_flash(socket, :info, "Torrents removed and files deleted")
           end
 
         {:noreply, socket}
@@ -703,6 +777,14 @@ defmodule TaniwhaWeb.DashboardLive do
   defp parse_tab("peers"), do: :peers
   defp parse_tab("trackers"), do: :trackers
   defp parse_tab(_), do: :general
+
+  @spec find_base_path([Torrent.t()], String.t()) :: String.t() | nil
+  defp find_base_path(torrents, hash) do
+    case Enum.find(torrents, &(&1.hash == hash)) do
+      nil -> nil
+      torrent -> torrent.base_path
+    end
+  end
 
   @spec maybe_close_detail_panel(Phoenix.LiveView.Socket.t(), MapSet.t()) ::
           Phoenix.LiveView.Socket.t()

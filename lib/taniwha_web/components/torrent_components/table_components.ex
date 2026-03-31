@@ -95,20 +95,74 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
       <%!-- Separator: 1px × 16px per Figma --%>
       <div class="w-px h-4 mx-1 shrink-0" style="background-color: var(--taniwha-actionbar-border)" />
 
-      <button
-        type="button"
-        phx-click="bulk_remove"
-        disabled={@selected_count == 0}
-        aria-label="Remove selected torrents"
-        class={[
-          "inline-flex items-center gap-1 h-[22px] px-2 text-[11px] rounded",
-          @selected_count > 0 && "hover:bg-red-50 hover:text-red-600 cursor-pointer",
-          @selected_count == 0 && "opacity-40 cursor-not-allowed"
-        ]}
-        style="color: var(--taniwha-col-header)"
+      <%!-- Remove split button: left = bulk_remove, right = dropdown for delete-files --%>
+      <div
+        id="remove-split"
+        class={["relative inline-flex", @selected_count == 0 && "opacity-40"]}
+        phx-click-away={Phoenix.LiveView.JS.hide(to: "#remove-dropdown")}
       >
-        <.icon name="hero-trash-micro" class="size-3" /> Remove
-      </button>
+        <button
+          type="button"
+          phx-click="bulk_remove"
+          disabled={@selected_count == 0}
+          aria-label="Remove selected torrents"
+          class={[
+            "inline-flex items-center gap-1 h-[22px] pl-2 pr-1 text-[11px] rounded-l",
+            @selected_count > 0 && "hover:bg-red-50 hover:text-red-600 cursor-pointer",
+            @selected_count == 0 && "cursor-not-allowed"
+          ]}
+          style="color: var(--taniwha-col-header)"
+        >
+          <.icon name="hero-trash-micro" class="size-3" /> Remove
+        </button>
+        <button
+          type="button"
+          phx-click={Phoenix.LiveView.JS.toggle(to: "#remove-dropdown")}
+          disabled={@selected_count == 0}
+          aria-label="More remove options"
+          aria-haspopup="true"
+          class={[
+            "inline-flex items-center h-[22px] px-1 text-[10px] rounded-r border-l",
+            @selected_count > 0 && "hover:bg-red-50 hover:text-red-600 cursor-pointer",
+            @selected_count == 0 && "cursor-not-allowed"
+          ]}
+          style="color: var(--taniwha-col-header); border-color: var(--taniwha-actionbar-border)"
+        >
+          ▾
+        </button>
+        <div
+          id="remove-dropdown"
+          class="hidden absolute top-full left-0 z-50 mt-1 min-w-[220px] rounded-lg border bg-white dark:bg-gray-800 shadow-lg"
+          style="border-color: var(--taniwha-row-border)"
+          role="menu"
+          aria-label="Remove options"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            phx-click={
+              Phoenix.LiveView.JS.push("bulk_remove")
+              |> Phoenix.LiveView.JS.hide(to: "#remove-dropdown")
+            }
+            class="block w-full text-left px-4 py-2 text-[11px] hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded-t-lg"
+            style="color: var(--taniwha-text, #374151)"
+          >
+            Remove torrent
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            phx-click={
+              Phoenix.LiveView.JS.push("bulk_remove_with_data")
+              |> Phoenix.LiveView.JS.hide(to: "#remove-dropdown")
+            }
+            class="block w-full text-left px-4 py-2 text-[11px] hover:bg-red-50 cursor-pointer rounded-b-lg"
+            style="color: var(--taniwha-destructive, #ef4444)"
+          >
+            Remove torrent and delete files
+          </button>
+        </div>
+      </div>
 
       <%!-- Spacer --%>
       <div class="flex-1" />
@@ -540,7 +594,8 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         { separator: true },
         { action: "copy_hash",        label: "Copy hash",    client: true, destructive: false },
         { separator: true },
-        { action: "erase",            label: "Remove",       destructive: true  },
+        { action: "erase",           label: "Remove torrent",                  destructive: true },
+        { action: "erase_with_data", label: "Remove torrent and delete files", destructive: true },
       ];
 
       function buildMenu(selected) {

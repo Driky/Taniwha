@@ -122,6 +122,48 @@ defmodule TaniwhaWeb.TorrentChannel do
     end
   end
 
+  def handle_in("remove_with_data", %{"hash" => hash}, socket) do
+    with {:ok, socket} <- check_and_update_rate_limit(socket),
+         :ok <- Validator.validate_hash(hash) do
+      with_command_span("remove_with_data", hash, socket, fn ->
+        @commands.erase_with_data(hash)
+      end)
+    else
+      {:error, :rate_limited} -> {:reply, {:error, %{reason: "rate_limited"}}, socket}
+      {:error, :invalid_hash} -> {:reply, {:error, %{reason: "invalid hash"}}, socket}
+    end
+  end
+
+  def handle_in("remove_with_data", %{"hashes" => hashes}, socket) when is_list(hashes) do
+    with {:ok, socket} <- check_and_update_rate_limit(socket) do
+      result =
+        Tracer.with_span "taniwha.channel.remove_with_data_bulk",
+                         %{
+                           attributes: %{
+                             "channel.topic": socket.topic,
+                             "channel.event": "remove_with_data_bulk"
+                           }
+                         } do
+          Logger.info("Channel command received",
+            channel_topic: socket.topic,
+            event: "remove_with_data_bulk"
+          )
+
+          case @commands.erase_many_with_data(hashes) do
+            {:ok, _ok, _errors} = r -> r
+            {:error, _reason} = err -> set_error_status(err)
+          end
+        end
+
+      case result do
+        {:ok, _ok, _errors} -> {:reply, :ok, socket}
+        {:error, reason} -> {:reply, {:error, %{reason: inspect(reason)}}, socket}
+      end
+    else
+      {:error, :rate_limited} -> {:reply, {:error, %{reason: "rate_limited"}}, socket}
+    end
+  end
+
   def handle_in("set_label", %{"hash" => hash, "label" => label}, socket) do
     with {:ok, socket} <- check_and_update_rate_limit(socket),
          :ok <- Validator.validate_hash(hash) do

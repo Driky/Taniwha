@@ -61,6 +61,32 @@ defmodule TaniwhaWeb.API.TorrentController do
     conn |> put_status(422) |> json(%{error: "magnet_url or torrent file required"})
   end
 
+  @doc """
+  Removes a torrent from rtorrent.
+
+  Accepts an optional `delete_files=true` query parameter. When present the
+  torrent's downloaded files are also deleted from disk via
+  `Commands.erase_with_data/1`. Without it only the torrent record is removed.
+
+  Returns 204 on success, 422 on error.
+  """
+  @spec delete(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def delete(conn, %{"hash" => hash} = params) do
+    delete_files = Map.get(params, "delete_files", "false") == "true"
+
+    result =
+      if delete_files do
+        @commands.erase_with_data(hash)
+      else
+        @commands.erase(hash)
+      end
+
+    case result do
+      :ok -> send_resp(conn, 204, "")
+      {:error, reason} -> conn |> put_status(422) |> json(%{error: inspect(reason)})
+    end
+  end
+
   @spec load_reply(Plug.Conn.t(), :ok | {:error, term()}) :: Plug.Conn.t()
   defp load_reply(conn, :ok), do: conn |> put_status(201) |> render(:create, status: "queued")
 

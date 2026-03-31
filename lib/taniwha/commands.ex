@@ -165,6 +165,70 @@ defmodule Taniwha.Commands do
     end
   end
 
+  @doc """
+  Erases a torrent from rtorrent **and** deletes its downloaded files.
+
+  Requires `config :taniwha, downloads_dir: "/path/to/downloads"` (set via the
+  `TANIWHA_DOWNLOADS_DIR` environment variable). The files are deleted first via
+  `Taniwha.FileSystem.safe_delete/2` — if that fails, the torrent record is
+  preserved in rtorrent. `d.erase` is only called once file deletion succeeds,
+  keeping rtorrent state and the filesystem consistent.
+
+  Possible errors:
+    * `{:error, :downloads_dir_not_configured}` — no downloads_dir in config
+    * `{:error, :no_base_path}` — torrent has no base path (not started yet)
+    * `{:error, :path_outside_downloads_dir}` — base_path escapes downloads_dir
+    * `{:error, posix}` — filesystem error from `File.rm_rf/1`
+    * `{:error, term}` — RPC error from rtorrent
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec erase_with_data(String.t()) :: :ok | {:error, term()}
+  def erase_with_data(hash) do
+    Tracer.with_span "taniwha.commands.erase_with_data",
+                     %{attributes: %{"command.name": "erase_with_data", "torrent.hash": hash}} do
+      Logger.info("Command executed", command: "erase_with_data", torrent_hash: hash)
+
+      case Application.get_env(:taniwha, :downloads_dir) do
+        nil ->
+          {:error, :downloads_dir_not_configured}
+
+        downloads_dir ->
+          with {:ok, base_path} <- fetch_base_path(hash),
+               :ok <- Taniwha.FileSystem.safe_delete(base_path, downloads_dir) do
+            run_lifecycle("d.erase", hash)
+          end
+      end
+    end
+  end
+
+  @doc """
+  Erases multiple torrents from rtorrent.
+
+  Calls `erase/1` for each hash. Returns `{:ok, ok_hashes, error_hashes}`.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec erase_many([String.t()]) :: {:ok, [String.t()], [String.t()]}
+  def erase_many(hashes) do
+    results = Enum.map(hashes, fn h -> {h, erase(h)} end)
+    ok = for {h, :ok} <- results, do: h
+    errors = for {h, {:error, _}} <- results, do: h
+    {:ok, ok, errors}
+  end
+
+  @doc """
+  Erases multiple torrents from rtorrent and deletes their downloaded files.
+
+  Calls `erase_with_data/1` for each hash. Returns `{:ok, ok_hashes, error_hashes}`.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec erase_many_with_data([String.t()]) :: {:ok, [String.t()], [String.t()]}
+  def erase_many_with_data(hashes) do
+    results = Enum.map(hashes, fn h -> {h, erase_with_data(h)} end)
+    ok = for {h, :ok} <- results, do: h
+    errors = for {h, {:error, _}} <- results, do: h
+    {:ok, ok, errors}
+  end
+
   @impl Taniwha.CommandsBehaviour
   @doc "Pauses a torrent. Returns `:ok` on success."
   @spec pause(String.t()) :: :ok | {:error, term()}
@@ -478,6 +542,15 @@ defmodule Taniwha.Commands do
   @spec run_lifecycle(String.t(), String.t()) :: :ok | {:error, term()}
   defp run_lifecycle(method, hash) do
     @rpc_client.call(method, [hash]) |> ok_on_zero()
+  end
+
+  @spec fetch_base_path(String.t()) :: {:ok, String.t()} | {:error, :no_base_path | term()}
+  defp fetch_base_path(hash) do
+    case @rpc_client.call("d.base_path", [hash]) do
+      {:ok, ""} -> {:error, :no_base_path}
+      {:ok, path} -> {:ok, path}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   @spec ok_on_zero({:ok, 0} | {:ok, term()} | {:error, term()}) :: :ok | {:error, term()}
