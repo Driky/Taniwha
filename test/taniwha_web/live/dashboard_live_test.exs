@@ -811,4 +811,183 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       assert :sys.get_state(lv.pid).socket.assigns.selected_hash == torrent1.hash
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Batch — Label filtering
+  # ---------------------------------------------------------------------------
+
+  describe "label filtering" do
+    test "sidebar shows label items with counts when torrents have labels", %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies", name: "Movie 1"}
+      t2 = %{Fixtures.torrent_fixture("h2") | label: "Movies", name: "Movie 2"}
+      t3 = %{Fixtures.torrent_fixture("h3") | label: "Linux", name: "Linux ISO"}
+      Enum.each([t1, t2, t3], &Store.put_torrent/1)
+
+      {:ok, _lv, html} = live(conn, ~p"/")
+
+      assert html =~ "Movies"
+      assert html =~ "Linux"
+    end
+
+    test "sidebar shows Manage labels button", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/")
+      assert html =~ "Manage labels"
+    end
+
+    test "clicking a label filters the torrent table", %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies", name: "Movie Torrent"}
+      t2 = %{Fixtures.torrent_fixture("h2") | label: "Linux", name: "Linux ISO"}
+      Enum.each([t1, t2], &Store.put_torrent/1)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      html =
+        lv
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=Movies]")
+        |> render_click()
+
+      assert html =~ "Movie Torrent"
+      refute html =~ "Linux ISO"
+    end
+
+    test "label filter combined with status filter narrows results", %{conn: conn} do
+      t1 = %{
+        Fixtures.torrent_fixture("h1")
+        | label: "Movies",
+          name: "Movie DL",
+          state: :started,
+          is_active: true,
+          complete: false
+      }
+
+      t2 = %{
+        Fixtures.torrent_fixture("h2")
+        | label: "Movies",
+          name: "Movie Seeder",
+          state: :started,
+          is_active: true,
+          complete: true
+      }
+
+      Enum.each([t1, t2], &Store.put_torrent/1)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      # First filter by label
+      lv
+      |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=Movies]")
+      |> render_click()
+
+      # Then filter by status (downloading only)
+      html =
+        lv
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=downloading]")
+        |> render_click()
+
+      assert html =~ "Movie DL"
+      refute html =~ "Movie Seeder"
+    end
+
+    test "label_groups recomputed after PubSub torrent_diffs", %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies", name: "Movie 1"}
+      Store.put_torrent(t1)
+
+      {:ok, lv, html} = live(conn, ~p"/")
+      assert html =~ "Movies"
+
+      # Add a torrent with a new label via PubSub diff
+      t2 = %{Fixtures.torrent_fixture("h2") | label: "Linux", name: "Linux ISO"}
+      send(lv.pid, {:torrent_diffs, [{:added, t2}]})
+      html = render(lv)
+
+      assert html =~ "Linux"
+    end
+
+    test "filter_label all resets to show all torrents", %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies", name: "Movie Torrent"}
+      t2 = %{Fixtures.torrent_fixture("h2") | label: "Linux", name: "Linux ISO"}
+      Enum.each([t1, t2], &Store.put_torrent/1)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      # Filter to Movies
+      lv
+      |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=Movies]")
+      |> render_click()
+
+      # Reset to all — click the All status button (which also triggers filter reset)
+      html = render_click(lv, "filter_label", %{"value" => "all"})
+
+      assert html =~ "Movie Torrent"
+      assert html =~ "Linux ISO"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch — Label column in torrent table
+  # ---------------------------------------------------------------------------
+
+  describe "label column in torrent table" do
+    test "table header has a Label column", %{conn: conn} do
+      Store.put_torrent(Fixtures.torrent_fixture("h1"))
+      {:ok, _lv, html} = live(conn, ~p"/")
+      assert html =~ ~r/<th[^>]*>\s*Label\s*<\/th>/
+    end
+
+    test "torrent row shows label pill when torrent has a label", %{conn: conn} do
+      torrent = %{Fixtures.torrent_fixture("h1") | label: "Movies", name: "Movie File"}
+      Store.put_torrent(torrent)
+
+      {:ok, _lv, html} = live(conn, ~p"/")
+      assert html =~ "Movies"
+    end
+
+    test "torrent row shows em dash when torrent has no label", %{conn: conn} do
+      torrent = %{Fixtures.torrent_fixture("h1") | name: "No Label Torrent"}
+      Store.put_torrent(torrent)
+
+      {:ok, _lv, html} = live(conn, ~p"/")
+      # The em dash for no-label should appear in the label column td
+      assert html =~ "No Label Torrent"
+      # em dash is U+2014, rendered as HTML entity or directly
+      assert html =~ ~r/—|&#x2014;|&mdash;/
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch — label_groups helper
+  # ---------------------------------------------------------------------------
+
+  describe "label_groups/1" do
+    test "returns empty list when no torrents have labels" do
+      torrents = [Fixtures.torrent_fixture("h1")]
+      assert TaniwhaWeb.DashboardLive.label_groups(torrents) == []
+    end
+
+    test "groups torrents by label with counts" do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies"}
+      t2 = %{Fixtures.torrent_fixture("h2") | label: "Movies"}
+      t3 = %{Fixtures.torrent_fixture("h3") | label: "Linux"}
+      t4 = Fixtures.torrent_fixture("h4")
+
+      groups = TaniwhaWeb.DashboardLive.label_groups([t1, t2, t3, t4])
+
+      assert {_, movies_count} = Enum.find(groups, fn {l, _} -> l == "Movies" end)
+      assert {_, linux_count} = Enum.find(groups, fn {l, _} -> l == "Linux" end)
+      assert movies_count == 2
+      assert linux_count == 1
+      # Torrent with no label is excluded
+      assert length(groups) == 2
+    end
+
+    test "returns groups sorted alphabetically" do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "TV"}
+      t2 = %{Fixtures.torrent_fixture("h2") | label: "Movies"}
+      t3 = %{Fixtures.torrent_fixture("h3") | label: "Linux"}
+
+      groups = TaniwhaWeb.DashboardLive.label_groups([t1, t2, t3])
+      labels = Enum.map(groups, &elem(&1, 0))
+      assert labels == Enum.sort(labels)
+    end
+  end
 end

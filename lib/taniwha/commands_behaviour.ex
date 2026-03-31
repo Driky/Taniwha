@@ -26,6 +26,8 @@ defmodule Taniwha.CommandsBehaviour do
   @callback load_raw(binary(), keyword()) :: :ok | {:error, term()}
   @callback set_label(String.t(), String.t()) :: :ok | {:error, term()}
   @callback remove_label(String.t()) :: :ok | {:error, term()}
+  @callback rename_label(String.t(), String.t()) ::
+              {:ok, non_neg_integer()} | {:error, {non_neg_integer(), non_neg_integer()}}
   @callback get_all_labels() :: [String.t()]
   @callback system_pid() :: {:ok, term()} | {:error, term()}
 end

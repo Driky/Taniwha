@@ -271,6 +271,33 @@ defmodule Taniwha.Commands do
   end
 
   @doc """
+  Renames a label across all torrents that currently carry `old_name`.
+
+  Reads the ETS cache to find affected torrents, then calls `d.custom1.set`
+  on each one. Returns `{:ok, count}` where `count` is the number of torrents
+  updated. If any individual RPC call fails, returns
+  `{:error, {ok_count, fail_count}}`.
+
+  **Note:** This may issue many RPC calls (one per affected torrent). Callers
+  should be prepared for partial failures and the associated inconsistency.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec rename_label(String.t(), String.t()) ::
+          {:ok, non_neg_integer()} | {:error, {non_neg_integer(), non_neg_integer()}}
+  def rename_label(old_name, new_name) do
+    affected = Store.get_all_torrents() |> Enum.filter(&(&1.label == old_name))
+    results = Enum.map(affected, fn t -> set_label(t.hash, new_name) end)
+    ok_count = Enum.count(results, &(&1 == :ok))
+    fail_count = length(results) - ok_count
+
+    if fail_count == 0 do
+      {:ok, ok_count}
+    else
+      {:error, {ok_count, fail_count}}
+    end
+  end
+
+  @doc """
   Returns a sorted list of unique labels currently assigned to any torrent.
 
   Derived from the ETS cache — no RPC call is made. Returns `[]` when no

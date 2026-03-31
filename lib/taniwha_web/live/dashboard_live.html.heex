@@ -10,6 +10,8 @@
     tracker_filter={@tracker_filter}
     status_counts={@status_counts}
     tracker_groups={@tracker_groups}
+    label_filter={@label_filter}
+    label_groups={@label_groups}
   />
 
   <%!-- Right column: topbar + action bar + table + detail panel --%>
@@ -26,7 +28,15 @@
     <.connection_banner connection_status={@connection_status} />
 
     <% visible =
-      visible_torrents(@torrents, @search, @filter, @tracker_filter, @sort_by, @sort_dir) %>
+      visible_torrents(
+        @torrents,
+        @search,
+        @filter,
+        @tracker_filter,
+        @label_filter,
+        @sort_by,
+        @sort_dir
+      ) %>
     <% visible_count = length(visible) %>
     <% selected_count = MapSet.size(@selected_hashes) %>
 
@@ -71,6 +81,14 @@
   module={TaniwhaWeb.AddTorrentComponent}
   id="add-torrent-modal"
   file_uploads={@uploads}
+/>
+
+<%!-- Label manager modal --%>
+<.live_component
+  :if={@show_label_manager}
+  module={TaniwhaWeb.LabelManagerComponent}
+  id="label-manager-modal"
+  label_groups={@label_groups}
 />
 
 <%!-- Toast notifications --%>

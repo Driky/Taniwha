@@ -23,6 +23,9 @@ defmodule Taniwha.Application do
       # CredentialStore must start before TaniwhaWeb.Endpoint so auth routes
       # are operational from the first HTTP request.
       Taniwha.Auth.CredentialStore,
+      # LabelStore must start before TaniwhaWeb.Endpoint so label colours are
+      # available when the first LiveView renders.
+      Taniwha.LabelStore,
       Taniwha.RPC.Client,
       Taniwha.State.Store,
       Taniwha.State.Poller,

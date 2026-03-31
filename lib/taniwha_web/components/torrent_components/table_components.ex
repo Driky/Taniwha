@@ -176,6 +176,15 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         <.sort_header label="Name" column={:name} sort_by={@sort_by} sort_dir={@sort_dir} />
       </th>
 
+      <%!-- Label --%>
+      <th
+        scope="col"
+        class="px-[6px] py-0 text-left"
+        style="width: 90px; height: var(--taniwha-actionbar-h)"
+      >
+        Label
+      </th>
+
       <%!-- Size (sortable, right-align) --%>
       <th
         scope="col"
@@ -276,6 +285,23 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         />
       </th>
     </tr>
+    """
+  end
+
+  # Renders a coloured label pill with background and text derived from LabelStore.
+  attr :label, :string, required: true
+
+  defp label_pill(assigns) do
+    {_dot, bg, text} = Taniwha.LabelStore.auto_assign(assigns.label)
+    assigns = assign(assigns, :pill_bg, bg) |> assign(:pill_text, text)
+
+    ~H"""
+    <span
+      class="inline-flex items-center text-[10px] px-[6px] py-[1px] rounded-[9999px] font-medium leading-[15px]"
+      style={"background-color: #{@pill_bg}; color: #{@pill_text}"}
+    >
+      {@label}
+    </span>
     """
   end
 
@@ -380,6 +406,15 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         >
           {@torrent.name}
         </span>
+      </td>
+
+      <%!-- Label pill or em dash --%>
+      <td class="px-[6px]">
+        <%= if @torrent.label do %>
+          <.label_pill label={@torrent.label} />
+        <% else %>
+          <span class="text-[11px]" style="color: var(--taniwha-cell-num)">—</span>
+        <% end %>
       </td>
 
       <td class="px-[6px] text-right text-[11px] tabular-nums" style="color: var(--taniwha-cell-num)">

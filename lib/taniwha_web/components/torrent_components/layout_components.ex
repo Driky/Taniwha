@@ -218,6 +218,8 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
   attr :tracker_filter, :any, required: true
   attr :status_counts, :map, required: true
   attr :tracker_groups, :list, default: []
+  attr :label_filter, :any, default: :all
+  attr :label_groups, :list, default: []
 
   def sidebar(assigns) do
     ~H"""
@@ -311,12 +313,36 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
         >
           Labels
         </p>
-        <p
-          class="px-3 py-1 text-[10px] italic"
+
+        <%= if @label_groups == [] do %>
+          <p
+            class="px-3 py-1 text-[10px] italic"
+            style="color: var(--taniwha-sidebar-section)"
+          >
+            No labels yet
+          </p>
+        <% else %>
+          <.sidebar_filter_item
+            :for={{label, count} <- @label_groups}
+            label={label}
+            value={label}
+            active?={@label_filter == label}
+            count={count}
+            dot_color={label_dot_color(label)}
+            event="filter_label"
+          />
+          <%!-- Divider above Manage labels --%>
+          <div class="mx-3 mt-1 border-t" style="border-color: var(--taniwha-sidebar-border)" />
+        <% end %>
+
+        <button
+          type="button"
+          phx-click="show_label_manager"
+          class="flex items-center w-full px-3 h-[27px] text-[10px] text-left"
           style="color: var(--taniwha-sidebar-section)"
         >
-          No labels yet
-        </p>
+          Manage labels
+        </button>
       </div>
     </nav>
     """
@@ -367,4 +393,10 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
   @spec status_dot_color(:all | :downloading | :seeding | :stopped | :checking) :: String.t()
   defp status_dot_color(:all), do: "var(--taniwha-sidebar-section)"
   defp status_dot_color(status), do: "var(--taniwha-status-#{status_slug(status)}-dot)"
+
+  @spec label_dot_color(String.t()) :: String.t()
+  defp label_dot_color(label) do
+    {dot, _bg, _text} = Taniwha.LabelStore.auto_assign(label)
+    dot
+  end
 end
