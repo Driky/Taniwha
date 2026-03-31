@@ -21,8 +21,7 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
   @doc """
   Renders the 32px bulk-action toolbar shown above the torrent table.
 
-  Displays Start/Pause/Stop/Remove buttons and a torrent count. The deselect
-  button only appears when one or more rows are selected.
+  Displays Start/Pause/Stop/Remove buttons and a combined selection + torrent count.
 
   ## Attributes
 
@@ -65,6 +64,21 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
 
       <button
         type="button"
+        phx-click="bulk_pause"
+        disabled={@selected_count == 0}
+        aria-label="Pause selected torrents"
+        class={[
+          "inline-flex items-center gap-1 h-[22px] px-2 text-[11px] rounded",
+          @selected_count > 0 && "hover:bg-[#f3f4f6] cursor-pointer",
+          @selected_count == 0 && "opacity-40 cursor-not-allowed"
+        ]}
+        style="color: var(--taniwha-col-header)"
+      >
+        <.icon name="hero-pause-micro" class="size-3" /> Pause
+      </button>
+
+      <button
+        type="button"
         phx-click="bulk_stop"
         disabled={@selected_count == 0}
         aria-label="Stop selected torrents"
@@ -96,31 +110,22 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         <.icon name="hero-trash-micro" class="size-3" /> Remove
       </button>
 
-      <button
-        :if={@selected_count > 0}
-        type="button"
-        phx-click="deselect_all"
-        aria-label="Deselect all torrents"
-        class="inline-flex items-center gap-1 h-[22px] px-2 text-[11px] rounded hover:bg-[#f3f4f6] cursor-pointer"
-        style="color: var(--taniwha-col-header)"
-      >
-        Clear
-      </button>
+      <%!-- Spacer --%>
+      <div class="flex-1" />
 
-      <%!-- Selected count --%>
+      <%!-- Combined selection + count --%>
       <span
         :if={@selected_count > 0}
         class="text-[10px] ml-1"
         style="color: var(--taniwha-sidebar-active)"
       >
-        {@selected_count} selected
+        {@selected_count} selected · {@visible_count} torrents
       </span>
-
-      <%!-- Spacer --%>
-      <div class="flex-1" />
-
-      <%!-- Count --%>
-      <span class="text-[10px]" style="color: var(--taniwha-sidebar-section)">
+      <span
+        :if={@selected_count == 0}
+        class="text-[10px]"
+        style="color: var(--taniwha-sidebar-section)"
+      >
         {@visible_count} torrents
       </span>
     </div>
@@ -136,23 +141,19 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
 
   Each sortable column emits `phx-click="sort"` with `phx-value-by` set to the
   column key. The active sort column has `aria-sort` set to `"ascending"` or
-  `"descending"`. A select-all checkbox appears in the leading cell.
+  `"descending"`.
 
   ## Attributes
 
   - `:sort_by` (required) — currently active sort column atom
   - `:sort_dir` (required) — `:asc` or `:desc`
-  - `:all_selected?` — whether every visible row is selected, default `false`
-  - `:total_visible` — count passed to select-all checkbox label, default 0
 
   ## Examples
 
-      <.table_header sort_by={@sort_by} sort_dir={@sort_dir} all_selected?={false} total_visible={6} />
+      <.table_header sort_by={@sort_by} sort_dir={@sort_dir} />
   """
   attr :sort_by, :atom, required: true
   attr :sort_dir, :atom, required: true
-  attr :all_selected?, :boolean, default: false
-  attr :total_visible, :integer, default: 0
 
   def table_header(assigns) do
     ~H"""
@@ -160,17 +161,6 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
       class="border-b text-[11px] font-medium"
       style="background: var(--taniwha-table-header-bg); border-color: var(--taniwha-row-border); color: var(--taniwha-col-header)"
     >
-      <%!-- Select-all checkbox --%>
-      <th scope="col" class="w-8 px-3 py-0" style="height: var(--taniwha-actionbar-h)">
-        <input
-          type="checkbox"
-          phx-click="select_all"
-          checked={@all_selected?}
-          aria-label={"Select all #{@total_visible} visible torrents"}
-          class="size-3 rounded"
-        />
-      </th>
-
       <%!-- Status icon (no label, no sort) --%>
       <th
         scope="col"
@@ -336,13 +326,15 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
   Renders a 28px table row (`<tr>`) with 10 data cells for a single torrent.
 
   Columns: Status icon, Name, Label, Size, Progress, Down, Up, Seeds
-  (placeholder "—"), Peers, Ratio. A leading checkbox cell supports row
-  selection.
+  (placeholder "—"), Peers, Ratio.
+
+  Row clicks are handled by the `.ContextMenu` JS hook on `<tbody>`. The
+  `selected?` attr drives `aria-selected` for CSS-based highlight styling.
 
   ## Attributes
 
   - `:torrent` (required) — a `Taniwha.Torrent` struct
-  - `:selected?` — whether this row is currently selected, default `false`
+  - `:selected?` — whether this row is bulk-selected, default `false`
   - `:row_selected?` — whether this row has the detail panel open, default `false`
 
   ## Examples
@@ -368,23 +360,11 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
     <tr
       id={"torrent-#{@torrent.hash}"}
       aria-label={@torrent.name}
-      phx-click="select_torrent"
-      phx-value-hash={@torrent.hash}
+      aria-selected={to_string(@selected?)}
       data-hash={@torrent.hash}
       class="border-b hover:bg-[#f9fafb] dark:hover:bg-[#1a1f2e] cursor-pointer"
       style={"height: var(--taniwha-row-h); border-color: var(--taniwha-row-border)#{if @row_selected?, do: "; background: var(--taniwha-sidebar-active-bg)", else: ""}"}
     >
-      <td class="w-8 px-3">
-        <input
-          type="checkbox"
-          phx-click="toggle_select"
-          phx-value-hash={@torrent.hash}
-          checked={@selected?}
-          aria-label={"Select #{@torrent.name}"}
-          class="size-3 rounded"
-        />
-      </td>
-
       <td class="px-1 text-center">
         <.status_icon status={@status} />
       </td>
@@ -467,7 +447,6 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
   Renders the full torrent table: sticky header row, data rows, and empty states.
 
   Accepts a pre-filtered and pre-sorted list of torrents from the LiveView.
-  The component computes `all_selected?` internally from `:total_visible` and `:selected_hashes`.
 
   ## Attributes
 
@@ -476,9 +455,9 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
     distinguish "no torrents at all" from "no results after filtering")
   - `:sort_by` (required) — active sort column atom
   - `:sort_dir` (required) — `:asc` or `:desc`
-  - `:selected_hashes` (required) — `MapSet` of hash strings for bulk selection
-  - `:total_visible` (required) — count of visible torrents (pass `length(visible)` from template)
-  - `:selected_hash` — hash string of the row-clicked torrent (opens detail panel),
+  - `:selected_hashes` (required) — `MapSet` of hash strings for bulk selection;
+    drives `aria-selected` on rows
+  - `:selected_hash` — hash string of the focused torrent (opens detail panel),
     or `nil`. Defaults to `nil`.
 
   ## Examples
@@ -489,7 +468,6 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         sort_by={@sort_by}
         sort_dir={@sort_dir}
         selected_hashes={@selected_hashes}
-        total_visible={visible_count}
         selected_hash={@selected_hash}
       />
   """
@@ -498,31 +476,20 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
   attr :sort_by, :atom, required: true
   attr :sort_dir, :atom, required: true
   attr :selected_hashes, :any, required: true
-  attr :total_visible, :integer, required: true
   attr :selected_hash, :any, default: nil
 
   def torrent_table(assigns) do
-    all_selected? =
-      assigns.total_visible > 0 and MapSet.size(assigns.selected_hashes) == assigns.total_visible
-
-    assigns = assign(assigns, :all_selected?, all_selected?)
-
     ~H"""
     <div class="min-h-0 flex-1 overflow-y-auto">
       <table class="w-full border-collapse table-fixed">
         <thead class="sticky top-0 z-10">
-          <.table_header
-            sort_by={@sort_by}
-            sort_dir={@sort_dir}
-            all_selected?={@all_selected?}
-            total_visible={@total_visible}
-          />
+          <.table_header sort_by={@sort_by} sort_dir={@sort_dir} />
         </thead>
         <tbody phx-hook=".ContextMenu" id="torrent-tbody">
           <%!-- Empty state: no torrents at all --%>
           <tr :if={@torrents == [] and @all_torrents_empty?}>
             <td
-              colspan="11"
+              colspan="10"
               class="py-16 text-center text-[11px]"
               style="color: var(--taniwha-col-header)"
               role="status"
@@ -538,7 +505,7 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
           <%!-- Empty state: filters active but nothing matches --%>
           <tr :if={@torrents == [] and not @all_torrents_empty?}>
             <td
-              colspan="11"
+              colspan="10"
               class="py-8 text-center text-[11px]"
               style="color: var(--taniwha-col-header)"
               role="status"
@@ -576,7 +543,8 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         { action: "erase",            label: "Remove",       destructive: true  },
       ];
 
-      function buildMenu(hash) {
+      function buildMenu(selected) {
+        const multiSelect = selected.size > 1;
         const menu = document.createElement("div");
         menu.setAttribute("role", "menu");
         menu.setAttribute("aria-label", "Torrent actions");
@@ -594,6 +562,19 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
 
         const focusable = [];
 
+        // Multi-select header
+        if (multiSelect) {
+          const header = document.createElement("div");
+          header.style.cssText = [
+            "padding:4px 12px 6px",
+            "font-size:10px",
+            "font-weight:500",
+            "color:var(--taniwha-col-header,#6b7280)",
+          ].join(";");
+          header.textContent = `${selected.size} torrents selected`;
+          menu.appendChild(header);
+        }
+
         MENU_ITEMS.forEach((item) => {
           if (item.separator) {
             const sep = document.createElement("div");
@@ -602,6 +583,9 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
             menu.appendChild(sep);
             return;
           }
+
+          // Hide "Copy hash" when multiple rows are selected
+          if (item.action === "copy_hash" && multiSelect) return;
 
           const btn = document.createElement("button");
           btn.setAttribute("role", "menuitem");
@@ -632,29 +616,82 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
 
       export default {
         _cleanup: null,
+        _selected: new Set(),
+        _anchor: null,
 
         mounted() {
+          this._onClick = (e) => {
+            const row = e.target.closest("tr[data-hash]");
+            if (!row) return;
+
+            // Ignore clicks inside the context menu (safety guard)
+            if (e.target.closest("[role=menu]")) return;
+
+            const hash = row.dataset.hash;
+
+            if (e.shiftKey && this._anchor) {
+              // Range select: walk DOM order between anchor and current row
+              const rows = Array.from(this.el.querySelectorAll("tr[data-hash]"));
+              const anchorIdx = rows.findIndex((r) => r.dataset.hash === this._anchor);
+              const currentIdx = rows.findIndex((r) => r.dataset.hash === hash);
+              const [lo, hi] = anchorIdx < currentIdx
+                ? [anchorIdx, currentIdx]
+                : [currentIdx, anchorIdx];
+              this._selected = new Set(rows.slice(lo, hi + 1).map((r) => r.dataset.hash));
+            } else if (e.ctrlKey || e.metaKey) {
+              // Toggle additive
+              if (this._selected.has(hash)) {
+                this._selected.delete(hash);
+              } else {
+                this._selected.add(hash);
+              }
+              this._anchor = hash;
+            } else {
+              // Plain click: exclusive select
+              this._selected = new Set([hash]);
+              this._anchor = hash;
+            }
+
+            this.pushEvent("update_selection", {
+              hashes: [...this._selected],
+              focused_hash: hash,
+            });
+          };
+
           this._onContextMenu = (e) => {
             const row = e.target.closest("tr[data-hash]");
             if (!row) return;
             e.preventDefault();
 
             const hash = row.dataset.hash;
-            this._openMenu(e.clientX, e.clientY, hash);
+
+            // Right-click on unselected row: update selection first
+            if (!this._selected.has(hash)) {
+              this._selected = new Set([hash]);
+              this._anchor = hash;
+              this.pushEvent("update_selection", {
+                hashes: [hash],
+                focused_hash: hash,
+              });
+            }
+
+            this._openMenu(e.clientX, e.clientY);
           };
 
+          this.el.addEventListener("click", this._onClick);
           this.el.addEventListener("contextmenu", this._onContextMenu);
         },
 
         destroyed() {
+          this.el.removeEventListener("click", this._onClick);
           this.el.removeEventListener("contextmenu", this._onContextMenu);
           this._closeMenu();
         },
 
-        _openMenu(x, y, hash) {
+        _openMenu(x, y) {
           this._closeMenu();
 
-          const { menu, focusable } = buildMenu(hash);
+          const { menu, focusable } = buildMenu(this._selected);
 
           // Position with viewport clamping
           const vw = window.innerWidth;
@@ -694,15 +731,17 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
             if (!menu.contains(e.target)) close();
           };
 
+          const selected = this._selected;
           menu.addEventListener("click", (e) => {
             const btn = e.target.closest("button[data-action]");
             if (!btn) return;
             const action = btn.dataset.action;
 
             if (action === "copy_hash") {
+              const [hash] = selected;
               navigator.clipboard.writeText(hash).catch(() => {});
             } else {
-              this.pushEvent("context_menu_action", { action, hash });
+              this.pushEvent("context_menu_action", { action, hashes: [...selected] });
             }
             close();
           });

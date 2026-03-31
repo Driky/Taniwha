@@ -180,6 +180,10 @@
   --taniwha-status-pause-icon: #facc15;
   --taniwha-status-check-icon: #f59e0b;
   --taniwha-status-err-icon: #ef4444;
+
+  /* Row selection */
+  --taniwha-row-selected-bg: var(--taniwha-sidebar-active-bg);
+  --taniwha-row-selected-border-l: #3b82f6;
 }
 
 /* Dark mode overrides */
@@ -210,9 +214,18 @@
   --taniwha-status-pause-icon: #facc15;
   --taniwha-status-check-icon: #fbbf24;
   --taniwha-status-err-icon: #ef4444;
+
+  /* Row selection */
+  --taniwha-row-selected-border-l: #60a5fa;
 }
 
 /* Context menu hover — rule lives here so it works when the menu is appended to <body> */
 [role="menu"] [role="menuitem"]:hover {
   background: var(--taniwha-hover-bg) !important;
+}
+
+/* Row selection highlight (driven by aria-selected from JS hook) */
+#torrent-tbody tr[aria-selected="true"] {
+  background: var(--taniwha-row-selected-bg);
+  border-left: 2px solid var(--taniwha-row-selected-border-l);
 }

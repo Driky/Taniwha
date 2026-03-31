@@ -393,47 +393,37 @@ defmodule TaniwhaWeb.DashboardLiveTest do
   # ---------------------------------------------------------------------------
 
   describe "selection and bulk actions" do
-    test "toggle_select adds hash to selected_hashes", %{conn: conn} do
+    test "update_selection sets selected_hashes from hashes list", %{conn: conn} do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      html = lv |> element("input[phx-click=toggle_select]") |> render_click()
+
+      html =
+        render_click(lv, "update_selection", %{
+          "hashes" => [torrent.hash],
+          "focused_hash" => torrent.hash
+        })
 
       assert html =~ "1 selected"
     end
 
-    test "toggle_select removes hash when already selected", %{conn: conn} do
+    test "update_selection with empty hashes clears selection", %{conn: conn} do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("input[phx-click=toggle_select]") |> render_click()
-      html = lv |> element("input[phx-click=toggle_select]") |> render_click()
 
-      # Bulk toolbar "N selected" count text should be gone
-      refute html =~ ~r/\d+ selected/
-    end
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
 
-    test "select_all selects all visible torrents", %{conn: conn} do
-      t1 = Fixtures.torrent_fixture("h1")
-      t2 = %{Fixtures.torrent_fixture("h2") | name: "Second"}
-      Store.put_torrent(t1)
-      Store.put_torrent(t2)
-
-      {:ok, lv, _html} = live(conn, ~p"/")
-      html = lv |> element("input[phx-click=select_all]") |> render_click()
-
-      assert html =~ "2 selected"
-    end
-
-    test "deselect_all clears selection", %{conn: conn} do
-      t1 = Fixtures.torrent_fixture("h1")
-      Store.put_torrent(t1)
-
-      {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("input[phx-click=select_all]") |> render_click()
-      html = lv |> element("button[phx-click=deselect_all]") |> render_click()
+      html =
+        render_click(lv, "update_selection", %{
+          "hashes" => [],
+          "focused_hash" => torrent.hash
+        })
 
       refute html =~ ~r/\d+ selected/
     end
@@ -447,7 +437,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       expect(MockCommands, :start, 2, fn _hash -> :ok end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("input[phx-click=select_all]") |> render_click()
+      render_click(lv, "update_selection", %{"hashes" => ["h1", "h2"], "focused_hash" => "h1"})
       lv |> element("button[phx-click=bulk_start]") |> render_click()
     end
 
@@ -474,8 +464,35 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       expect(MockCommands, :stop, 2, fn _hash -> :ok end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("input[phx-click=select_all]") |> render_click()
+      render_click(lv, "update_selection", %{"hashes" => ["h1", "h2"], "focused_hash" => "h1"})
       lv |> element("button[phx-click=bulk_stop]") |> render_click()
+    end
+
+    test "bulk_pause calls pause for each selected hash", %{conn: conn} do
+      t1 = %{
+        Fixtures.torrent_fixture("h1")
+        | state: :started,
+          is_active: true,
+          complete: false,
+          name: "T1"
+      }
+
+      t2 = %{
+        Fixtures.torrent_fixture("h2")
+        | state: :started,
+          is_active: true,
+          complete: false,
+          name: "T2"
+      }
+
+      Store.put_torrent(t1)
+      Store.put_torrent(t2)
+
+      expect(MockCommands, :pause, 2, fn _hash -> :ok end)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "update_selection", %{"hashes" => ["h1", "h2"], "focused_hash" => "h1"})
+      lv |> element("button[phx-click=bulk_pause]") |> render_click()
     end
   end
 
@@ -525,17 +542,22 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       refute html =~ "background: var(--taniwha-sidebar-active-bg)"
     end
 
-    test "clicking a row sets selected_hash", %{conn: conn} do
+    test "update_selection with focused_hash highlights the row", %{conn: conn} do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      html = lv |> element("tr[phx-click=select_torrent]") |> render_click()
+
+      html =
+        render_click(lv, "update_selection", %{
+          "hashes" => [torrent.hash],
+          "focused_hash" => torrent.hash
+        })
 
       assert html =~ "background: var(--taniwha-sidebar-active-bg)"
     end
 
-    test "clicking a different row updates selected_hash", %{conn: conn} do
+    test "update_selection with new focused_hash moves highlight", %{conn: conn} do
       t1 = %{Fixtures.torrent_fixture("h1") | name: "First"}
       t2 = %{Fixtures.torrent_fixture("h2") | name: "Second"}
       Store.put_torrent(t1)
@@ -543,10 +565,11 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      lv |> element("tr#torrent-h1[phx-click=select_torrent]") |> render_click()
+      render_click(lv, "update_selection", %{"hashes" => ["h1"], "focused_hash" => "h1"})
 
-      # Select row h2 — h2 should be highlighted, h1 should not
-      html = lv |> element("tr#torrent-h2[phx-click=select_torrent]") |> render_click()
+      # Select h2 — h2 should be highlighted, h1 should not
+      html =
+        render_click(lv, "update_selection", %{"hashes" => ["h2"], "focused_hash" => "h2"})
 
       # h2 row should be highlighted; background style appears exactly once (for h2)
       assert html =~ "background: var(--taniwha-sidebar-active-bg)"
@@ -615,8 +638,12 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("input[phx-click=toggle_select]") |> render_click()
-      # Trigger event directly — bulk_remove button is added in Batch 4
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
+
       render_click(lv, "bulk_remove", %{})
 
       assert render(lv) =~ ~s(role="dialog")
@@ -632,7 +659,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       expect(MockCommands, :erase, fn "h2" -> :ok end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      render_click(lv, "select_all", %{})
+      render_click(lv, "update_selection", %{"hashes" => ["h1", "h2"], "focused_hash" => "h1"})
       render_click(lv, "bulk_remove", %{})
       lv |> element("button[phx-click=confirm_action]") |> render_click()
 
@@ -655,27 +682,27 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
     test "start action calls Commands.start/1", %{lv: lv, hash: hash} do
       expect(MockCommands, :start, fn ^hash -> :ok end)
-      render_click(lv, "context_menu_action", %{"action" => "start", "hash" => hash})
+      render_click(lv, "context_menu_action", %{"action" => "start", "hashes" => [hash]})
     end
 
     test "stop action calls Commands.stop/1", %{lv: lv, hash: hash} do
       expect(MockCommands, :stop, fn ^hash -> :ok end)
-      render_click(lv, "context_menu_action", %{"action" => "stop", "hash" => hash})
+      render_click(lv, "context_menu_action", %{"action" => "stop", "hashes" => [hash]})
     end
 
     test "erase action sets confirm_action without erasing", %{lv: lv, hash: hash} do
-      render_click(lv, "context_menu_action", %{"action" => "erase", "hash" => hash})
+      render_click(lv, "context_menu_action", %{"action" => "erase", "hashes" => [hash]})
       assert render(lv) =~ ~s(role="dialog")
     end
 
     test "pause action calls Commands.pause/1", %{lv: lv, hash: hash} do
       expect(MockCommands, :pause, fn ^hash -> :ok end)
-      render_click(lv, "context_menu_action", %{"action" => "pause", "hash" => hash})
+      render_click(lv, "context_menu_action", %{"action" => "pause", "hashes" => [hash]})
     end
 
     test "unknown action is a no-op", %{lv: lv, hash: hash} do
       # Should not crash
-      render_click(lv, "context_menu_action", %{"action" => "unknown", "hash" => hash})
+      render_click(lv, "context_menu_action", %{"action" => "unknown", "hashes" => [hash]})
       assert Process.alive?(lv.pid)
     end
   end
@@ -749,7 +776,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
     test "context_menu_action start shows error flash on failure", %{lv: lv, hash: hash} do
       expect(MockCommands, :start, fn _hash -> {:error, :connection_failed} end)
-      render_click(lv, "context_menu_action", %{"action" => "start", "hash" => hash})
+      render_click(lv, "context_menu_action", %{"action" => "start", "hashes" => [hash]})
       assert render(lv) =~ "Failed to start"
     end
   end
@@ -783,7 +810,11 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       # Select the torrent to open the detail panel
-      render_click(lv, "select_torrent", %{"hash" => torrent.hash})
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
+
       assert :sys.get_state(lv.pid).socket.assigns.selected_hash == torrent.hash
 
       # Simulate Poller broadcasting a removal diff
@@ -802,7 +833,11 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      render_click(lv, "select_torrent", %{"hash" => torrent1.hash})
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent1.hash],
+        "focused_hash" => torrent1.hash
+      })
+
       assert :sys.get_state(lv.pid).socket.assigns.selected_hash == torrent1.hash
 
       # Remove torrent2, not the selected torrent1
@@ -1008,7 +1043,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       expect(MockCommands, :remove_label, fn "h1" -> :ok end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      render_click(lv, "context_menu_action", %{"action" => "remove_label", "hash" => "h1"})
+      render_click(lv, "context_menu_action", %{"action" => "remove_label", "hashes" => ["h1"]})
 
       # Mox verify_on_exit! confirms remove_label was called exactly once
       assert render(lv)

@@ -161,46 +161,60 @@ defmodule TaniwhaWeb.DashboardLive do
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_event("context_menu_action", %{"action" => "start", "hash" => hash}, socket) do
-    case @commands.start(hash) do
-      :ok ->
-        {:noreply, socket}
+  def handle_event("context_menu_action", %{"action" => "start", "hashes" => hashes}, socket) do
+    socket =
+      Enum.reduce(hashes, socket, fn hash, acc ->
+        case @commands.start(hash) do
+          :ok -> acc
+          {:error, reason} -> put_flash(acc, :error, "Failed to start: #{inspect(reason)}")
+        end
+      end)
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to start: #{inspect(reason)}")}
-    end
+    {:noreply, socket}
   end
 
-  def handle_event("context_menu_action", %{"action" => "stop", "hash" => hash}, socket) do
-    case @commands.stop(hash) do
-      :ok ->
-        {:noreply, socket}
+  def handle_event("context_menu_action", %{"action" => "stop", "hashes" => hashes}, socket) do
+    socket =
+      Enum.reduce(hashes, socket, fn hash, acc ->
+        case @commands.stop(hash) do
+          :ok -> acc
+          {:error, reason} -> put_flash(acc, :error, "Failed to stop: #{inspect(reason)}")
+        end
+      end)
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to stop: #{inspect(reason)}")}
-    end
+    {:noreply, socket}
   end
 
-  def handle_event("context_menu_action", %{"action" => "pause", "hash" => hash}, socket) do
-    case @commands.pause(hash) do
-      :ok ->
-        {:noreply, socket}
+  def handle_event("context_menu_action", %{"action" => "pause", "hashes" => hashes}, socket) do
+    socket =
+      Enum.reduce(hashes, socket, fn hash, acc ->
+        case @commands.pause(hash) do
+          :ok -> acc
+          {:error, reason} -> put_flash(acc, :error, "Failed to pause: #{inspect(reason)}")
+        end
+      end)
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to pause: #{inspect(reason)}")}
-    end
+    {:noreply, socket}
   end
 
-  def handle_event("context_menu_action", %{"action" => "erase", "hash" => hash}, socket) do
+  def handle_event("context_menu_action", %{"action" => "erase", "hashes" => [hash]}, socket) do
     {:noreply, assign(socket, :confirm_action, {:erase, hash})}
+  end
+
+  def handle_event("context_menu_action", %{"action" => "erase", "hashes" => hashes}, socket) do
+    {:noreply, assign(socket, :confirm_action, {:bulk_erase, hashes})}
   end
 
   def handle_event("context_menu_action", %{"action" => "set_label_prompt"}, socket) do
     {:noreply, assign(socket, :show_label_manager, true)}
   end
 
-  def handle_event("context_menu_action", %{"action" => "remove_label", "hash" => hash}, socket) do
-    @commands.remove_label(hash)
+  def handle_event(
+        "context_menu_action",
+        %{"action" => "remove_label", "hashes" => hashes},
+        socket
+      ) do
+    Enum.each(hashes, &@commands.remove_label/1)
     {:noreply, socket}
   end
 
@@ -382,48 +396,29 @@ defmodule TaniwhaWeb.DashboardLive do
     {:noreply, cancel_upload(socket, :torrent_file, ref)}
   end
 
-  def handle_event("toggle_select", %{"hash" => hash}, socket) do
-    selected =
-      if MapSet.member?(socket.assigns.selected_hashes, hash) do
-        MapSet.delete(socket.assigns.selected_hashes, hash)
+  def handle_event(
+        "update_selection",
+        %{"hashes" => hashes, "focused_hash" => focused},
+        socket
+      ) do
+    selected = MapSet.new(hashes)
+    old_hash = socket.assigns.selected_hash
+
+    socket =
+      if focused != old_hash do
+        unsubscribe_detail(old_hash)
+
+        if is_binary(focused) and byte_size(focused) > 0 do
+          Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:#{focused}")
+          socket |> assign(:selected_hash, focused) |> reset_detail_assigns()
+        else
+          socket |> assign(:selected_hash, nil) |> reset_detail_assigns()
+        end
       else
-        MapSet.put(socket.assigns.selected_hashes, hash)
+        socket
       end
 
     {:noreply, assign(socket, :selected_hashes, selected)}
-  end
-
-  def handle_event("select_all", _params, socket) do
-    %{
-      torrents: torrents,
-      search: search,
-      filter: filter,
-      tracker_filter: tracker_filter,
-      label_filter: label_filter,
-      sort_by: sort_by,
-      sort_dir: sort_dir
-    } = socket.assigns
-
-    visible =
-      visible_torrents(torrents, search, filter, tracker_filter, label_filter, sort_by, sort_dir)
-
-    selected = visible |> Enum.map(& &1.hash) |> MapSet.new()
-    {:noreply, assign(socket, :selected_hashes, selected)}
-  end
-
-  def handle_event("deselect_all", _params, socket) do
-    {:noreply, assign(socket, :selected_hashes, MapSet.new())}
-  end
-
-  def handle_event("select_torrent", %{"hash" => hash}, socket) do
-    if socket.assigns.selected_hash == hash do
-      unsubscribe_detail(hash)
-      {:noreply, socket |> assign(:selected_hash, nil) |> reset_detail_assigns()}
-    else
-      unsubscribe_detail(socket.assigns.selected_hash)
-      Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:#{hash}")
-      {:noreply, socket |> assign(:selected_hash, hash) |> reset_detail_assigns()}
-    end
   end
 
   def handle_event("close_panel", _params, socket) do
@@ -484,6 +479,18 @@ defmodule TaniwhaWeb.DashboardLive do
 
     socket =
       if any_failed, do: put_flash(socket, :error, "Some torrents failed to stop"), else: socket
+
+    {:noreply, socket}
+  end
+
+  def handle_event("bulk_pause", _params, socket) do
+    any_failed =
+      Enum.any?(socket.assigns.selected_hashes, fn hash ->
+        @commands.pause(hash) != :ok
+      end)
+
+    socket =
+      if any_failed, do: put_flash(socket, :error, "Some torrents failed to pause"), else: socket
 
     {:noreply, socket}
   end

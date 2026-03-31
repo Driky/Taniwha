@@ -379,14 +379,24 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
       assert html =~ ~s(phx-click="bulk_stop")
     end
 
+    test "renders Pause bulk action button" do
+      html = render_component(&action_bar/1, visible_count: 3)
+      assert html =~ ~s(phx-click="bulk_pause")
+    end
+
     test "all buttons have accessible labels" do
       html = render_component(&action_bar/1, visible_count: 3)
       assert_labeled_buttons(html)
     end
 
-    test "deselect button appears when selected_count > 0" do
-      html = render_component(&action_bar/1, visible_count: 3, selected_count: 2)
-      assert html =~ ~s(phx-click="deselect_all")
+    test "Pause button is disabled when selected_count is 0" do
+      html = render_component(&action_bar/1, visible_count: 3, selected_count: 0)
+      assert html =~ ~r/phx-click="bulk_pause"[^>]*disabled/
+    end
+
+    test "Pause button is enabled when selected_count > 0" do
+      html = render_component(&action_bar/1, visible_count: 3, selected_count: 1)
+      refute html =~ ~r/phx-click="bulk_pause"[^>]*disabled/
     end
 
     test "shows N selected text when selected_count > 0" do
@@ -397,6 +407,11 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
     test "does not show N selected count text when selected_count is 0" do
       html = render_component(&action_bar/1, visible_count: 3, selected_count: 0)
       refute html =~ ~r/\d+ selected/
+    end
+
+    test "does not render a Clear/deselect_all button" do
+      html = render_component(&action_bar/1, visible_count: 3, selected_count: 2)
+      refute html =~ ~s(phx-click="deselect_all")
     end
 
     test "Start button is disabled when selected_count is 0" do
@@ -432,7 +447,7 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
 
   describe "table_header/1" do
     defp base_header_assigns do
-      [sort_by: :name, sort_dir: :asc, all_selected?: false, total_visible: 5]
+      [sort_by: :name, sort_dir: :asc]
     end
 
     test "renders all nine column names" do
@@ -466,9 +481,7 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
       html =
         render_component(&table_header/1,
           sort_by: :name,
-          sort_dir: :desc,
-          all_selected?: false,
-          total_visible: 5
+          sort_dir: :desc
         )
 
       assert html =~ ~s(aria-sort="descending")
@@ -479,9 +492,9 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
       assert html =~ ~s(phx-click="sort")
     end
 
-    test "select-all checkbox is rendered" do
+    test "no select-all checkbox is rendered" do
       html = render_component(&table_header/1, base_header_assigns())
-      assert html =~ ~s(type="checkbox")
+      refute html =~ ~s(type="checkbox")
     end
   end
 
@@ -550,10 +563,23 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
       assert html =~ "hero-arrow-up-micro"
     end
 
-    test "checkbox has phx-click=toggle_select" do
+    test "no checkbox is rendered in row" do
       torrent = Fixtures.torrent_fixture()
       html = render_component(&torrent_row/1, torrent: torrent)
-      assert html =~ ~s(phx-click="toggle_select")
+      refute html =~ ~s(phx-click="toggle_select")
+      refute html =~ ~s(type="checkbox")
+    end
+
+    test "tr has aria-selected=false by default" do
+      torrent = Fixtures.torrent_fixture()
+      html = render_component(&torrent_row/1, torrent: torrent)
+      assert html =~ ~s(aria-selected="false")
+    end
+
+    test "tr has aria-selected=true when selected? is true" do
+      torrent = Fixtures.torrent_fixture()
+      html = render_component(&torrent_row/1, torrent: torrent, selected?: true)
+      assert html =~ ~s(aria-selected="true")
     end
 
     test "row has aria-label with torrent name" do
@@ -568,10 +594,10 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
       assert html =~ ~s(id="torrent-#{torrent.hash}")
     end
 
-    test "tr has phx-click=select_torrent" do
+    test "tr has no phx-click (JS hook handles clicks)" do
       torrent = Fixtures.torrent_fixture()
       html = render_component(&torrent_row/1, torrent: torrent)
-      assert html =~ ~s(phx-click="select_torrent")
+      refute html =~ ~s(phx-click="select_torrent")
     end
 
     test "row_selected? false gives no selected highlight" do
@@ -599,7 +625,6 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
         sort_by: :name,
         sort_dir: :asc,
         selected_hashes: MapSet.new(),
-        total_visible: length(torrents),
         selected_hash: nil
       ]
     end
@@ -637,7 +662,6 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
           sort_by: :name,
           sort_dir: :asc,
           selected_hashes: MapSet.new(),
-          total_visible: 0,
           selected_hash: nil
         )
 
@@ -659,7 +683,6 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
           sort_by: :size,
           sort_dir: :desc,
           selected_hashes: MapSet.new(),
-          total_visible: 0,
           selected_hash: nil
         )
 
@@ -676,11 +699,15 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
           sort_by: :name,
           sort_dir: :asc,
           selected_hashes: MapSet.new(),
-          total_visible: 1,
           selected_hash: t.hash
         )
 
       assert html =~ "--taniwha-sidebar-active-bg"
+    end
+
+    test "empty state colspan is 10" do
+      html = render_component(&torrent_table/1, table_assigns([]))
+      assert html =~ ~s(colspan="10")
     end
 
     test "all_torrents_empty? false + empty visible → no-results state" do
@@ -691,7 +718,6 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
           sort_by: :name,
           sort_dir: :asc,
           selected_hashes: MapSet.new(),
-          total_visible: 0,
           selected_hash: nil
         )
 

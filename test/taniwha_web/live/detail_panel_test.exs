@@ -35,40 +35,44 @@ defmodule TaniwhaWeb.DetailPanelTest do
       refute html =~ ~r/role="region" [^>]*aria-label="Torrent details"[^>]*>[^<]*#{torrent.name}/
     end
 
-    test "clicking a torrent row opens the panel with that torrent's data", %{conn: conn} do
+    test "update_selection opens the panel with that torrent's data", %{conn: conn} do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
       html =
-        lv
-        |> element("#torrent-#{torrent.hash}")
-        |> render_click()
+        render_click(lv, "update_selection", %{
+          "hashes" => [torrent.hash],
+          "focused_hash" => torrent.hash
+        })
 
       assert html =~ "Torrent details"
       assert html =~ torrent.name
     end
 
-    test "clicking the same row again closes the panel (toggle)", %{conn: conn} do
+    test "update_selection with same focused_hash keeps panel open", %{conn: conn} do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      # Open
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
 
-      # Close (same row again)
+      # Selecting same row again does not close the panel
       html =
-        lv
-        |> element("#torrent-#{torrent.hash}")
-        |> render_click()
+        render_click(lv, "update_selection", %{
+          "hashes" => [torrent.hash],
+          "focused_hash" => torrent.hash
+        })
 
-      assert html =~ ~r/id="detail-panel"[^>]*class="[^"]*max-h-0/
+      refute html =~ ~r/id="detail-panel"[^>]*class="[^"]*max-h-0/
     end
 
-    test "clicking a different row switches panel content without closing", %{conn: conn} do
+    test "update_selection with different focused_hash switches panel content", %{conn: conn} do
       torrent_a = Fixtures.torrent_fixture("hash_a")
       torrent_b = Fixtures.torrent_fixture("hash_b") |> Map.put(:name, "Torrent B")
       Store.put_torrent(torrent_a)
@@ -76,12 +80,16 @@ defmodule TaniwhaWeb.DetailPanelTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      lv |> element("#torrent-hash_a") |> render_click()
+      render_click(lv, "update_selection", %{
+        "hashes" => ["hash_a"],
+        "focused_hash" => "hash_a"
+      })
 
       html =
-        lv
-        |> element("#torrent-hash_b")
-        |> render_click()
+        render_click(lv, "update_selection", %{
+          "hashes" => ["hash_b"],
+          "focused_hash" => "hash_b"
+        })
 
       # Panel stays open and shows torrent B's name
       assert html =~ "Torrent B"
@@ -94,7 +102,11 @@ defmodule TaniwhaWeb.DetailPanelTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
 
       html =
         lv
@@ -109,7 +121,11 @@ defmodule TaniwhaWeb.DetailPanelTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
 
       html = render_keydown(lv, "keydown", %{"key" => "Escape"})
 
@@ -126,7 +142,12 @@ defmodule TaniwhaWeb.DetailPanelTest do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
+
       {:ok, lv: lv, torrent: torrent}
     end
 
@@ -180,7 +201,11 @@ defmodule TaniwhaWeb.DetailPanelTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
 
       html = render(lv)
       assert html =~ "Name"
@@ -195,7 +220,11 @@ defmodule TaniwhaWeb.DetailPanelTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
 
       html = render(lv)
       assert html =~ torrent.name
@@ -206,7 +235,11 @@ defmodule TaniwhaWeb.DetailPanelTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
 
       html = render(lv)
       assert html =~ "font-mono"
@@ -218,7 +251,11 @@ defmodule TaniwhaWeb.DetailPanelTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
 
       html = render(lv)
       # finished_at renders as "—" when nil
@@ -235,7 +272,12 @@ defmodule TaniwhaWeb.DetailPanelTest do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
+
       {:ok, lv: lv, torrent: torrent}
     end
 
@@ -317,7 +359,12 @@ defmodule TaniwhaWeb.DetailPanelTest do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
+
       {:ok, lv: lv, torrent: torrent}
     end
 
@@ -378,7 +425,12 @@ defmodule TaniwhaWeb.DetailPanelTest do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
+
       {:ok, lv: lv, torrent: torrent}
     end
 
@@ -475,7 +527,11 @@ defmodule TaniwhaWeb.DetailPanelTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
 
       updated = %{torrent | name: "Updated Torrent Name", download_rate: 9_999_999}
       send(lv.pid, {:torrent_updated, updated})
@@ -494,7 +550,12 @@ defmodule TaniwhaWeb.DetailPanelTest do
       torrent = Fixtures.torrent_fixture()
       Store.put_torrent(torrent)
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("#torrent-#{torrent.hash}") |> render_click()
+
+      render_click(lv, "update_selection", %{
+        "hashes" => [torrent.hash],
+        "focused_hash" => torrent.hash
+      })
+
       {:ok, lv: lv}
     end
 
