@@ -195,6 +195,15 @@ defmodule TaniwhaWeb.DashboardLive do
     {:noreply, assign(socket, :confirm_action, {:erase, hash})}
   end
 
+  def handle_event("context_menu_action", %{"action" => "set_label_prompt"}, socket) do
+    {:noreply, assign(socket, :show_label_manager, true)}
+  end
+
+  def handle_event("context_menu_action", %{"action" => "remove_label", "hash" => hash}, socket) do
+    @commands.remove_label(hash)
+    {:noreply, socket}
+  end
+
   def handle_event("context_menu_action", _params, socket) do
     {:noreply, socket}
   end

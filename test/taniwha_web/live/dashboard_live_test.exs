@@ -990,4 +990,28 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       assert labels == Enum.sort(labels)
     end
   end
+
+  # ── Context menu label actions ─────────────────────────────────────────────
+
+  describe "context menu label actions" do
+    test "set_label_prompt action opens the label manager modal", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "context_menu_action", %{"action" => "set_label_prompt", "hash" => "h1"})
+
+      html = render(lv)
+      assert html =~ "label-manager-modal"
+    end
+
+    test "remove_label action calls Commands.remove_label for the given hash", %{conn: conn} do
+      t = Fixtures.torrent_fixture("h1")
+      Store.put_torrent(t)
+      expect(MockCommands, :remove_label, fn "h1" -> :ok end)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "context_menu_action", %{"action" => "remove_label", "hash" => "h1"})
+
+      # Mox verify_on_exit! confirms remove_label was called exactly once
+      assert render(lv)
+    end
+  end
 end

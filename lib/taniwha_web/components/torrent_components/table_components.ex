@@ -622,13 +622,16 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
       const ITEM_HEIGHT = 28;
 
       const MENU_ITEMS = [
-        { action: "start",  label: "Start",       destructive: false },
-        { action: "pause",  label: "Pause",       destructive: false },
-        { action: "stop",   label: "Stop",        destructive: false },
+        { action: "start",            label: "Start",        destructive: false },
+        { action: "pause",            label: "Pause",        destructive: false },
+        { action: "stop",             label: "Stop",         destructive: false },
         { separator: true },
-        { action: "copy_hash", label: "Copy hash", client: true, destructive: false },
+        { action: "set_label_prompt", label: "Set label…",   destructive: false },
+        { action: "remove_label",     label: "Remove label", destructive: false },
         { separator: true },
-        { action: "erase",  label: "Remove",      destructive: true  },
+        { action: "copy_hash",        label: "Copy hash",    client: true, destructive: false },
+        { separator: true },
+        { action: "erase",            label: "Remove",       destructive: true  },
       ];
 
       function buildMenu(hash) {
