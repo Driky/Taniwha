@@ -349,7 +349,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       expect(MockCommands, :start, fn ^hash -> :ok end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("button[phx-click=start_torrent]") |> render_click()
+      render_click(lv, "start_torrent", %{"hash" => hash})
     end
 
     test "stop_torrent calls Commands.stop/1", %{conn: conn} do
@@ -359,7 +359,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       expect(MockCommands, :stop, fn ^hash -> :ok end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("button[phx-click=stop_torrent]") |> render_click()
+      render_click(lv, "stop_torrent", %{"hash" => hash})
     end
 
     test "remove_torrent sets confirm_action assign (does not call Commands.erase)", %{
@@ -369,7 +369,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("button[phx-click=remove_torrent]") |> render_click()
+      render_click(lv, "remove_torrent", %{"hash" => torrent.hash})
 
       html = render(lv)
       # Confirmation dialog should be visible
@@ -381,7 +381,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("button[phx-click=remove_torrent]") |> render_click()
+      render_click(lv, "remove_torrent", %{"hash" => torrent.hash})
 
       html = render(lv)
       assert html =~ torrent.name
@@ -566,7 +566,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("button[phx-click=remove_torrent]") |> render_click()
+      render_click(lv, "remove_torrent", %{"hash" => torrent.hash})
 
       assert render(lv) =~ ~s(role="dialog")
     end
@@ -576,7 +576,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       Store.put_torrent(torrent)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("button[phx-click=remove_torrent]") |> render_click()
+      render_click(lv, "remove_torrent", %{"hash" => torrent.hash})
       lv |> element("button[phx-click=cancel_confirm]") |> render_click()
 
       refute render(lv) =~ ~s(role="dialog")
@@ -589,7 +589,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       expect(MockCommands, :erase, fn ^hash -> :ok end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("button[phx-click=remove_torrent]") |> render_click()
+      render_click(lv, "remove_torrent", %{"hash" => torrent.hash})
       lv |> element("button[phx-click=confirm_action]") |> render_click()
 
       html = render(lv)
@@ -603,7 +603,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       stub(MockCommands, :erase, fn _hash -> :ok end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
-      lv |> element("button[phx-click=remove_torrent]") |> render_click()
+      render_click(lv, "remove_torrent", %{"hash" => torrent.hash})
       lv |> element("button[phx-click=confirm_action]") |> render_click()
 
       html = render(lv)

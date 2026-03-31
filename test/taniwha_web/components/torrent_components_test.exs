@@ -445,7 +445,16 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
       assert html =~ "Seeds"
       assert html =~ "Peers"
       assert html =~ "Ratio"
-      assert html =~ "Status"
+    end
+
+    test "status icon column has no sort button" do
+      html = render_component(&table_header/1, base_header_assigns())
+      refute html =~ ~s(phx-value-by="status")
+    end
+
+    test "status icon column width is ~28px" do
+      html = render_component(&table_header/1, base_header_assigns())
+      assert html =~ "28px"
     end
 
     test "active sort column has aria-sort=ascending" do
@@ -505,11 +514,16 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
       assert html =~ ~s(role="progressbar")
     end
 
-    test "renders status badge with abbreviated label" do
+    test "status icon cell is rendered" do
       torrent = Fixtures.torrent_fixture()
       html = render_component(&torrent_row/1, torrent: torrent)
-      # downloading torrent fixture → "DL"
-      assert html =~ "DL"
+      assert html =~ "<svg"
+    end
+
+    test "no status badge in a torrent row" do
+      torrent = Fixtures.torrent_fixture()
+      html = render_component(&torrent_row/1, torrent: torrent)
+      refute html =~ "taniwha-status-dl-badge-bg"
     end
 
     test "Seeds column renders em-dash placeholder" do
@@ -546,12 +560,6 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
       torrent = Fixtures.torrent_fixture()
       html = render_component(&torrent_row/1, torrent: torrent)
       assert html =~ ~s(aria-label="#{torrent.name}")
-    end
-
-    test "remove button has descriptive aria-label" do
-      torrent = Fixtures.torrent_fixture()
-      html = render_component(&torrent_row/1, torrent: torrent, on_remove: "remove_torrent")
-      assert html =~ ~s(aria-label="Remove #{torrent.name}")
     end
 
     test "tr has stable id attribute based on hash" do

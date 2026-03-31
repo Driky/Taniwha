@@ -9,7 +9,7 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
   import TaniwhaWeb.FormatHelpers, only: [format_bytes: 1, format_ratio: 1]
 
   import TaniwhaWeb.TorrentComponents.StatusComponents,
-    only: [progress_bar: 1, speed_display: 1, status_badge: 1]
+    only: [progress_bar: 1, speed_display: 1, status_icon: 1]
 
   alias Phoenix.LiveView.ColocatedHook
   alias Taniwha.Torrent
@@ -171,6 +171,13 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         />
       </th>
 
+      <%!-- Status icon (no label, no sort) --%>
+      <th
+        scope="col"
+        class="px-1 py-0 text-center"
+        style="width: 28px; height: var(--taniwha-actionbar-h)"
+      />
+
       <%!-- Name (sortable, grows) --%>
       <th scope="col" class="px-[6px] py-0 text-left" style="height: var(--taniwha-actionbar-h)">
         <.sort_header label="Name" column={:name} sort_by={@sort_by} sort_dir={@sort_dir} />
@@ -270,20 +277,6 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
           align={:right}
         />
       </th>
-
-      <%!-- Status (sortable) --%>
-      <th
-        scope="col"
-        class="px-[6px] py-0 text-left"
-        style="width: 78px; height: var(--taniwha-actionbar-h)"
-      >
-        <.sort_header
-          label="Status"
-          column={:status}
-          sort_by={@sort_by}
-          sort_dir={@sort_dir}
-        />
-      </th>
     </tr>
     """
   end
@@ -340,18 +333,17 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Renders a 28px table row (`<tr>`) with 9 data cells for a single torrent.
+  Renders a 28px table row (`<tr>`) with 10 data cells for a single torrent.
 
-  Columns: Name, Size, Progress, Down, Up, Seeds (placeholder "—"), Peers,
-  Ratio, Status. A leading checkbox cell supports row selection.
+  Columns: Status icon, Name, Label, Size, Progress, Down, Up, Seeds
+  (placeholder "—"), Peers, Ratio. A leading checkbox cell supports row
+  selection.
 
   ## Attributes
 
   - `:torrent` (required) — a `Taniwha.Torrent` struct
   - `:selected?` — whether this row is currently selected, default `false`
-  - `:on_start` — event name for the start action
-  - `:on_stop` — event name for the stop action
-  - `:on_remove` — event name for the remove action
+  - `:row_selected?` — whether this row has the detail panel open, default `false`
 
   ## Examples
 
@@ -359,17 +351,12 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         :for={torrent <- visible}
         torrent={torrent}
         selected?={MapSet.member?(@selected_hashes, torrent.hash)}
-        on_start="start_torrent"
-        on_stop="stop_torrent"
-        on_remove="remove_torrent"
+        row_selected?={@selected_hash == torrent.hash}
       />
   """
   attr :torrent, :map, required: true
   attr :selected?, :boolean, default: false
   attr :row_selected?, :boolean, default: false
-  attr :on_start, :any, default: nil
-  attr :on_stop, :any, default: nil
-  attr :on_remove, :any, default: nil
 
   def torrent_row(assigns) do
     assigns =
@@ -396,6 +383,10 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
           aria-label={"Select #{@torrent.name}"}
           class="size-3 rounded"
         />
+      </td>
+
+      <td class="px-1 text-center">
+        <.status_icon status={@status} />
       </td>
 
       <td class="px-[6px] overflow-hidden">
@@ -464,45 +455,6 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
       >
         {format_ratio(@torrent.ratio)}
       </td>
-
-      <td class="px-[6px]">
-        <div class="flex items-center gap-1">
-          <.status_badge status={@status} />
-          <button
-            :if={@on_start && @status in [:stopped, :paused]}
-            type="button"
-            phx-click={@on_start}
-            phx-value-hash={@torrent.hash}
-            aria-label={"Start #{@torrent.name}"}
-            class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[#dcfce7] hover:text-[#15803d]"
-            style="color: var(--taniwha-col-header)"
-          >
-            <.icon name="hero-play-micro" class="size-3" />
-          </button>
-          <button
-            :if={@on_stop && @status in [:downloading, :seeding, :checking]}
-            type="button"
-            phx-click={@on_stop}
-            phx-value-hash={@torrent.hash}
-            aria-label={"Stop #{@torrent.name}"}
-            class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[#f3f4f6]"
-            style="color: var(--taniwha-col-header)"
-          >
-            <.icon name="hero-stop-micro" class="size-3" />
-          </button>
-          <button
-            :if={@on_remove}
-            type="button"
-            phx-click={@on_remove}
-            phx-value-hash={@torrent.hash}
-            aria-label={"Remove #{@torrent.name}"}
-            class="ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[#fee2e2] hover:text-[#991b1b]"
-            style="color: var(--taniwha-col-header)"
-          >
-            <.icon name="hero-trash-micro" class="size-3" />
-          </button>
-        </div>
-      </td>
     </tr>
     """
   end
@@ -528,7 +480,6 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
   - `:total_visible` (required) — count of visible torrents (pass `length(visible)` from template)
   - `:selected_hash` — hash string of the row-clicked torrent (opens detail panel),
     or `nil`. Defaults to `nil`.
-  - `:on_start`, `:on_stop`, `:on_remove` — event name strings passed to each row
 
   ## Examples
 
@@ -540,9 +491,6 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         selected_hashes={@selected_hashes}
         total_visible={visible_count}
         selected_hash={@selected_hash}
-        on_start="start_torrent"
-        on_stop="stop_torrent"
-        on_remove="remove_torrent"
       />
   """
   attr :torrents, :list, required: true
@@ -552,9 +500,6 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
   attr :selected_hashes, :any, required: true
   attr :total_visible, :integer, required: true
   attr :selected_hash, :any, default: nil
-  attr :on_start, :string, default: nil
-  attr :on_stop, :string, default: nil
-  attr :on_remove, :string, default: nil
 
   def torrent_table(assigns) do
     all_selected? =
@@ -577,7 +522,7 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
           <%!-- Empty state: no torrents at all --%>
           <tr :if={@torrents == [] and @all_torrents_empty?}>
             <td
-              colspan="10"
+              colspan="11"
               class="py-16 text-center text-[11px]"
               style="color: var(--taniwha-col-header)"
               role="status"
@@ -593,7 +538,7 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
           <%!-- Empty state: filters active but nothing matches --%>
           <tr :if={@torrents == [] and not @all_torrents_empty?}>
             <td
-              colspan="10"
+              colspan="11"
               class="py-8 text-center text-[11px]"
               style="color: var(--taniwha-col-header)"
               role="status"
@@ -609,9 +554,6 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
             torrent={torrent}
             selected?={MapSet.member?(@selected_hashes, torrent.hash)}
             row_selected?={@selected_hash == torrent.hash}
-            on_start={@on_start}
-            on_stop={@on_stop}
-            on_remove={@on_remove}
           />
         </tbody>
       </table>

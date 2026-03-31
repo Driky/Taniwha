@@ -172,6 +172,14 @@
   --taniwha-status-err-bar: #ef4444;
   --taniwha-status-err-badge-bg: #fee2e2;
   --taniwha-status-err-badge-text: #991b1b;
+
+  /* Status — icons */
+  --taniwha-status-dl-icon: #3b82f6;
+  --taniwha-status-seed-icon: #22c55e;
+  --taniwha-status-stop-icon: #94a3b8;
+  --taniwha-status-pause-icon: #facc15;
+  --taniwha-status-check-icon: #f59e0b;
+  --taniwha-status-err-icon: #ef4444;
 }
 
 /* Dark mode overrides */
@@ -195,6 +203,13 @@
   --taniwha-search-border: #4b5563;
   --taniwha-sidebar-active-bg: #172554;
   --taniwha-hover-bg: #374151;
+
+  --taniwha-status-dl-icon: #60a5fa;
+  --taniwha-status-seed-icon: #4ade80;
+  --taniwha-status-stop-icon: #6b7280;
+  --taniwha-status-pause-icon: #facc15;
+  --taniwha-status-check-icon: #fbbf24;
+  --taniwha-status-err-icon: #ef4444;
 }
 
 /* Context menu hover — rule lives here so it works when the menu is appended to <body> */

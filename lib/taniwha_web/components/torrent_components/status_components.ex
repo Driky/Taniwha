@@ -120,6 +120,163 @@ defmodule TaniwhaWeb.TorrentComponents.StatusComponents do
   defp badge_label(_), do: "Unknown"
 
   # ---------------------------------------------------------------------------
+  # status_icon/1
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Renders a colour-coded SVG icon for a torrent status.
+
+  Uses CSS custom properties (`--taniwha-status-*-icon`) for colour so that the
+  icon adapts to light/dark mode automatically. Each icon has a distinct shape
+  for colour-blind safety.
+
+  ## Attributes
+
+  - `:status` (required) — one of `:downloading`, `:seeding`, `:stopped`,
+    `:paused`, `:checking`, `:unknown`
+
+  ## Examples
+
+      <.status_icon status={Torrent.status(@torrent)} />
+  """
+  attr :status, :atom, required: true
+
+  def status_icon(assigns) do
+    ~H"""
+    <span
+      role="img"
+      aria-label={icon_aria_label(@status)}
+      style={"color: var(#{icon_color_var(@status)})"}
+    >
+      <.icon_svg status={@status} />
+    </span>
+    """
+  end
+
+  defp icon_svg(%{status: :seeding} = assigns) do
+    ~H"""
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.5"
+      width="14"
+      height="14"
+      aria-hidden="true"
+    >
+      <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+    </svg>
+    """
+  end
+
+  defp icon_svg(%{status: :downloading} = assigns) do
+    ~H"""
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.5"
+      width="14"
+      height="14"
+      aria-hidden="true"
+    >
+      <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+    </svg>
+    """
+  end
+
+  defp icon_svg(%{status: :stopped} = assigns) do
+    ~H"""
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="none"
+      width="12"
+      height="12"
+      aria-hidden="true"
+    >
+      <rect x="5" y="5" width="14" height="14" rx="2" />
+    </svg>
+    """
+  end
+
+  defp icon_svg(%{status: :paused} = assigns) do
+    ~H"""
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      width="14"
+      height="14"
+      aria-hidden="true"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+    """
+  end
+
+  defp icon_svg(%{status: :checking} = assigns) do
+    ~H"""
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      width="14"
+      height="14"
+      aria-hidden="true"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+      />
+    </svg>
+    """
+  end
+
+  defp icon_svg(assigns) do
+    ~H"""
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      width="14"
+      height="14"
+      aria-hidden="true"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+      />
+    </svg>
+    """
+  end
+
+  @spec icon_aria_label(atom()) :: String.t()
+  defp icon_aria_label(:downloading), do: "Downloading"
+  defp icon_aria_label(:seeding), do: "Seeding"
+  defp icon_aria_label(:stopped), do: "Stopped"
+  defp icon_aria_label(:paused), do: "Paused"
+  defp icon_aria_label(:checking), do: "Checking"
+  defp icon_aria_label(_), do: "Unknown"
+
+  @spec icon_color_var(atom()) :: String.t()
+  defp icon_color_var(:downloading), do: "--taniwha-status-dl-icon"
+  defp icon_color_var(:seeding), do: "--taniwha-status-seed-icon"
+  defp icon_color_var(:stopped), do: "--taniwha-status-stop-icon"
+  defp icon_color_var(:paused), do: "--taniwha-status-pause-icon"
+  defp icon_color_var(:checking), do: "--taniwha-status-check-icon"
+  defp icon_color_var(_), do: "--taniwha-status-err-icon"
+
+  # ---------------------------------------------------------------------------
   # speed_display/1
   # ---------------------------------------------------------------------------
 
