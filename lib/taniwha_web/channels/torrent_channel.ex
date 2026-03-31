@@ -149,15 +149,12 @@ defmodule TaniwhaWeb.TorrentChannel do
             event: "remove_with_data_bulk"
           )
 
-          case @commands.erase_many_with_data(hashes) do
-            {:ok, _ok, _errors} = r -> r
-            {:error, _reason} = err -> set_error_status(err)
-          end
+          @commands.erase_many_with_data(hashes)
         end
 
       case result do
-        {:ok, _ok, _errors} -> {:reply, :ok, socket}
-        {:error, reason} -> {:reply, {:error, %{reason: inspect(reason)}}, socket}
+        {:ok, _ok, []} -> {:reply, :ok, socket}
+        {:ok, _ok, failed} -> {:reply, {:error, %{reason: "some_failed", failed: failed}}, socket}
       end
     else
       {:error, :rate_limited} -> {:reply, {:error, %{reason: "rate_limited"}}, socket}
