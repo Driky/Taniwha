@@ -360,7 +360,7 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
     <button
       type="button"
       phx-click={@event}
-      phx-value-value={@value}
+      phx-value-filter={@value}
       aria-pressed={to_string(@active?)}
       class="flex items-center gap-2 w-full px-3 h-[27px] text-[11px] text-left"
       style={sidebar_item_style(@active?)}

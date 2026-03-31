@@ -178,7 +178,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       html =
         lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=all]")
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=all]")
         |> render_click()
 
       assert html =~ downloading.name
@@ -208,7 +208,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       html =
         lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=downloading]")
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=downloading]")
         |> render_click()
 
       assert html =~ "Active DL"
@@ -238,7 +238,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       html =
         lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=seeding]")
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=seeding]")
         |> render_click()
 
       assert html =~ "Seeder"
@@ -268,7 +268,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       html =
         lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=stopped]")
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=stopped]")
         |> render_click()
 
       refute html =~ "Downloader"
@@ -843,7 +843,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       html =
         lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=Movies]")
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=Movies]")
         |> render_click()
 
       assert html =~ "Movie Torrent"
@@ -875,13 +875,13 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       # First filter by label
       lv
-      |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=Movies]")
+      |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=Movies]")
       |> render_click()
 
       # Then filter by status (downloading only)
       html =
         lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=downloading]")
+        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=downloading]")
         |> render_click()
 
       assert html =~ "Movie DL"
@@ -912,11 +912,11 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       # Filter to Movies
       lv
-      |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-value=Movies]")
+      |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=Movies]")
       |> render_click()
 
       # Reset to all — click the All status button (which also triggers filter reset)
-      html = render_click(lv, "filter_label", %{"value" => "all"})
+      html = render_click(lv, "filter_label", %{"filter" => "all"})
 
       assert html =~ "Movie Torrent"
       assert html =~ "Linux ISO"

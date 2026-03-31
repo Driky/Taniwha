@@ -212,15 +212,15 @@ defmodule TaniwhaWeb.DashboardLive do
     {:noreply, assign(socket, :search, v)}
   end
 
-  def handle_event("filter", %{"value" => v}, socket) do
+  def handle_event("filter", %{"filter" => v}, socket) do
     {:noreply, assign(socket, :filter, parse_filter(v))}
   end
 
-  def handle_event("filter_tracker", %{"value" => domain}, socket) do
+  def handle_event("filter_tracker", %{"filter" => domain}, socket) do
     {:noreply, assign(socket, :tracker_filter, parse_tracker_filter(domain))}
   end
 
-  def handle_event("filter_label", %{"value" => v}, socket) do
+  def handle_event("filter_label", %{"filter" => v}, socket) do
     {:noreply, assign(socket, :label_filter, parse_label_filter(v))}
   end
 
