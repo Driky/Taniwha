@@ -14,7 +14,8 @@ defmodule Taniwha.MixProject do
       listeners: [Phoenix.CodeReloader],
       dialyzer: [
         plt_add_apps: [:mix],
-        plt_local_path: "priv/plts"
+        plt_local_path: "priv/plts",
+        ignore_warnings: ".dialyzer_ignore.exs"
       ],
       # 80% threshold accounts for Phoenix-generated boilerplate modules
       # (PageController, PageHTML, Telemetry), the Guardian auth plug, stub
@@ -105,7 +106,14 @@ defmodule Taniwha.MixProject do
         "esbuild taniwha --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: [
+        "compile --warnings-as-errors",
+        "deps.unlock --unused",
+        "format",
+        "credo --strict",
+        "dialyzer",
+        "test"
+      ]
     ]
   end
 end
