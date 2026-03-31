@@ -21,7 +21,9 @@ defmodule TaniwhaWeb.AddTorrentComponent do
      |> assign(:active_tab, :url)
      |> assign(:url, "")
      |> assign(:loading, false)
-     |> assign(:error, nil)}
+     |> assign(:error, nil)
+     |> assign(:selected_label, nil)
+     |> assign(:label_groups, [])}
   end
 
   @impl true
@@ -38,6 +40,13 @@ defmodule TaniwhaWeb.AddTorrentComponent do
     {:noreply, assign(socket, active_tab: :file, error: nil)}
   end
 
+  def handle_event("select_label", %{"label" => label}, socket) do
+    selected =
+      if socket.assigns.selected_label == label, do: nil, else: label
+
+    {:noreply, assign(socket, :selected_label, selected)}
+  end
+
   def handle_event("submit_url", %{"url" => url}, socket) do
     url = String.trim(url)
 
@@ -47,8 +56,9 @@ defmodule TaniwhaWeb.AddTorrentComponent do
 
       :ok ->
         socket = assign(socket, :loading, true)
+        opts = label_opt(socket.assigns.selected_label)
 
-        case @commands.load_url(url, []) do
+        case @commands.load_url(url, opts) do
           :ok ->
             send(self(), {:add_torrent_success})
             {:noreply, socket}
@@ -188,6 +198,40 @@ defmodule TaniwhaWeb.AddTorrentComponent do
                 <%!-- Hidden submit so Enter key works --%>
                 <button type="submit" class="sr-only" aria-label="Submit magnet URL" />
               </form>
+              <%!-- Label selector --%>
+              <div :if={@label_groups != []} class="mt-3">
+                <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-[6px]">Label</p>
+                <div class="flex flex-wrap gap-[6px]" role="group" aria-label="Select label">
+                  <%= for {label, _count} <- @label_groups do %>
+                    <% {dot, bg, text} = Taniwha.LabelStore.auto_assign(label) %>
+                    <button
+                      type="button"
+                      phx-click="select_label"
+                      phx-target={@myself}
+                      phx-value-label={label}
+                      aria-pressed={to_string(@selected_label == label)}
+                      class={[
+                        "inline-flex items-center gap-[5px] h-[22px] px-[8px] text-[11px] rounded-full border cursor-pointer transition-colors",
+                        @selected_label == label &&
+                          "border-transparent",
+                        @selected_label != label &&
+                          "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+                      ]}
+                      style={
+                        if @selected_label == label,
+                          do: "background-color: #{bg}; color: #{text};",
+                          else: ""
+                      }
+                    >
+                      <span
+                        class="size-[7px] rounded-full shrink-0"
+                        style={"background-color: #{dot}"}
+                        aria-hidden="true"
+                      />{label}
+                    </button>
+                  <% end %>
+                </div>
+              </div>
             </div>
 
             <%!-- File upload panel --%>
@@ -290,6 +334,10 @@ defmodule TaniwhaWeb.AddTorrentComponent do
     </div>
     """
   end
+
+  @spec label_opt(String.t() | nil) :: keyword()
+  defp label_opt(nil), do: []
+  defp label_opt(label), do: [label: label]
 
   @spec upload_error_to_string(atom()) :: String.t()
   defp upload_error_to_string(:too_large), do: "File is too large (max 10 MB)."

@@ -5,6 +5,7 @@ defmodule TaniwhaWeb.AddTorrentTest do
   import Mox
 
   alias Taniwha.State.Store
+  alias Taniwha.Test.Fixtures
 
   setup :verify_on_exit!
 
@@ -191,6 +192,63 @@ defmodule TaniwhaWeb.AddTorrentTest do
       html = render(lv)
       # Upload validation should show an error
       assert html =~ "not-allowed" or html =~ "error" or html =~ "invalid"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch 8 — Label selector in URL tab
+  # ---------------------------------------------------------------------------
+
+  describe "label selector in URL tab" do
+    setup %{conn: conn} do
+      t = %{Fixtures.torrent_fixture("h1") | label: "Movies"}
+      Store.put_torrent(t)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      lv |> element("[phx-click=show_add_modal]") |> render_click()
+      {:ok, lv: lv}
+    end
+
+    test "shows label buttons for existing labels", %{lv: lv} do
+      html = render(lv)
+      assert html =~ ~r/phx-click="select_label"[^>]*phx-value-label="Movies"/
+    end
+
+    test "clicking a label selects it (aria-pressed=true)", %{lv: lv} do
+      lv
+      |> element("[phx-click=select_label][phx-value-label=Movies]")
+      |> render_click()
+
+      html = render(lv)
+      assert html =~ ~r/phx-value-label="Movies"[^>]*aria-pressed="true"/
+    end
+
+    test "clicking the selected label again deselects it", %{lv: lv} do
+      lv |> element("[phx-click=select_label][phx-value-label=Movies]") |> render_click()
+      lv |> element("[phx-click=select_label][phx-value-label=Movies]") |> render_click()
+
+      html = render(lv)
+      assert html =~ ~r/phx-value-label="Movies"[^>]*aria-pressed="false"/
+    end
+
+    test "submitting URL with selected label passes label: opt to load_url", %{lv: lv} do
+      url = "magnet:?xt=urn:btih:abc123"
+      expect(Taniwha.MockCommands, :load_url, fn ^url, [label: "Movies"] -> :ok end)
+
+      lv |> element("[phx-click=select_label][phx-value-label=Movies]") |> render_click()
+
+      lv
+      |> element("form[phx-submit=submit_url]")
+      |> render_submit(%{"url" => url})
+    end
+
+    test "submitting URL without selection passes empty opts", %{lv: lv} do
+      url = "magnet:?xt=urn:btih:abc123"
+      expect(Taniwha.MockCommands, :load_url, fn ^url, [] -> :ok end)
+
+      lv
+      |> element("form[phx-submit=submit_url]")
+      |> render_submit(%{"url" => url})
     end
   end
 end
