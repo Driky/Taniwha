@@ -42,9 +42,17 @@ if downloads_dir = System.get_env("TANIWHA_DOWNLOADS_DIR") do
 end
 
 # Optional: path for the throttle settings JSON file.
-# Defaults to priv/throttle_settings.json.
-# Mount the file (or its parent directory) as a Docker volume for persistence.
-if throttle_path = System.get_env("TANIWHA_THROTTLE_PATH") do
+# Defaults to priv/throttle_settings.json when neither env var is set.
+# TANIWHA_THROTTLE_PATH takes precedence; otherwise derived from TANIWHA_DATA_DIR
+# so that production deployments don't need an extra env var.
+throttle_path =
+  System.get_env("TANIWHA_THROTTLE_PATH") ||
+    case System.get_env("TANIWHA_DATA_DIR") do
+      nil -> nil
+      dir -> Path.join(dir, "throttle_settings.json")
+    end
+
+if throttle_path do
   config :taniwha, throttle_settings_path: throttle_path
 end
 

@@ -31,7 +31,8 @@ config :taniwha,
   commands: Taniwha.MockCommands,
   poll_interval: 86_400_000,
   rpc_max_retries: 0,
-  rpc_retry_base_ms: 0
+  rpc_retry_base_ms: 0,
+  throttle_sync_interval: :disabled
 
 config :taniwha, api_key: "test-api-key-for-tests"
 

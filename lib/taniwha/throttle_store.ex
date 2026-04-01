@@ -38,6 +38,8 @@ defmodule Taniwha.ThrottleStore do
 
   @default_table :taniwha_throttle
 
+  @sync_interval 5_000
+
   @default_presets [
     %{value: 512, unit: :kib_s, label: "512 KiB/s"},
     %{value: 1, unit: :mib_s, label: "1 MiB/s"},
@@ -49,7 +51,11 @@ defmodule Taniwha.ThrottleStore do
   @type unit() :: :kib_s | :mib_s
   @type preset() :: %{value: pos_integer(), unit: unit(), label: String.t()}
 
-  @type state() :: %{file_path: String.t(), table: atom()}
+  @type state() :: %{
+          file_path: String.t(),
+          table: atom(),
+          sync_interval: pos_integer() | :disabled
+        }
 
   # ── Pure helpers ──────────────────────────────────────────────────────────
 
@@ -178,16 +184,26 @@ defmodule Taniwha.ThrottleStore do
 
     :ets.new(table, [:set, :named_table, :public, {:read_concurrency, true}])
 
+    sync_interval =
+      Keyword.get(
+        opts,
+        :sync_interval,
+        Application.get_env(:taniwha, :throttle_sync_interval, @sync_interval)
+      )
+
+    state = %{file_path: file_path, table: table, sync_interval: sync_interval}
+
     {dl, ul, presets, loaded?} = load_from_file(file_path)
     populate_ets(table, dl, ul, presets)
 
     unless loaded? do
-      persist_to_file(%{file_path: file_path, table: table}, dl, ul, presets)
+      persist_to_file(state, dl, ul, presets)
     end
 
     apply_limits_on_startup(dl, ul)
 
-    {:ok, %{file_path: file_path, table: table}}
+    schedule_sync(state)
+    {:ok, state}
   end
 
   @impl true
@@ -236,6 +252,29 @@ defmodule Taniwha.ThrottleStore do
   def handle_call(:reset, _from, state) do
     populate_ets(state.table, 0, 0, @default_presets)
     {:reply, :ok, state}
+  end
+
+  @impl true
+  def handle_info(:sync_limits, state) do
+    with {:ok, dl} <- @commands.get_download_limit(),
+         {:ok, ul} <- @commands.get_upload_limit() do
+      current_dl = :ets.lookup_element(state.table, :download_limit, 2)
+      current_ul = :ets.lookup_element(state.table, :upload_limit, 2)
+
+      if dl != current_dl or ul != current_ul do
+        :ets.insert(state.table, {:download_limit, dl})
+        :ets.insert(state.table, {:upload_limit, ul})
+        presets = :ets.lookup_element(state.table, :presets, 2)
+        persist_to_file(state, dl, ul, presets)
+        broadcast_throttle_update(dl, ul)
+      end
+    else
+      {:error, reason} ->
+        Logger.debug("ThrottleStore: sync_limits failed", reason: inspect(reason))
+    end
+
+    schedule_sync(state)
+    {:noreply, state}
   end
 
   # ── Private helpers ───────────────────────────────────────────────────────
@@ -414,6 +453,10 @@ defmodule Taniwha.ThrottleStore do
   defp check_all(list, pred, error) do
     if Enum.all?(list, pred), do: :ok, else: {:error, error}
   end
+
+  @spec schedule_sync(state()) :: reference() | :ok
+  defp schedule_sync(%{sync_interval: :disabled}), do: :ok
+  defp schedule_sync(%{sync_interval: ms}), do: Process.send_after(self(), :sync_limits, ms)
 
   @spec format_number(float()) :: integer() | float()
   defp format_number(n) do

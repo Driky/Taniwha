@@ -15,6 +15,10 @@ defmodule Taniwha.ThrottleStoreTest do
   setup do
     Mox.stub(Taniwha.MockCommands, :set_download_limit, fn _ -> :ok end)
     Mox.stub(Taniwha.MockCommands, :set_upload_limit, fn _ -> :ok end)
+    # Prevent spurious calls from the global store's sync timer (disabled in test
+    # env via config, but isolated stores started with sync_interval: 50 need stubs).
+    Mox.stub(Taniwha.MockCommands, :get_download_limit, fn -> {:ok, 0} end)
+    Mox.stub(Taniwha.MockCommands, :get_upload_limit, fn -> {:ok, 0} end)
     ThrottleStore.reset()
     :ok
   end
@@ -328,6 +332,81 @@ defmodule Taniwha.ThrottleStoreTest do
       presets = [%{value: 3, unit: :mib_s, label: "3 MiB/s"}]
       :ok = ThrottleStore.set_presets(presets)
       assert ThrottleStore.get_presets() == presets
+    end
+  end
+
+  # ── Batch 6: sync_limits polling ──────────────────────────────────────────
+
+  describe "sync_limits polling" do
+    # Starts an isolated store with a fast sync interval.
+    defp start_sync_store(opts \\ []) do
+      start_isolated_store(Keyword.merge([sync_interval: 50], opts))
+    end
+
+    test "updates ETS and broadcasts when rtorrent returns different limits" do
+      stub(Taniwha.MockCommands, :get_download_limit, fn -> {:ok, 0} end)
+      stub(Taniwha.MockCommands, :get_upload_limit, fn -> {:ok, 0} end)
+      {_pid, _path, table} = start_sync_store()
+
+      Phoenix.PubSub.subscribe(Taniwha.PubSub, "throttle:settings")
+
+      stub(Taniwha.MockCommands, :get_download_limit, fn -> {:ok, 3_145_728} end)
+      stub(Taniwha.MockCommands, :get_upload_limit, fn -> {:ok, 1_048_576} end)
+
+      assert_receive {:throttle_updated, %{download_limit: 3_145_728, upload_limit: 1_048_576}},
+                     500
+
+      assert :ets.lookup_element(table, :download_limit, 2) == 3_145_728
+      assert :ets.lookup_element(table, :upload_limit, 2) == 1_048_576
+    end
+
+    test "does not broadcast when rtorrent returns the same limits" do
+      stub(Taniwha.MockCommands, :get_download_limit, fn -> {:ok, 0} end)
+      stub(Taniwha.MockCommands, :get_upload_limit, fn -> {:ok, 0} end)
+      {_pid, _path, _table} = start_sync_store()
+
+      Phoenix.PubSub.subscribe(Taniwha.PubSub, "throttle:settings")
+
+      refute_receive {:throttle_updated, _}, 200
+    end
+
+    test "persists changed limits to file" do
+      stub(Taniwha.MockCommands, :get_download_limit, fn -> {:ok, 0} end)
+      stub(Taniwha.MockCommands, :get_upload_limit, fn -> {:ok, 0} end)
+      {_pid, path, _table} = start_sync_store()
+
+      stub(Taniwha.MockCommands, :get_download_limit, fn -> {:ok, 2_097_152} end)
+      stub(Taniwha.MockCommands, :get_upload_limit, fn -> {:ok, 0} end)
+
+      :timer.sleep(200)
+
+      {:ok, json} = File.read(path)
+      {:ok, data} = Jason.decode(json)
+      assert data["download_limit"] == 2_097_152
+    end
+
+    test "does not crash when Commands returns an error" do
+      stub(Taniwha.MockCommands, :get_download_limit, fn -> {:error, :timeout} end)
+      stub(Taniwha.MockCommands, :get_upload_limit, fn -> {:ok, 0} end)
+      {pid, _path, _table} = start_sync_store()
+
+      :timer.sleep(200)
+      assert Process.alive?(pid)
+    end
+
+    test "continues polling after an error" do
+      stub(Taniwha.MockCommands, :get_download_limit, fn -> {:error, :timeout} end)
+      stub(Taniwha.MockCommands, :get_upload_limit, fn -> {:ok, 0} end)
+      {pid, _path, table} = start_sync_store()
+
+      :timer.sleep(100)
+
+      stub(Taniwha.MockCommands, :get_download_limit, fn -> {:ok, 5_242_880} end)
+      stub(Taniwha.MockCommands, :get_upload_limit, fn -> {:ok, 0} end)
+
+      :timer.sleep(200)
+      assert :ets.lookup_element(table, :download_limit, 2) == 5_242_880
+      assert Process.alive?(pid)
     end
   end
 end
