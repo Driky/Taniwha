@@ -81,6 +81,11 @@ defmodule TaniwhaWeb.Router do
     get "/torrents/:hash", TorrentController, :show
     post "/torrents", TorrentController, :create
     delete "/torrents/:hash", TorrentController, :delete
+
+    get "/throttle", ThrottleController, :show
+    put "/throttle/download", ThrottleController, :set_download
+    put "/throttle/upload", ThrottleController, :set_upload
+    put "/throttle/presets", ThrottleController, :set_presets
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

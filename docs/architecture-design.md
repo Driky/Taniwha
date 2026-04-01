@@ -388,6 +388,10 @@ Clients connect to the socket with a JWT token parameter. The socket verifies th
 | `POST` | `/api/v1/torrents` | Add torrent (magnet URL or .torrent upload) |
 | `GET` | `/api/v1/torrents` | Snapshot of all torrents |
 | `GET` | `/api/v1/torrents/:hash` | Single torrent snapshot |
+| `GET` | `/api/v1/throttle` | Current download/upload limits and presets |
+| `PUT` | `/api/v1/throttle/download` | Set global download limit (`{"limit": bytes}`) |
+| `PUT` | `/api/v1/throttle/upload` | Set global upload limit (`{"limit": bytes}`) |
+| `PUT` | `/api/v1/throttle/presets` | Replace preset list (`{"presets": [...]}`) |
 
 ### 9.4 LiveView views
 
