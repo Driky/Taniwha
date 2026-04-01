@@ -347,8 +347,9 @@ Clients connect to the socket with a JWT token parameter. The socket verifies th
 |---|---|---|
 | `torrents:list` | Subscribe to all torrent updates | `%{torrents: [...]}` — full snapshot |
 | `torrents:{hash}` | Subscribe to one torrent's updates | `%{torrent: {...}}` — full detail |
+| `throttle:settings` | Subscribe to bandwidth throttle settings | `%{"download_limit" => int, "upload_limit" => int, "presets" => [...]}` |
 
-**Client → Server messages:**
+**Client → Server messages (torrents topics):**
 
 | Event | Payload | Description |
 |---|---|---|
@@ -357,12 +358,27 @@ Clients connect to the socket with a JWT token parameter. The socket verifies th
 | `remove` | `%{"hash" => hash}` | Remove from rtorrent |
 | `set_file_priority` | `%{"hash" => h, "index" => i, "priority" => p}` | Set file priority (0=skip, 1=normal, 2=high) |
 
-**Server → Client pushes:**
+**Server → Client pushes (torrents topics):**
 
 | Event | Payload | Description |
 |---|---|---|
 | `diffs` | `%{diffs: [{type, data}]}` | Incremental updates |
 | `updated` | `%{torrent: {...}}` | Full torrent state for detail subscribers |
+
+**Client → Server messages (throttle:settings topic):**
+
+| Event | Payload | Description |
+|---|---|---|
+| `set_download_limit` | `%{"limit" => non_neg_integer()}` | Set global download limit in bytes/s (0 = unlimited) |
+| `set_upload_limit` | `%{"limit" => non_neg_integer()}` | Set global upload limit in bytes/s (0 = unlimited) |
+| `set_presets` | `%{"presets" => [%{"value" => pos_int, "unit" => "kib_s"\|"mib_s"}]}` | Replace preset list; labels are auto-generated |
+
+**Server → Client pushes (throttle:settings topic):**
+
+| Event | Payload | Description |
+|---|---|---|
+| `throttle_updated` | `%{"download_limit" => int, "upload_limit" => int}` | One or both limits changed |
+| `presets_updated` | `%{"presets" => [%{"value" => int, "unit" => string, "label" => string}]}` | Preset list replaced |
 
 ### 9.3 REST endpoints
 

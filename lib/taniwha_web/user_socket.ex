@@ -9,6 +9,7 @@ defmodule TaniwhaWeb.UserSocket do
   use Phoenix.Socket
 
   channel "torrents:*", TaniwhaWeb.TorrentChannel
+  channel "throttle:settings", TaniwhaWeb.ThrottleChannel
 
   @impl true
   def connect(%{"token" => token}, socket, _connect_info) do
