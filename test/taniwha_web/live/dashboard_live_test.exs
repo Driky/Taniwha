@@ -4,7 +4,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
   import Phoenix.LiveViewTest
   import Mox
 
-  alias Taniwha.{MockCommands, State.Store}
+  alias Taniwha.{MockCommands, State.Store, ThrottleStore}
   alias Taniwha.Test.Fixtures
 
   setup :set_mox_from_context
@@ -1049,6 +1049,210 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       # Mox verify_on_exit! confirms remove_label was called exactly once
       assert render(lv)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Throttle shared setup helper
+  # ---------------------------------------------------------------------------
+
+  defp setup_throttle(_context) do
+    ThrottleStore.reset()
+    Mox.stub(MockCommands, :set_download_limit, fn _ -> :ok end)
+    Mox.stub(MockCommands, :set_upload_limit, fn _ -> :ok end)
+
+    throttle_pid = Process.whereis(Taniwha.ThrottleStore)
+    if throttle_pid, do: Mox.allow(MockCommands, self(), throttle_pid)
+
+    on_exit(fn -> ThrottleStore.reset() end)
+    :ok
+  end
+
+  # ---------------------------------------------------------------------------
+  # Throttle Batch 1 — mount assigns throttle state
+  # ---------------------------------------------------------------------------
+
+  describe "throttle mount assigns" do
+    setup :setup_throttle
+
+    test "mounts with download_limit 0 and upload_limit 0 — no speed bracket in HTML", %{
+      conn: conn
+    } do
+      {:ok, _lv, html} = live(conn, ~p"/")
+      refute html =~ "MiB/s]"
+      refute html =~ "KiB/s]"
+    end
+
+    test "mounts with throttle_menu nil — no throttle menu in HTML", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/")
+      refute html =~ "throttle-menu-"
+    end
+
+    test "shows [5 MiB/s] when ETS has download_limit 5_242_880", %{conn: conn} do
+      :ets.insert(:taniwha_throttle, {:download_limit, 5_242_880})
+      {:ok, _lv, html} = live(conn, ~p"/")
+      assert html =~ "[5 MiB/s]"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Throttle Batch 2 — PubSub handle_info
+  # ---------------------------------------------------------------------------
+
+  describe "throttle PubSub handle_info" do
+    setup :setup_throttle
+
+    test "throttle_updated with download_limit 5_242_880 renders [5 MiB/s]", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      send(lv.pid, {:throttle_updated, %{download_limit: 5_242_880, upload_limit: 0}})
+      assert render(lv) =~ "[5 MiB/s]"
+    end
+
+    test "throttle_updated with both limits 0 removes speed bracket", %{conn: conn} do
+      :ets.insert(:taniwha_throttle, {:download_limit, 5_242_880})
+      {:ok, lv, _html} = live(conn, ~p"/")
+      send(lv.pid, {:throttle_updated, %{download_limit: 0, upload_limit: 0}})
+      html = render(lv)
+      refute html =~ "MiB/s]"
+      refute html =~ "KiB/s]"
+    end
+
+    test "presets_updated reflects new presets when download menu is open", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "open_throttle_menu", %{"direction" => "download"})
+      send(lv.pid, {:presets_updated, [%{value: 8, unit: :mib_s, label: "8 MiB/s"}]})
+      assert render(lv) =~ "8 MiB/s"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Throttle Batch 3 — open/close menu events
+  # ---------------------------------------------------------------------------
+
+  describe "throttle menu open/close" do
+    setup :setup_throttle
+
+    test "open_throttle_menu download shows Download limit aria-label", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      html = render_click(lv, "open_throttle_menu", %{"direction" => "download"})
+      assert html =~ ~s(aria-label="Download limit")
+    end
+
+    test "open_throttle_menu upload shows Upload limit aria-label", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      html = render_click(lv, "open_throttle_menu", %{"direction" => "upload"})
+      assert html =~ ~s(aria-label="Upload limit")
+    end
+
+    test "close_throttle_menu removes throttle menu from HTML", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "open_throttle_menu", %{"direction" => "download"})
+      html = render_click(lv, "close_throttle_menu", %{})
+      refute html =~ "throttle-menu-"
+    end
+
+    test "opening second direction closes first", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "open_throttle_menu", %{"direction" => "download"})
+      html = render_click(lv, "open_throttle_menu", %{"direction" => "upload"})
+      refute html =~ ~s(aria-label="Download limit")
+      assert html =~ ~s(aria-label="Upload limit")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Throttle Batch 4 — set_throttle_limit
+  # ---------------------------------------------------------------------------
+
+  describe "throttle set_throttle_limit" do
+    setup :setup_throttle
+
+    test "set_throttle_limit download calls set_download_limit, closes menu, shows bracket", %{
+      conn: conn
+    } do
+      expect(MockCommands, :set_download_limit, fn 5_242_880 -> :ok end)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "open_throttle_menu", %{"direction" => "download"})
+
+      html =
+        render_click(lv, "set_throttle_limit", %{
+          "direction" => "download",
+          "bytes" => "5242880"
+        })
+
+      refute html =~ "throttle-menu-"
+      assert html =~ "[5 MiB/s]"
+    end
+
+    test "set_throttle_limit with bytes 0 sets unlimited, removes speed bracket", %{conn: conn} do
+      expect(MockCommands, :set_download_limit, fn 0 -> :ok end)
+      :ets.insert(:taniwha_throttle, {:download_limit, 5_242_880})
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "open_throttle_menu", %{"direction" => "download"})
+
+      html =
+        render_click(lv, "set_throttle_limit", %{"direction" => "download", "bytes" => "0"})
+
+      refute html =~ "MiB/s]"
+      refute html =~ "KiB/s]"
+    end
+
+    test "active limit has aria-checked true in open menu", %{conn: conn} do
+      :ets.insert(:taniwha_throttle, {:download_limit, 5_242_880})
+      {:ok, lv, _html} = live(conn, ~p"/")
+      html = render_click(lv, "open_throttle_menu", %{"direction" => "download"})
+      assert html =~ ~s(aria-checked="true")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Throttle Batch 5 — custom input
+  # ---------------------------------------------------------------------------
+
+  describe "throttle custom input" do
+    setup :setup_throttle
+
+    test "show_custom_input displays the custom form", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "open_throttle_menu", %{"direction" => "download"})
+      html = render_click(lv, "show_custom_input", %{"direction" => "download"})
+      assert html =~ ~s(phx-submit="apply_custom_limit")
+    end
+
+    test "apply_custom_limit with valid value calls set_download_limit and closes menu", %{
+      conn: conn
+    } do
+      expect(MockCommands, :set_download_limit, fn 7_864_320 -> :ok end)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "open_throttle_menu", %{"direction" => "download"})
+      render_click(lv, "show_custom_input", %{"direction" => "download"})
+
+      html =
+        render_submit(lv, "apply_custom_limit", %{
+          "direction" => "download",
+          "value" => "7.5",
+          "unit" => "mib_s"
+        })
+
+      refute html =~ "throttle-menu-"
+    end
+
+    test "apply_custom_limit with invalid value shows error and keeps menu open", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+      render_click(lv, "open_throttle_menu", %{"direction" => "download"})
+      render_click(lv, "show_custom_input", %{"direction" => "download"})
+
+      html =
+        render_submit(lv, "apply_custom_limit", %{
+          "direction" => "download",
+          "value" => "abc",
+          "unit" => "mib_s"
+        })
+
+      assert html =~ "Invalid limit value"
     end
   end
 end

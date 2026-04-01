@@ -6,6 +6,8 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
   use TaniwhaWeb, :html
 
   import TaniwhaWeb.TorrentComponents.StatusComponents, only: [speed_display: 1, status_slug: 1]
+  import TaniwhaWeb.TorrentComponents.ThrottleComponents, only: [throttle_context_menu: 1]
+  import TaniwhaWeb.FormatHelpers, only: [format_speed: 1]
 
   # ---------------------------------------------------------------------------
   # topbar/1
@@ -38,6 +40,11 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
   attr :download_rate, :integer, default: 0
   attr :search, :string, default: ""
   attr :current_user, :map, default: nil
+  attr :download_limit, :integer, default: 0
+  attr :upload_limit, :integer, default: 0
+  attr :presets, :list, default: []
+  attr :throttle_menu, :any, default: nil
+  attr :custom_input, :boolean, default: false
 
   def topbar(assigns) do
     ~H"""
@@ -80,14 +87,79 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
       <%!-- Spacer --%>
       <div class="flex-1" />
 
-      <%!-- Global transfer stats --%>
-      <div
-        role="status"
-        aria-label="Global transfer statistics"
-        class="flex items-center gap-3"
-      >
-        <.speed_display bytes_per_second={@download_rate} direction={:down} />
-        <.speed_display bytes_per_second={@upload_rate} direction={:up} />
+      <%!-- Global transfer stats with bandwidth limit controls --%>
+      <div role="status" aria-label="Global transfer statistics" class="flex items-center gap-3">
+        <%!-- Download speed indicator --%>
+        <div
+          class="relative"
+          id="throttle-dl-indicator"
+          phx-hook="ThrottleMenu"
+          data-direction="download"
+        >
+          <button
+            type="button"
+            phx-click="open_throttle_menu"
+            phx-value-direction="download"
+            aria-haspopup="true"
+            aria-expanded={to_string(@throttle_menu == :download)}
+            aria-label={dl_indicator_label(@download_rate, @download_limit)}
+            class={[
+              "flex items-center gap-1 cursor-context-menu px-1 py-0.5 rounded",
+              @throttle_menu == :download && "bg-gray-100 dark:bg-gray-800"
+            ]}
+          >
+            <.speed_display bytes_per_second={@download_rate} direction={:down} />
+            <span
+              :if={@download_limit > 0}
+              class="text-[10px] font-normal text-gray-400 dark:text-gray-500"
+            >
+              [{Taniwha.ThrottleStore.bytes_to_display(@download_limit)}]
+            </span>
+          </button>
+          <.throttle_context_menu
+            :if={@throttle_menu == :download}
+            direction={:download}
+            current_limit={@download_limit}
+            presets={@presets}
+            custom_input={@custom_input}
+          />
+        </div>
+
+        <%!-- Upload speed indicator --%>
+        <div
+          class="relative"
+          id="throttle-ul-indicator"
+          phx-hook="ThrottleMenu"
+          data-direction="upload"
+        >
+          <button
+            type="button"
+            phx-click="open_throttle_menu"
+            phx-value-direction="upload"
+            aria-haspopup="true"
+            aria-expanded={to_string(@throttle_menu == :upload)}
+            aria-label={ul_indicator_label(@upload_rate, @upload_limit)}
+            class={[
+              "flex items-center gap-1 cursor-context-menu px-1 py-0.5 rounded",
+              @throttle_menu == :upload && "bg-gray-100 dark:bg-gray-800"
+            ]}
+          >
+            <.speed_display bytes_per_second={@upload_rate} direction={:up} />
+            <span
+              :if={@upload_limit > 0}
+              class="text-[10px] font-normal text-gray-400 dark:text-gray-500"
+            >
+              [{Taniwha.ThrottleStore.bytes_to_display(@upload_limit)}]
+            </span>
+          </button>
+          <.throttle_context_menu
+            :if={@throttle_menu == :upload}
+            direction={:upload}
+            current_limit={@upload_limit}
+            presets={@presets}
+            custom_input={@custom_input}
+          />
+        </div>
       </div>
 
       <%!-- Separator --%>
@@ -399,4 +471,20 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
     {dot, _bg, _text} = Taniwha.LabelStore.auto_assign(label)
     dot
   end
+
+  @spec dl_indicator_label(non_neg_integer(), non_neg_integer()) :: String.t()
+  defp dl_indicator_label(rate, 0),
+    do: "Download: #{format_speed(rate)}. Right-click to set limit."
+
+  defp dl_indicator_label(rate, limit),
+    do:
+      "Download: #{format_speed(rate)}, limit: #{Taniwha.ThrottleStore.bytes_to_display(limit)}. Right-click to change."
+
+  @spec ul_indicator_label(non_neg_integer(), non_neg_integer()) :: String.t()
+  defp ul_indicator_label(rate, 0),
+    do: "Upload: #{format_speed(rate)}. Right-click to set limit."
+
+  defp ul_indicator_label(rate, limit),
+    do:
+      "Upload: #{format_speed(rate)}, limit: #{Taniwha.ThrottleStore.bytes_to_display(limit)}. Right-click to change."
 end

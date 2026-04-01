@@ -11,7 +11,7 @@ defmodule TaniwhaWeb.DashboardLive do
   use TaniwhaWeb.TorrentComponents
   import TaniwhaWeb.FormatHelpers, only: [format_add_error: 1, maybe_add_directory: 2]
 
-  alias Taniwha.{State.Store, Torrent}
+  alias Taniwha.{State.Store, ThrottleStore, Torrent}
   alias Phoenix.LiveView.AsyncResult
 
   @commands Application.compile_env(:taniwha, :commands, Taniwha.Commands)
@@ -27,6 +27,7 @@ defmodule TaniwhaWeb.DashboardLive do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Taniwha.PubSub, "torrents:list")
       Phoenix.PubSub.subscribe(Taniwha.PubSub, "system:status")
+      Phoenix.PubSub.subscribe(Taniwha.PubSub, "throttle:settings")
     end
 
     socket =
@@ -59,6 +60,11 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign(:downloads_dir_configured?, Application.get_env(:taniwha, :downloads_dir) != nil)
       |> assign_global_stats(torrents)
       |> assign(:status_counts, status_counts(torrents))
+      |> assign(:download_limit, ThrottleStore.get_download_limit())
+      |> assign(:upload_limit, ThrottleStore.get_upload_limit())
+      |> assign(:presets, ThrottleStore.get_presets())
+      |> assign(:throttle_menu, nil)
+      |> assign(:custom_input, false)
 
     {:ok, socket}
   end
@@ -105,6 +111,14 @@ defmodule TaniwhaWeb.DashboardLive do
       end
 
     {:noreply, assign(socket, :connection_status, :connected)}
+  end
+
+  def handle_info({:throttle_updated, %{download_limit: dl, upload_limit: ul}}, socket) do
+    {:noreply, socket |> assign(:download_limit, dl) |> assign(:upload_limit, ul)}
+  end
+
+  def handle_info({:presets_updated, presets}, socket) do
+    {:noreply, assign(socket, :presets, presets)}
   end
 
   def handle_info({:add_torrent_success}, socket) do
@@ -423,8 +437,83 @@ defmodule TaniwhaWeb.DashboardLive do
     {:noreply, socket}
   end
 
+  def handle_event("open_throttle_menu", %{"direction" => dir}, socket) do
+    {:noreply,
+     socket
+     |> assign(:throttle_menu, parse_direction(dir))
+     |> assign(:custom_input, false)}
+  end
+
+  def handle_event("close_throttle_menu", _params, socket) do
+    {:noreply, socket |> assign(:throttle_menu, nil) |> assign(:custom_input, false)}
+  end
+
+  def handle_event("set_throttle_limit", %{"direction" => dir, "bytes" => bytes_str}, socket) do
+    with {bytes, ""} <- Integer.parse(bytes_str),
+         true <- bytes >= 0 do
+      set_fn =
+        if dir == "download",
+          do: &ThrottleStore.set_download_limit/1,
+          else: &ThrottleStore.set_upload_limit/1
+
+      case set_fn.(bytes) do
+        :ok ->
+          assign_key = if dir == "download", do: :download_limit, else: :upload_limit
+
+          {:noreply,
+           socket
+           |> assign(assign_key, bytes)
+           |> assign(:throttle_menu, nil)
+           |> assign(:custom_input, false)}
+
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to set limit: #{inspect(reason)}")}
+      end
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Invalid bytes value")}
+    end
+  end
+
+  def handle_event("show_custom_input", _params, socket) do
+    {:noreply, assign(socket, :custom_input, true)}
+  end
+
+  def handle_event(
+        "apply_custom_limit",
+        %{"direction" => dir, "value" => val, "unit" => unit},
+        socket
+      ) do
+    case parse_custom_limit(val, unit) do
+      {:ok, bytes} ->
+        set_fn =
+          if dir == "download",
+            do: &ThrottleStore.set_download_limit/1,
+            else: &ThrottleStore.set_upload_limit/1
+
+        case set_fn.(bytes) do
+          :ok ->
+            assign_key = if dir == "download", do: :download_limit, else: :upload_limit
+
+            {:noreply,
+             socket
+             |> assign(assign_key, bytes)
+             |> assign(:throttle_menu, nil)
+             |> assign(:custom_input, false)}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to set limit: #{inspect(reason)}")}
+        end
+
+      {:error, :invalid_value} ->
+        {:noreply, put_flash(socket, :error, "Invalid limit value — enter a positive number")}
+    end
+  end
+
   def handle_event("keydown", %{"key" => "Escape"}, socket) do
     cond do
+      socket.assigns.throttle_menu != nil ->
+        {:noreply, socket |> assign(:throttle_menu, nil) |> assign(:custom_input, false)}
+
       socket.assigns.confirm_action != nil ->
         {:noreply, assign(socket, :confirm_action, nil)}
 
@@ -754,6 +843,23 @@ defmodule TaniwhaWeb.DashboardLive do
     case Enum.find(torrents, &(&1.hash == hash)) do
       nil -> nil
       torrent -> torrent.base_path
+    end
+  end
+
+  @spec parse_direction(String.t()) :: :upload | :download
+  defp parse_direction("upload"), do: :upload
+  defp parse_direction(_), do: :download
+
+  @spec parse_custom_limit(String.t(), String.t()) ::
+          {:ok, non_neg_integer()} | {:error, :invalid_value}
+  defp parse_custom_limit(val, unit) do
+    case Float.parse(String.trim(val)) do
+      {v, ""} when v > 0 ->
+        multiplier = if unit == "mib_s", do: 1_048_576, else: 1_024
+        {:ok, round(v * multiplier)}
+
+      _ ->
+        {:error, :invalid_value}
     end
   end
 

@@ -220,7 +220,8 @@
 }
 
 /* Context menu hover — rule lives here so it works when the menu is appended to <body> */
-[role="menu"] [role="menuitem"]:hover {
+[role="menu"] [role="menuitem"]:hover,
+[role="menu"] [role="menuitemradio"]:hover {
   background: var(--taniwha-hover-bg) !important;
 }
 

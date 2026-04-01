@@ -22,6 +22,7 @@ defmodule TaniwhaWeb.TorrentComponents do
       import TaniwhaWeb.TorrentComponents.TableComponents
       import TaniwhaWeb.TorrentComponents.DetailComponents
       import TaniwhaWeb.TorrentComponents.Dialogs
+      import TaniwhaWeb.TorrentComponents.ThrottleComponents
     end
   end
 end

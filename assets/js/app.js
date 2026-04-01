@@ -146,11 +146,70 @@ const PasskeyLogin = {
   },
 }
 
+// ThrottleMenu: handles left-click on a speed indicator and click-outside to close.
+const ThrottleMenu = {
+  mounted() {
+    const direction = this.el.dataset.direction
+
+    this.contextmenu = (e) => {
+      e.preventDefault()
+      this.pushEvent("open_throttle_menu", {direction})
+    }
+    this.el.addEventListener("contextmenu", this.contextmenu)
+
+    this.clickOutside = (e) => {
+      if (!this.el.contains(e.target)) {
+        this.pushEvent("close_throttle_menu", {})
+      }
+    }
+    document.addEventListener("click", this.clickOutside)
+  },
+  destroyed() {
+    this.el.removeEventListener("contextmenu", this.contextmenu)
+    document.removeEventListener("click", this.clickOutside)
+  }
+}
+
+// ThrottleFocus: on mount focuses the active or first menu item; arrow keys navigate items.
+const ThrottleFocus = {
+  mounted() {
+    const items = () => Array.from(this.el.querySelectorAll('[role="menuitem"],[role="menuitemradio"]'))
+    const active = items().find(el => el.getAttribute("aria-checked") === "true")
+    ;(active || items()[0])?.focus()
+
+    this.keydown = (e) => {
+      const all = items()
+      const idx = all.indexOf(document.activeElement)
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        all[(idx + 1) % all.length]?.focus()
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault()
+        all[(idx - 1 + all.length) % all.length]?.focus()
+      } else if (e.key === "Enter" && idx >= 0) {
+        e.preventDefault()
+        all[idx].click()
+      }
+    }
+    this.el.addEventListener("keydown", this.keydown)
+  },
+  destroyed() {
+    this.el.removeEventListener("keydown", this.keydown)
+  }
+}
+
+// ThrottleFocusInput: auto-focuses the custom limit text input when it appears.
+const ThrottleFocusInput = {
+  mounted() {
+    this.el.focus()
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, UserMenu, PasskeyRegister, PasskeyLogin},
+  hooks: {...colocatedHooks, UserMenu, PasskeyRegister, PasskeyLogin, ThrottleMenu, ThrottleFocus, ThrottleFocusInput},
 })
 
 // Show progress bar on live navigation and form submits
