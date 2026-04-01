@@ -157,11 +157,7 @@ defmodule Taniwha.ThrottleStore do
     GenServer.call(server, {:set_presets, presets})
   end
 
-  @doc """
-  Resets ETS to defaults without touching rtorrent or the file on disk.
-
-  Intended for use in tests to restore a known state between test cases.
-  """
+  @doc false
   @spec reset(GenServer.server()) :: :ok
   def reset(server \\ __MODULE__) do
     GenServer.call(server, :reset)
@@ -296,27 +292,32 @@ defmodule Taniwha.ThrottleStore do
   @spec load_from_file(String.t()) ::
           {non_neg_integer(), non_neg_integer(), [preset()], boolean()}
   defp load_from_file(path) do
-    if File.exists?(path) do
-      with {:ok, json} <- File.read(path),
-           {:ok, parsed} <- Jason.decode(json),
-           {:ok, data} <- validate_json(parsed) do
-        presets =
-          Enum.map(data["presets"], fn p ->
-            %{
-              value: p["value"],
-              unit: String.to_existing_atom(p["unit"]),
-              label: p["label"]
-            }
-          end)
+    case File.read(path) do
+      {:ok, json} ->
+        with {:ok, parsed} <- Jason.decode(json),
+             {:ok, data} <- validate_json(parsed) do
+          presets =
+            Enum.map(data["presets"], fn p ->
+              %{
+                value: p["value"],
+                unit: String.to_existing_atom(p["unit"]),
+                label: p["label"]
+              }
+            end)
 
-        {data["download_limit"], data["upload_limit"], presets, true}
-      else
-        _ ->
-          Logger.warning("ThrottleStore: could not parse #{path}, using defaults")
-          {0, 0, @default_presets, false}
-      end
-    else
-      {0, 0, @default_presets, false}
+          {data["download_limit"], data["upload_limit"], presets, true}
+        else
+          _ ->
+            Logger.warning("ThrottleStore: could not parse #{path}, using defaults")
+            {0, 0, @default_presets, false}
+        end
+
+      {:error, :enoent} ->
+        {0, 0, @default_presets, false}
+
+      {:error, reason} ->
+        Logger.warning("ThrottleStore: could not read #{path}", reason: inspect(reason))
+        {0, 0, @default_presets, false}
     end
   end
 
@@ -392,11 +393,11 @@ defmodule Taniwha.ThrottleStore do
   defp validate_presets(presets) do
     valid_units = [:kib_s, :mib_s]
 
-    with :ok <- check_all(presets, fn p -> p[:unit] in valid_units end, :invalid_unit),
+    with :ok <- check_all(presets, fn p -> p.unit in valid_units end, :invalid_unit),
          :ok <-
            check_all(
              presets,
-             fn p -> is_integer(p[:value]) and p[:value] > 0 end,
+             fn p -> is_integer(p.value) and p.value > 0 end,
              :invalid_value
            ),
          bytes_list = Enum.map(presets, &preset_to_bytes/1),
