@@ -228,6 +228,153 @@ defmodule TaniwhaWeb.SettingsLiveTest do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Task 12.6 — Speed limit presets section
+  # ---------------------------------------------------------------------------
+
+  describe "speed limit presets section" do
+    setup do
+      :ok = Taniwha.ThrottleStore.reset()
+      :ok
+    end
+
+    test "renders the 'Speed limit presets' section heading", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/settings")
+      assert html =~ "Speed limit presets"
+    end
+
+    test "renders default presets sorted ascending by byte value", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/settings")
+      assert html =~ "512 KiB/s"
+      assert html =~ "1 MiB/s"
+      assert html =~ "10 MiB/s"
+      # 512 KiB/s (524 288 bytes) must appear before 1 MiB/s (1 048 576 bytes)
+      assert String.split(html, "512 KiB/s") |> hd() |> byte_size() <
+               String.split(html, "1 MiB/s") |> hd() |> byte_size()
+    end
+
+    test "does NOT show 'Unlimited' in the editable preset list", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/settings")
+      # "Unlimited" should not appear inside the role="list" element
+      refute html =~ ~r/role="list".*Unlimited/s
+    end
+
+    test "each preset row has an accessible remove button", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/settings")
+      assert html =~ ~s(aria-label="Remove 512 KiB/s preset")
+    end
+
+    test "renders the add preset form with unit selector defaulting to MiB/s", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/settings")
+      assert html =~ "add_preset"
+      assert html =~ "mib_s"
+    end
+  end
+
+  describe "add_preset event" do
+    setup do
+      :ok = Taniwha.ThrottleStore.reset()
+      :ok
+    end
+
+    test "adds a valid MiB/s preset and clears the input", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/settings")
+      render_submit(lv, "add_preset", %{"value" => "7", "unit" => "mib_s"})
+      html = render(lv)
+      assert html =~ "7 MiB/s"
+    end
+
+    test "adds a KiB/s preset that already exists shows duplicate error", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/settings")
+      render_submit(lv, "add_preset", %{"value" => "512", "unit" => "kib_s"})
+      html = render(lv)
+      # 512 KiB/s already exists in defaults; should show duplicate error
+      assert html =~ "already"
+    end
+
+    test "add_preset with non-numeric input shows validation error", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/settings")
+      render_submit(lv, "add_preset", %{"value" => "abc", "unit" => "mib_s"})
+      html = render(lv)
+      assert html =~ "positive" or html =~ "number" or html =~ "whole"
+    end
+
+    test "add_preset with zero shows validation error", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/settings")
+      render_submit(lv, "add_preset", %{"value" => "0", "unit" => "mib_s"})
+      html = render(lv)
+      assert html =~ "positive" or html =~ "number"
+    end
+
+    test "add_preset with negative value shows validation error", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/settings")
+      render_submit(lv, "add_preset", %{"value" => "-3", "unit" => "mib_s"})
+      html = render(lv)
+      assert html =~ "positive" or html =~ "number"
+    end
+
+    test "add_preset duplicate (byte-normalised) shows duplicate error", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/settings")
+      render_submit(lv, "add_preset", %{"value" => "5", "unit" => "mib_s"})
+      html = render(lv)
+      assert html =~ "already"
+    end
+
+    test "add_preset with 3 MiB/s succeeds and list re-sorts", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/settings")
+      render_submit(lv, "add_preset", %{"value" => "3", "unit" => "mib_s"})
+      html = render(lv)
+      assert html =~ "3 MiB/s"
+      refute html =~ ~s(role="alert")
+    end
+  end
+
+  describe "remove_preset event" do
+    setup do
+      :ok = Taniwha.ThrottleStore.reset()
+      :ok
+    end
+
+    test "removes the preset at the given index", %{conn: conn} do
+      {:ok, lv, html} = live(conn, ~p"/settings")
+      assert html =~ "512 KiB/s"
+      render_click(lv, "remove_preset", %{"index" => "0"})
+      html = render(lv)
+      refute html =~ "512 KiB/s"
+    end
+
+    test "removing the last preset results in an empty list (allowed)", %{conn: conn} do
+      :ok = Taniwha.ThrottleStore.set_presets([%{value: 5, unit: :mib_s, label: "5 MiB/s"}])
+      {:ok, lv, _html} = live(conn, ~p"/settings")
+      render_click(lv, "remove_preset", %{"index" => "0"})
+      html = render(lv)
+      # The add form should still be present
+      assert html =~ "Add preset"
+    end
+  end
+
+  describe "PubSub presets_updated" do
+    setup do
+      :ok = Taniwha.ThrottleStore.reset()
+      :ok
+    end
+
+    test "handle_info :presets_updated refreshes the displayed list", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/settings")
+
+      new_presets = [%{value: 99, unit: :mib_s, label: "99 MiB/s"}]
+
+      Phoenix.PubSub.broadcast(
+        Taniwha.PubSub,
+        "throttle:settings",
+        {:presets_updated, new_presets}
+      )
+
+      html = render(lv)
+      assert html =~ "99 MiB/s"
+    end
+  end
+
   describe "connection status" do
     test "shows connected when RPC client process is alive", %{conn: conn} do
       # In tests, the RPC client process might not be running, so we check

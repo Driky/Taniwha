@@ -151,6 +151,120 @@ defmodule TaniwhaWeb.TorrentComponents.ThrottleComponents do
     """
   end
 
+  @doc """
+  Renders the preset list editor used in the Settings page.
+
+  ## Attributes
+
+  - `:presets` (required) — list of preset maps (already sorted ascending by bytes)
+  - `:new_value` (required) — current value string in the add-preset input
+  - `:new_unit` (required) — current unit selection (`"mib_s"` or `"kib_s"`)
+  - `:error` — validation error string or `nil`
+  """
+  attr :presets, :list, required: true
+  attr :new_value, :string, required: true
+  attr :new_unit, :string, required: true
+  attr :error, :string, default: nil
+
+  def preset_editor(assigns) do
+    ~H"""
+    <%!-- Preset list --%>
+    <ul role="list" class="border-t border-gray-100 dark:border-[#2d3748] mt-3">
+      <li
+        :for={{preset, idx} <- Enum.with_index(@presets)}
+        class="border-b border-gray-100 dark:border-[#2d3748] px-4 py-[10px] flex items-center gap-2.5"
+      >
+        <svg
+          class="w-3.5 h-3.5 flex-shrink-0"
+          fill="none"
+          stroke="#9ca3af"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M13 10V3L4 14h7v7l9-11h-7z"
+          />
+        </svg>
+        <span class="flex-1 text-[11px] font-medium text-gray-900 dark:text-gray-100">
+          {preset.label}
+        </span>
+        <button
+          type="button"
+          phx-click="remove_preset"
+          phx-value-index={idx}
+          aria-label={"Remove #{preset.label} preset"}
+          class="w-[26px] h-[26px] rounded border-none bg-transparent cursor-pointer
+                 flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity"
+        >
+          <svg
+            class="w-[13px] h-[13px]"
+            fill="none"
+            stroke="#ef4444"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858
+                 L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+        </button>
+      </li>
+    </ul>
+    <%!-- Add preset footer --%>
+    <div class="px-4 py-[10px] border-t border-gray-100 dark:border-[#2d3748]">
+      <label
+        for="preset-value-input"
+        class="text-[11px] font-medium text-gray-700 dark:text-gray-300 block mb-1.5"
+      >
+        Add preset
+      </label>
+      <form phx-submit="add_preset" class="flex items-center gap-1.5">
+        <input
+          id="preset-value-input"
+          type="text"
+          name="value"
+          value={@new_value}
+          placeholder="e.g., 5"
+          phx-change="update_new_preset"
+          aria-label="Speed value"
+          aria-describedby={if @error, do: "preset-error", else: nil}
+          class="w-16 h-[26px] px-2 text-[11px] border border-gray-200 dark:border-gray-700
+                 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300
+                 outline-none text-right"
+        />
+        <select
+          name="unit"
+          aria-label="Unit"
+          phx-change="update_new_unit"
+          class="h-[26px] px-1.5 text-[11px] border border-gray-200 dark:border-gray-700
+                 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300
+                 outline-none cursor-pointer"
+        >
+          <option value="mib_s" selected={@new_unit == "mib_s"}>MiB/s</option>
+          <option value="kib_s" selected={@new_unit == "kib_s"}>KiB/s</option>
+        </select>
+        <button
+          type="submit"
+          class="h-[26px] px-3 text-[11px] font-medium bg-blue-600 text-white
+                 border-none rounded-md cursor-pointer"
+        >
+          Add
+        </button>
+      </form>
+      <p :if={@error} id="preset-error" role="alert" class="mt-1.5 text-[10px] text-red-500">
+        {@error}
+      </p>
+    </div>
+    """
+  end
+
   @spec menu_label(:download | :upload) :: String.t()
   defp menu_label(:download), do: "Download limit"
   defp menu_label(:upload), do: "Upload limit"

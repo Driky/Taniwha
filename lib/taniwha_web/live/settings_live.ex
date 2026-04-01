@@ -8,10 +8,16 @@ defmodule TaniwhaWeb.SettingsLive do
 
   use TaniwhaWeb, :live_view
 
+  import TaniwhaWeb.TorrentComponents.ThrottleComponents
+
   alias Taniwha.Auth.{CredentialStore, WebAuthn}
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Taniwha.PubSub, "throttle:settings")
+    end
+
     {:ok,
      socket
      |> assign(:page_title, "Settings")
@@ -21,7 +27,11 @@ defmodule TaniwhaWeb.SettingsLive do
      |> assign(:connection_status, check_connection())
      |> assign(:passkeys, socket.assigns.current_user.passkeys)
      |> assign(:passkey_error, nil)
-     |> assign(:reg_challenge, nil)}
+     |> assign(:reg_challenge, nil)
+     |> assign(:presets, Taniwha.ThrottleStore.get_presets() |> sort_presets())
+     |> assign(:new_preset_value, "")
+     |> assign(:new_preset_unit, "mib_s")
+     |> assign(:preset_error, nil)}
   end
 
   @impl true
@@ -92,6 +102,62 @@ defmodule TaniwhaWeb.SettingsLive do
     {:noreply, assign(socket, :passkeys, updated_user.passkeys)}
   end
 
+  def handle_event("add_preset", %{"value" => raw, "unit" => unit_str}, socket) do
+    trimmed = String.trim(raw)
+
+    case Integer.parse(trimmed) do
+      {n, ""} when n > 0 ->
+        unit = String.to_existing_atom(unit_str)
+        new_preset = %{value: n, unit: unit, label: "#{n} #{unit_label(unit)}"}
+        new_bytes = Taniwha.ThrottleStore.preset_to_bytes(new_preset)
+
+        existing_bytes =
+          Enum.map(socket.assigns.presets, &Taniwha.ThrottleStore.preset_to_bytes/1)
+
+        if new_bytes in existing_bytes do
+          {:noreply, assign(socket, :preset_error, "This speed is already in your presets")}
+        else
+          updated = sort_presets([new_preset | socket.assigns.presets])
+
+          case Taniwha.ThrottleStore.set_presets(updated) do
+            :ok ->
+              {:noreply,
+               assign(socket, presets: updated, new_preset_value: "", preset_error: nil)}
+
+            {:error, reason} ->
+              {:noreply, assign(socket, :preset_error, "Error: #{inspect(reason)}")}
+          end
+        end
+
+      _ ->
+        {:noreply, assign(socket, :preset_error, "Value must be a positive whole number")}
+    end
+  end
+
+  def handle_event("remove_preset", %{"index" => idx_str}, socket) do
+    idx = String.to_integer(idx_str)
+    updated = List.delete_at(socket.assigns.presets, idx)
+    Taniwha.ThrottleStore.set_presets(updated)
+    {:noreply, assign(socket, :presets, updated)}
+  end
+
+  def handle_event("update_new_preset", %{"value" => v}, socket) do
+    {:noreply, socket |> assign(:new_preset_value, v) |> assign(:preset_error, nil)}
+  end
+
+  def handle_event("update_new_unit", %{"unit" => u}, socket) do
+    {:noreply, assign(socket, :new_preset_unit, u)}
+  end
+
+  @impl true
+  def handle_info({:presets_updated, presets}, socket) do
+    {:noreply, assign(socket, presets: sort_presets(presets), preset_error: nil)}
+  end
+
+  def handle_info({:throttle_updated, _limits}, socket) do
+    {:noreply, socket}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -141,6 +207,30 @@ defmodule TaniwhaWeb.SettingsLive do
               {if @connection_status == :ok, do: "Connected", else: "Not connected"}
             </span>
           </div>
+        </div>
+
+        <%!-- Speed limit presets section --%>
+        <div
+          class="mb-5 rounded-[10px] border bg-white dark:bg-[#1a1f2e]"
+          style="border-color: #e5e7eb"
+        >
+          <div class="px-5 py-[14px] border-b" style="border-color: #f3f4f6">
+            <h2 class="text-[13px] font-semibold text-gray-900 dark:text-gray-100">
+              Speed limit presets
+            </h2>
+          </div>
+          <div class="px-4 pt-3">
+            <p class="text-[11px] text-gray-500 leading-relaxed m-0">
+              Customise the speed options shown when right-clicking the transfer stats
+              in the topbar. These presets apply to both upload and download menus.
+            </p>
+          </div>
+          <.preset_editor
+            presets={@presets}
+            new_value={@new_preset_value}
+            new_unit={@new_preset_unit}
+            error={@preset_error}
+          />
         </div>
 
         <%!-- API Key section --%>
@@ -382,4 +472,13 @@ defmodule TaniwhaWeb.SettingsLive do
       {"Taniwha", info.taniwha}
     ]
   end
+
+  @spec sort_presets([Taniwha.ThrottleStore.preset()]) :: [Taniwha.ThrottleStore.preset()]
+  defp sort_presets(presets) do
+    Enum.sort_by(presets, &Taniwha.ThrottleStore.preset_to_bytes/1)
+  end
+
+  @spec unit_label(:kib_s | :mib_s) :: String.t()
+  defp unit_label(:kib_s), do: "KiB/s"
+  defp unit_label(:mib_s), do: "MiB/s"
 end
