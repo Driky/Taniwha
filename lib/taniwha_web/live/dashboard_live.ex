@@ -437,7 +437,13 @@ defmodule TaniwhaWeb.DashboardLive do
     {:noreply, socket}
   end
 
-  def handle_event("submit_file", _params, socket) do
+  def handle_event("submit_file", params, socket) do
+    dir =
+      case Map.get(params, "download_dir", "") do
+        "" -> nil
+        d -> d
+      end
+
     results =
       consume_uploaded_entries(socket, :torrent_file, fn %{path: path}, _entry ->
         File.read(path)
@@ -445,7 +451,7 @@ defmodule TaniwhaWeb.DashboardLive do
 
     case results do
       [binary] when is_binary(binary) ->
-        case @commands.load_raw(binary, []) do
+        case @commands.load_raw(binary, maybe_add_directory([], dir)) do
           :ok ->
             {:noreply,
              socket
@@ -792,6 +798,10 @@ defmodule TaniwhaWeb.DashboardLive do
         "Torrent path: #{torrent_path}. Configured directory: #{configured_dir}."
 
   defp format_erase_error(reason), do: "Failed to remove: #{inspect(reason)}"
+
+  @spec maybe_add_directory(keyword(), String.t() | nil) :: keyword()
+  defp maybe_add_directory(opts, nil), do: opts
+  defp maybe_add_directory(opts, dir), do: Keyword.put(opts, :directory, dir)
 
   @spec find_base_path([Torrent.t()], String.t()) :: String.t() | nil
   defp find_base_path(torrents, hash) do

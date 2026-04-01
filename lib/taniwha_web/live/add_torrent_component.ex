@@ -23,7 +23,12 @@ defmodule TaniwhaWeb.AddTorrentComponent do
      |> assign(:loading, false)
      |> assign(:error, nil)
      |> assign(:selected_label, nil)
-     |> assign(:label_groups, [])}
+     |> assign(:label_groups, [])
+     |> assign(:download_dir, Taniwha.FileSystem.default_download_dir())
+     |> assign(:dir_browser_open, false)
+     |> assign(:dir_browser_path, nil)
+     |> assign(:dir_browser_entries, [])
+     |> assign(:dir_browser_parent, nil)}
   end
 
   @impl true
@@ -47,6 +52,52 @@ defmodule TaniwhaWeb.AddTorrentComponent do
     {:noreply, assign(socket, :selected_label, selected)}
   end
 
+  def handle_event("open_dir_browser", _params, socket) do
+    base = Taniwha.FileSystem.default_download_dir()
+
+    if base do
+      {:ok, entries} = Taniwha.FileSystem.list_directories(base, base)
+
+      {:noreply,
+       socket
+       |> assign(:dir_browser_open, true)
+       |> assign(:dir_browser_path, base)
+       |> assign(:dir_browser_entries, entries)
+       |> assign(:dir_browser_parent, nil)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("browse_to", %{"path" => path}, socket) do
+    base = Taniwha.FileSystem.default_download_dir()
+
+    case Taniwha.FileSystem.list_directories(path, base) do
+      {:ok, entries} ->
+        parent = if path == base, do: nil, else: Path.dirname(path)
+
+        {:noreply,
+         socket
+         |> assign(:dir_browser_path, path)
+         |> assign(:dir_browser_entries, entries)
+         |> assign(:dir_browser_parent, parent)}
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("select_dir", %{"path" => path}, socket) do
+    {:noreply,
+     socket
+     |> assign(:download_dir, path)
+     |> assign(:dir_browser_open, false)}
+  end
+
+  def handle_event("close_dir_browser", _params, socket) do
+    {:noreply, assign(socket, :dir_browser_open, false)}
+  end
+
   def handle_event("submit_url", %{"url" => url}, socket) do
     url = String.trim(url)
 
@@ -56,7 +107,11 @@ defmodule TaniwhaWeb.AddTorrentComponent do
 
       :ok ->
         socket = assign(socket, :loading, true)
-        opts = label_opt(socket.assigns.selected_label)
+
+        opts =
+          socket.assigns.selected_label
+          |> label_opt()
+          |> maybe_add_directory(socket.assigns.download_dir)
 
         case @commands.load_url(url, opts) do
           :ok ->
@@ -249,6 +304,7 @@ defmodule TaniwhaWeb.AddTorrentComponent do
                 phx-drop-target={@file_uploads.torrent_file.ref}
                 class="flex flex-col items-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-[10px] text-center"
               >
+                <input type="hidden" name="download_dir" value={@download_dir || ""} />
                 <label
                   for={@file_uploads.torrent_file.ref}
                   class="flex flex-col items-center w-full px-5 py-8 cursor-pointer"
@@ -338,6 +394,10 @@ defmodule TaniwhaWeb.AddTorrentComponent do
   @spec label_opt(String.t() | nil) :: keyword()
   defp label_opt(nil), do: []
   defp label_opt(label), do: [label: label]
+
+  @spec maybe_add_directory(keyword(), String.t() | nil) :: keyword()
+  defp maybe_add_directory(opts, nil), do: opts
+  defp maybe_add_directory(opts, dir), do: Keyword.put(opts, :directory, dir)
 
   @spec upload_error_to_string(atom()) :: String.t()
   defp upload_error_to_string(:too_large), do: "File is too large (max 10 MB)."

@@ -8,6 +8,10 @@ defmodule Taniwha.FileSystem do
   directory. On rejection the error tuple includes both the resolved path and
   the configured directory to make volume-mount misconfigurations easier to
   diagnose.
+
+  The `list_directories/2` function returns immediate subdirectories of a path,
+  restricted to within `base_dir`. Symlinks are skipped (via `File.lstat/1`)
+  to prevent escaping the base directory through symlink traversal.
   """
 
   @doc """
@@ -41,18 +45,115 @@ defmodule Taniwha.FileSystem do
   def safe_delete(path, base_dir) do
     resolved = Path.expand(path)
     expanded_base = Path.expand(base_dir)
-    base_with_sep = expanded_base <> "/"
-    resolved_with_sep = resolved <> "/"
 
     cond do
       resolved == expanded_base ->
         {:error, {:path_outside_downloads_dir, resolved, expanded_base}}
 
-      not String.starts_with?(resolved_with_sep, base_with_sep) ->
+      not within_base_dir?(resolved, expanded_base) ->
         {:error, {:path_outside_downloads_dir, resolved, expanded_base}}
 
       true ->
         File.rm_rf(resolved) |> normalize_rm_result()
+    end
+  end
+
+  @doc """
+  Lists immediate subdirectories of `path`, restricted to within `base_dir`.
+
+  Returns `{:ok, entries}` where each entry is a map with:
+
+    * `:name` — the directory name (basename only)
+    * `:path` — the absolute path to the directory
+    * `:has_children` — `true` if the directory contains at least one subdirectory
+
+  Symlinks are skipped silently (uses `File.lstat/1`, which does not follow
+  symlinks). Only entries of type `:directory` are included.
+
+  Returns one of the following errors:
+
+    * `{:error, :invalid_path}` — path is an empty string
+    * `{:error, {:path_outside_downloads_dir, resolved_path, configured_dir}}` —
+      resolved path is outside `base_dir`
+    * `{:error, posix}` — a POSIX error from `File.ls/1` (e.g. `:enoent`, `:eacces`)
+
+  ## Security notes
+
+  `Path.expand/1` resolves `..` before the prefix check. `File.lstat/1` does
+  not follow symlinks, so symlinks pointing outside `base_dir` are skipped.
+  Listing `base_dir` itself is allowed (unlike `safe_delete/2`).
+  """
+  @spec list_directories(String.t(), String.t()) ::
+          {:ok, [%{name: String.t(), path: String.t(), has_children: boolean()}]}
+          | {:error,
+             :invalid_path
+             | {:path_outside_downloads_dir, String.t(), String.t()}
+             | File.posix()}
+  def list_directories("", _base_dir), do: {:error, :invalid_path}
+
+  def list_directories(path, base_dir) do
+    resolved = Path.expand(path)
+    exp_base = Path.expand(base_dir)
+
+    if within_base_dir?(resolved, exp_base) do
+      case File.ls(resolved) do
+        {:ok, names} ->
+          entries =
+            names
+            |> Enum.sort()
+            |> Enum.reduce([], fn name, acc ->
+              full = Path.join(resolved, name)
+
+              case File.lstat(full) do
+                {:ok, %{type: :directory}} ->
+                  [%{name: name, path: full, has_children: has_subdirectories?(full)} | acc]
+
+                _ ->
+                  acc
+              end
+            end)
+            |> Enum.reverse()
+
+          {:ok, entries}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    else
+      {:error, {:path_outside_downloads_dir, resolved, exp_base}}
+    end
+  end
+
+  @doc """
+  Returns the configured downloads directory, or `nil` if not set.
+
+  Reads `Application.get_env(:taniwha, :downloads_dir)`, which is populated
+  from the `TANIWHA_DOWNLOADS_DIR` environment variable at runtime.
+  """
+  @spec default_download_dir() :: String.t() | nil
+  def default_download_dir do
+    Application.get_env(:taniwha, :downloads_dir)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers
+  # ---------------------------------------------------------------------------
+
+  @spec within_base_dir?(String.t(), String.t()) :: boolean()
+  defp within_base_dir?(resolved, expanded_base) do
+    String.starts_with?(resolved <> "/", expanded_base <> "/")
+  end
+
+  @spec has_subdirectories?(String.t()) :: boolean()
+  defp has_subdirectories?(path) do
+    case File.ls(path) do
+      {:ok, names} ->
+        Enum.any?(names, fn n ->
+          match?({:ok, %{type: :directory}}, File.lstat(Path.join(path, n)))
+        end)
+
+      _ ->
+        false
     end
   end
 
