@@ -262,6 +262,11 @@ defmodule Taniwha.ThrottleStore do
       current_ul = :ets.lookup_element(state.table, :upload_limit, 2)
 
       if dl != current_dl or ul != current_ul do
+        Logger.info("ThrottleStore: synced limits from rtorrent",
+          download_limit: dl,
+          upload_limit: ul
+        )
+
         :ets.insert(state.table, {:download_limit, dl})
         :ets.insert(state.table, {:upload_limit, ul})
         presets = :ets.lookup_element(state.table, :presets, 2)
@@ -269,8 +274,8 @@ defmodule Taniwha.ThrottleStore do
         broadcast_throttle_update(dl, ul)
       end
     else
-      {:error, reason} ->
-        Logger.debug("ThrottleStore: sync_limits failed", reason: inspect(reason))
+      other ->
+        Logger.warning("ThrottleStore: sync_limits failed", reason: inspect(other))
     end
 
     schedule_sync(state)
