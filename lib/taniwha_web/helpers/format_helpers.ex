@@ -166,4 +166,21 @@ defmodule TaniwhaWeb.FormatHelpers do
   @spec format_datetime(DateTime.t() | nil) :: String.t()
   def format_datetime(nil), do: "—"
   def format_datetime(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
+
+  @doc """
+  Conditionally adds a `:directory` key to a keyword options list.
+
+  Skips adding the key when `dir` is `nil`, empty, or equal to the configured
+  default download directory. Used when building `load_url/load_raw` options.
+  """
+  @spec maybe_add_directory(keyword(), String.t() | nil) :: keyword()
+  def maybe_add_directory(opts, dir) do
+    default = Taniwha.FileSystem.default_download_dir()
+
+    if is_nil(dir) or dir == "" or dir == default do
+      opts
+    else
+      Keyword.put(opts, :directory, dir)
+    end
+  end
 end

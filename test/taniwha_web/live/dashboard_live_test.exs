@@ -649,14 +649,16 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       assert render(lv) =~ ~s(role="dialog")
     end
 
-    test "confirm_action with bulk_erase calls Commands.erase for each hash", %{conn: conn} do
+    test "confirm_action with bulk_erase calls Commands.erase_many", %{conn: conn} do
       t1 = Fixtures.torrent_fixture("h1")
       t2 = Fixtures.torrent_fixture("h2")
       Store.put_torrent(t1)
       Store.put_torrent(t2)
 
-      expect(MockCommands, :erase, fn "h1" -> :ok end)
-      expect(MockCommands, :erase, fn "h2" -> :ok end)
+      expect(MockCommands, :erase_many, fn hashes ->
+        assert Enum.sort(hashes) == ["h1", "h2"]
+        {:ok, ["h1", "h2"], []}
+      end)
 
       {:ok, lv, _html} = live(conn, ~p"/")
       render_click(lv, "update_selection", %{"hashes" => ["h1", "h2"], "focused_hash" => "h1"})

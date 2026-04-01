@@ -10,7 +10,7 @@ defmodule TaniwhaWeb.AddTorrentComponent do
 
   use TaniwhaWeb, :live_component
 
-  import TaniwhaWeb.FormatHelpers, only: [format_add_error: 1]
+  import TaniwhaWeb.FormatHelpers, only: [format_add_error: 1, maybe_add_directory: 2]
   import TaniwhaWeb.FolderPicker, only: [folder_picker: 1]
 
   alias Taniwha.FileSystem
@@ -102,10 +102,7 @@ defmodule TaniwhaWeb.AddTorrentComponent do
              Map.put(socket.assigns.folder_picker_children, path, entries)
            )
            |> assign(:folder_picker_expanded, MapSet.put(expanded, path))
-           |> assign(
-             :folder_picker_loading,
-             MapSet.delete(socket.assigns.folder_picker_loading, path)
-           )}
+           |> assign(:folder_picker_loading, MapSet.delete(loading, path))}
 
         {:error, _} ->
           {:noreply, assign(socket, :folder_picker_loading, MapSet.delete(loading, path))}
@@ -492,17 +489,6 @@ defmodule TaniwhaWeb.AddTorrentComponent do
   @spec label_opt(String.t() | nil) :: keyword()
   defp label_opt(nil), do: []
   defp label_opt(label), do: [label: label]
-
-  @spec maybe_add_directory(keyword(), String.t() | nil) :: keyword()
-  defp maybe_add_directory(opts, dir) do
-    default = FileSystem.default_download_dir()
-
-    if is_nil(dir) or dir == "" or dir == default do
-      opts
-    else
-      Keyword.put(opts, :directory, dir)
-    end
-  end
 
   @spec upload_error_to_string(atom()) :: String.t()
   defp upload_error_to_string(:too_large), do: "File is too large (max 10 MB)."

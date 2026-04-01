@@ -46,15 +46,10 @@ defmodule Taniwha.FileSystem do
     resolved = Path.expand(path)
     expanded_base = Path.expand(base_dir)
 
-    cond do
-      resolved == expanded_base ->
-        {:error, {:path_outside_downloads_dir, resolved, expanded_base}}
-
-      not within_base_dir?(resolved, expanded_base) ->
-        {:error, {:path_outside_downloads_dir, resolved, expanded_base}}
-
-      true ->
-        File.rm_rf(resolved) |> normalize_rm_result()
+    if resolved == expanded_base or not within_base_dir?(resolved, expanded_base) do
+      {:error, {:path_outside_downloads_dir, resolved, expanded_base}}
+    else
+      File.rm_rf(resolved) |> normalize_rm_result()
     end
   end
 
@@ -101,18 +96,17 @@ defmodule Taniwha.FileSystem do
           entries =
             names
             |> Enum.sort()
-            |> Enum.reduce([], fn name, acc ->
+            |> Enum.flat_map(fn name ->
               full = Path.join(resolved, name)
 
               case File.lstat(full) do
                 {:ok, %{type: :directory}} ->
-                  [%{name: name, path: full, has_children: has_subdirectories?(full)} | acc]
+                  [%{name: name, path: full, has_children: has_subdirectories?(full)}]
 
                 _ ->
-                  acc
+                  []
               end
             end)
-            |> Enum.reverse()
 
           {:ok, entries}
 

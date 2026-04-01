@@ -9,7 +9,7 @@ defmodule TaniwhaWeb.DashboardLive do
   use TaniwhaWeb, :live_view
 
   use TaniwhaWeb.TorrentComponents
-  import TaniwhaWeb.FormatHelpers, only: [format_add_error: 1]
+  import TaniwhaWeb.FormatHelpers, only: [format_add_error: 1, maybe_add_directory: 2]
 
   alias Taniwha.{State.Store, Torrent}
   alias Phoenix.LiveView.AsyncResult
@@ -162,36 +162,19 @@ defmodule TaniwhaWeb.DashboardLive do
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_event("context_menu_action", %{"action" => "start", "hashes" => hashes}, socket) do
+  def handle_event(
+        "context_menu_action",
+        %{"action" => action, "hashes" => hashes},
+        socket
+      )
+      when action in ["start", "stop", "pause"] do
+    command_fn = lifecycle_command(action)
+
     socket =
       Enum.reduce(hashes, socket, fn hash, acc ->
-        case @commands.start(hash) do
+        case command_fn.(hash) do
           :ok -> acc
-          {:error, reason} -> put_flash(acc, :error, "Failed to start: #{inspect(reason)}")
-        end
-      end)
-
-    {:noreply, socket}
-  end
-
-  def handle_event("context_menu_action", %{"action" => "stop", "hashes" => hashes}, socket) do
-    socket =
-      Enum.reduce(hashes, socket, fn hash, acc ->
-        case @commands.stop(hash) do
-          :ok -> acc
-          {:error, reason} -> put_flash(acc, :error, "Failed to stop: #{inspect(reason)}")
-        end
-      end)
-
-    {:noreply, socket}
-  end
-
-  def handle_event("context_menu_action", %{"action" => "pause", "hashes" => hashes}, socket) do
-    socket =
-      Enum.reduce(hashes, socket, fn hash, acc ->
-        case @commands.pause(hash) do
-          :ok -> acc
-          {:error, reason} -> put_flash(acc, :error, "Failed to pause: #{inspect(reason)}")
+          {:error, reason} -> put_flash(acc, :error, "Failed to #{action}: #{inspect(reason)}")
         end
       end)
 
@@ -316,105 +299,24 @@ defmodule TaniwhaWeb.DashboardLive do
   def handle_event("confirm_action", _params, socket) do
     case socket.assigns.confirm_action do
       {:erase, hash} ->
-        case @commands.erase(hash) do
-          :ok ->
-            torrents = Enum.reject(socket.assigns.torrents, &(&1.hash == hash))
-            selected = MapSet.delete(socket.assigns.selected_hashes, hash)
-
-            socket =
-              socket
-              |> assign(:torrents, torrents)
-              |> assign(:selected_hashes, selected)
-              |> assign(:confirm_action, nil)
-              |> assign_global_stats(torrents)
-              |> assign(:status_counts, status_counts(torrents))
-              |> put_flash(:info, "Torrent removed")
-
-            {:noreply, socket}
-
-          {:error, reason} ->
-            socket =
-              socket
-              |> assign(:confirm_action, nil)
-              |> put_flash(:error, "Failed to remove: #{inspect(reason)}")
-
-            {:noreply, socket}
-        end
+        {:noreply, do_single_erase(socket, hash, &@commands.erase/1, "Torrent removed")}
 
       {:bulk_erase, hashes} ->
-        results = Enum.map(hashes, fn h -> {h, @commands.erase(h)} end)
-        succeeded = for {h, :ok} <- results, do: h
-        any_failed = length(succeeded) < length(hashes)
-
-        succeeded_set = MapSet.new(succeeded)
-        torrents = Enum.reject(socket.assigns.torrents, &MapSet.member?(succeeded_set, &1.hash))
-
-        socket =
-          socket
-          |> assign(:torrents, torrents)
-          |> assign(:selected_hashes, MapSet.new())
-          |> assign(:confirm_action, nil)
-          |> assign_global_stats(torrents)
-          |> assign(:status_counts, status_counts(torrents))
-
-        socket =
-          if any_failed do
-            put_flash(socket, :error, "Some torrents failed to remove")
-          else
-            put_flash(socket, :info, "Torrents removed")
-          end
-
-        {:noreply, socket}
+        {:ok, succeeded, _failed} = @commands.erase_many(hashes)
+        {:noreply, do_bulk_erase(socket, hashes, succeeded, "Torrents removed")}
 
       {:erase_with_data, hash, _path} ->
-        case @commands.erase_with_data(hash) do
-          :ok ->
-            torrents = Enum.reject(socket.assigns.torrents, &(&1.hash == hash))
-            selected = MapSet.delete(socket.assigns.selected_hashes, hash)
-
-            socket =
-              socket
-              |> assign(:torrents, torrents)
-              |> assign(:selected_hashes, selected)
-              |> assign(:confirm_action, nil)
-              |> assign_global_stats(torrents)
-              |> assign(:status_counts, status_counts(torrents))
-              |> put_flash(:info, "Torrent removed and files deleted")
-
-            {:noreply, socket}
-
-          {:error, reason} ->
-            socket =
-              socket
-              |> assign(:confirm_action, nil)
-              |> put_flash(:error, format_erase_error(reason))
-
-            {:noreply, socket}
-        end
+        {:noreply,
+         do_single_erase(
+           socket,
+           hash,
+           &@commands.erase_with_data/1,
+           "Torrent removed and files deleted"
+         )}
 
       {:bulk_erase_with_data, hashes, _paths} ->
         {:ok, succeeded, _failed} = @commands.erase_many_with_data(hashes)
-        any_failed = length(succeeded) < length(hashes)
-
-        succeeded_set = MapSet.new(succeeded)
-        torrents = Enum.reject(socket.assigns.torrents, &MapSet.member?(succeeded_set, &1.hash))
-
-        socket =
-          socket
-          |> assign(:torrents, torrents)
-          |> assign(:selected_hashes, MapSet.new())
-          |> assign(:confirm_action, nil)
-          |> assign_global_stats(torrents)
-          |> assign(:status_counts, status_counts(torrents))
-
-        socket =
-          if any_failed do
-            put_flash(socket, :error, "Some torrents failed to remove")
-          else
-            put_flash(socket, :info, "Torrents removed and files deleted")
-          end
-
-        {:noreply, socket}
+        {:noreply, do_bulk_erase(socket, hashes, succeeded, "Torrents removed and files deleted")}
 
       nil ->
         {:noreply, socket}
@@ -540,41 +442,20 @@ defmodule TaniwhaWeb.DashboardLive do
 
   def handle_event("keydown", _params, socket), do: {:noreply, socket}
 
-  def handle_event("bulk_start", _params, socket) do
-    any_failed =
-      Enum.any?(socket.assigns.selected_hashes, fn hash ->
-        @commands.start(hash) != :ok
-      end)
+  def handle_event("bulk_start", _params, socket),
+    do:
+      {:noreply,
+       run_bulk_lifecycle(socket, socket.assigns.selected_hashes, &@commands.start/1, "start")}
 
-    socket =
-      if any_failed, do: put_flash(socket, :error, "Some torrents failed to start"), else: socket
+  def handle_event("bulk_stop", _params, socket),
+    do:
+      {:noreply,
+       run_bulk_lifecycle(socket, socket.assigns.selected_hashes, &@commands.stop/1, "stop")}
 
-    {:noreply, socket}
-  end
-
-  def handle_event("bulk_stop", _params, socket) do
-    any_failed =
-      Enum.any?(socket.assigns.selected_hashes, fn hash ->
-        @commands.stop(hash) != :ok
-      end)
-
-    socket =
-      if any_failed, do: put_flash(socket, :error, "Some torrents failed to stop"), else: socket
-
-    {:noreply, socket}
-  end
-
-  def handle_event("bulk_pause", _params, socket) do
-    any_failed =
-      Enum.any?(socket.assigns.selected_hashes, fn hash ->
-        @commands.pause(hash) != :ok
-      end)
-
-    socket =
-      if any_failed, do: put_flash(socket, :error, "Some torrents failed to pause"), else: socket
-
-    {:noreply, socket}
-  end
+  def handle_event("bulk_pause", _params, socket),
+    do:
+      {:noreply,
+       run_bulk_lifecycle(socket, socket.assigns.selected_hashes, &@commands.pause/1, "pause")}
 
   # ---------------------------------------------------------------------------
   # Public helpers (called from template)
@@ -799,15 +680,73 @@ defmodule TaniwhaWeb.DashboardLive do
 
   defp format_erase_error(reason), do: "Failed to remove: #{inspect(reason)}"
 
-  @spec maybe_add_directory(keyword(), String.t() | nil) :: keyword()
-  defp maybe_add_directory(opts, dir) do
-    default = Taniwha.FileSystem.default_download_dir()
+  @spec lifecycle_command(String.t()) :: (String.t() -> :ok | {:error, term()})
+  defp lifecycle_command("start"), do: &@commands.start/1
+  defp lifecycle_command("stop"), do: &@commands.stop/1
+  defp lifecycle_command("pause"), do: &@commands.pause/1
 
-    if is_nil(dir) or dir == "" or dir == default do
-      opts
-    else
-      Keyword.put(opts, :directory, dir)
+  @spec run_bulk_lifecycle(
+          Phoenix.LiveView.Socket.t(),
+          MapSet.t(),
+          (String.t() -> :ok | {:error, term()}),
+          String.t()
+        ) :: Phoenix.LiveView.Socket.t()
+  defp run_bulk_lifecycle(socket, selected, command_fn, action) do
+    failed = Enum.count(selected, fn hash -> command_fn.(hash) != :ok end)
+
+    if failed > 0,
+      do: put_flash(socket, :error, "Some torrents failed to #{action}"),
+      else: socket
+  end
+
+  @spec do_single_erase(
+          Phoenix.LiveView.Socket.t(),
+          String.t(),
+          (String.t() -> :ok | {:error, term()}),
+          String.t()
+        ) :: Phoenix.LiveView.Socket.t()
+  defp do_single_erase(socket, hash, command_fn, success_msg) do
+    case command_fn.(hash) do
+      :ok ->
+        torrents = Enum.reject(socket.assigns.torrents, &(&1.hash == hash))
+        selected = MapSet.delete(socket.assigns.selected_hashes, hash)
+
+        socket
+        |> assign(:torrents, torrents)
+        |> assign(:selected_hashes, selected)
+        |> assign(:confirm_action, nil)
+        |> assign_global_stats(torrents)
+        |> assign(:status_counts, status_counts(torrents))
+        |> put_flash(:info, success_msg)
+
+      {:error, reason} ->
+        socket
+        |> assign(:confirm_action, nil)
+        |> put_flash(:error, format_erase_error(reason))
     end
+  end
+
+  @spec do_bulk_erase(
+          Phoenix.LiveView.Socket.t(),
+          [String.t()],
+          [String.t()],
+          String.t()
+        ) :: Phoenix.LiveView.Socket.t()
+  defp do_bulk_erase(socket, hashes, succeeded, success_msg) do
+    succeeded_set = MapSet.new(succeeded)
+    torrents = Enum.reject(socket.assigns.torrents, &MapSet.member?(succeeded_set, &1.hash))
+
+    socket =
+      socket
+      |> assign(:torrents, torrents)
+      |> assign(:selected_hashes, MapSet.new())
+      |> assign(:confirm_action, nil)
+      |> assign_global_stats(torrents)
+      |> assign(:status_counts, status_counts(torrents))
+
+    if length(succeeded) < length(hashes),
+      do: put_flash(socket, :error, "Some torrents failed to remove"),
+      else: put_flash(socket, :info, success_msg)
   end
 
   @spec find_base_path([Torrent.t()], String.t()) :: String.t() | nil

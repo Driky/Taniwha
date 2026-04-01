@@ -208,12 +208,7 @@ defmodule Taniwha.Commands do
   """
   @impl Taniwha.CommandsBehaviour
   @spec erase_many([String.t()]) :: {:ok, [String.t()], [String.t()]}
-  def erase_many(hashes) do
-    results = Enum.map(hashes, fn h -> {h, erase(h)} end)
-    ok = for {h, :ok} <- results, do: h
-    errors = for {h, {:error, _}} <- results, do: h
-    {:ok, ok, errors}
-  end
+  def erase_many(hashes), do: run_many(hashes, &erase/1)
 
   @doc """
   Erases multiple torrents from rtorrent and deletes their downloaded files.
@@ -222,12 +217,7 @@ defmodule Taniwha.Commands do
   """
   @impl Taniwha.CommandsBehaviour
   @spec erase_many_with_data([String.t()]) :: {:ok, [String.t()], [String.t()]}
-  def erase_many_with_data(hashes) do
-    results = Enum.map(hashes, fn h -> {h, erase_with_data(h)} end)
-    ok = for {h, :ok} <- results, do: h
-    errors = for {h, {:error, _}} <- results, do: h
-    {:ok, ok, errors}
-  end
+  def erase_many_with_data(hashes), do: run_many(hashes, &erase_with_data/1)
 
   @impl Taniwha.CommandsBehaviour
   @doc "Pauses a torrent. Returns `:ok` on success."
@@ -551,6 +541,15 @@ defmodule Taniwha.Commands do
       {:ok, path} -> {:ok, path}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  @spec run_many([String.t()], (String.t() -> :ok | {:error, term()})) ::
+          {:ok, [String.t()], [String.t()]}
+  defp run_many(hashes, command_fn) do
+    results = Enum.map(hashes, fn h -> {h, command_fn.(h)} end)
+    ok = for {h, :ok} <- results, do: h
+    errors = for {h, {:error, _}} <- results, do: h
+    {:ok, ok, errors}
   end
 
   @spec ok_on_zero({:ok, 0} | {:ok, term()} | {:error, term()}) :: :ok | {:error, term()}
