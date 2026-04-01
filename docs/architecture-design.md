@@ -51,6 +51,8 @@ Taniwha is a Phoenix application that wraps rtorrent's SCGI/XML-RPC interface be
 Taniwha.Application
 ├── Phoenix.PubSub                 # Broadcast infrastructure (name: Taniwha.PubSub)
 ├── Taniwha.RateLimiter            # ETS-backed rate limiter (GenServer)
+├── Taniwha.Auth.CredentialStore   # Passkey + API key store (GenServer)
+├── Taniwha.LabelStore             # Label colour metadata (GenServer)
 ├── Taniwha.RPC.Client             # SCGI/XML-RPC command dispatch (GenServer)
 ├── Taniwha.State.Store            # ETS table owner (GenServer)
 ├── Taniwha.State.Poller           # Periodic polling + diff engine (GenServer)
@@ -58,7 +60,7 @@ Taniwha.Application
     └── TaniwhaWeb.UserSocket      # WebSocket entry point
 ```
 
-**Startup order matters:** `Taniwha.RateLimiter` must be up before `TaniwhaWeb.Endpoint` (the first HTTP request must never arrive before the ETS table is ready). Store must start before Poller (ETS table must exist). RPC.Client must start before Poller (Poller calls RPC). The order in the supervisor child list enforces this naturally via the `one_for_one` strategy.
+**Startup order matters:** `Taniwha.RateLimiter` must be up before `TaniwhaWeb.Endpoint` (the first HTTP request must never arrive before the ETS table is ready). `Taniwha.Auth.CredentialStore` must start before `TaniwhaWeb.Endpoint` so auth routes are operational from the first HTTP request. `Taniwha.LabelStore` must start before `TaniwhaWeb.Endpoint` so label colours are available when the first LiveView renders. Store must start before Poller (ETS table must exist). RPC.Client must start before Poller (Poller calls RPC). The order in the supervisor child list enforces this naturally via the `one_for_one` strategy.
 
 ---
 
@@ -184,32 +186,35 @@ defmodule Taniwha.Torrent do
   @type t :: %__MODULE__{
     hash: String.t(),
     name: String.t(),
-    size_bytes: non_neg_integer(),
+    size: non_neg_integer(),
     completed_bytes: non_neg_integer(),
-    up_rate: non_neg_integer(),
-    down_rate: non_neg_integer(),
+    upload_rate: non_neg_integer(),
+    download_rate: non_neg_integer(),
     ratio: float(),
     state: :stopped | :started,
     is_active: boolean(),
     is_hash_checking: boolean(),
     complete: boolean(),
     peers_connected: non_neg_integer(),
-    timestamp_started: DateTime.t() | nil,
-    timestamp_finished: DateTime.t() | nil,
+    started_at: DateTime.t() | nil,
+    finished_at: DateTime.t() | nil,
     base_path: String.t() | nil,
-    files: [Taniwha.TorrentFile.t()] | nil
+    label: String.t() | nil,
+    files: list() | nil
   }
 end
 ```
+
+**`label`** is read from `d.custom1` (the de facto standard field used by ruTorrent). `diff_fields/0` includes `label` so label changes trigger PubSub broadcasts. **`files`** is typed as `list() | nil` because files are lazily loaded and not constrained to `TorrentFile.t()` at the struct level.
 
 ### 7.2 TorrentFile struct
 
 ```elixir
 defmodule Taniwha.TorrentFile do
   @type t :: %__MODULE__{
-    path: String.t(),
-    size_bytes: non_neg_integer(),
-    priority: 0..2,
+    path: String.t() | nil,
+    size: non_neg_integer(),
+    priority: non_neg_integer(),
     completed_chunks: non_neg_integer(),
     total_chunks: non_neg_integer()
   }
@@ -224,25 +229,61 @@ end
 
 **Interface:**
 
-| Function | RPC call(s) | Returns |
-|---|---|---|
-| `list_hashes(view \\ "")` | `download_list` | `{:ok, [String.t()]}` |
-| `get_torrent(hash)` | multicall of `d.*` fields | `{:ok, Torrent.t()}` |
-| `start(hash)` | `d.start` | `:ok \| {:error, term()}` |
-| `stop(hash)` | `d.stop` | `:ok \| {:error, term()}` |
-| `close(hash)` | `d.close` | `:ok \| {:error, term()}` |
-| `erase(hash)` | `d.erase` | `:ok \| {:error, term()}` |
-| `pause(hash)` | `d.pause` | `:ok \| {:error, term()}` |
-| `resume(hash)` | `d.resume` | `:ok \| {:error, term()}` |
-| `load_url(url)` | `load.start` | `:ok \| {:error, term()}` |
-| `load_raw(binary)` | `load.raw_start` | `:ok \| {:error, term()}` |
-| `list_files(hash)` | `f.multicall` | `{:ok, [TorrentFile.t()]}` |
-| `set_file_priority(hash, index, priority)` | `f.priority.set` | `:ok \| {:error, term()}` |
-| `list_peers(hash)` | `p.multicall` | `{:ok, [Peer.t()]}` |
-| `list_trackers(hash)` | `t.multicall` | `{:ok, [Tracker.t()]}` |
-| `global_up_rate()` | `throttle.global_up.rate` | `{:ok, non_neg_integer()}` |
-| `global_down_rate()` | `throttle.global_down.rate` | `{:ok, non_neg_integer()}` |
-| `system_pid()` | `system.pid` | `{:ok, term()} \| {:error, term()}` |
+| Function | RPC call(s) | Returns | Note |
+|---|---|---|---|
+| `list_hashes(view \\ "")` | `download_list` | `{:ok, [String.t()]}` | |
+| `get_torrent(hash)` | multicall of `d.*` fields | `{:ok, Torrent.t()}` | |
+| `get_all_torrents(view \\ "")` | multicall (`list_hashes` + all fields) | `{:ok, [Torrent.t()]}` | Batched — one round-trip |
+| `start(hash)` | `d.start` | `:ok \| {:error, term()}` | |
+| `stop(hash)` | `d.stop` | `:ok \| {:error, term()}` | |
+| `close(hash)` | `d.close` | `:ok \| {:error, term()}` | |
+| `erase(hash)` | `d.erase` | `:ok \| {:error, term()}` | |
+| `erase_with_data(hash)` | `d.base_path` + `d.erase` | `:ok \| {:error, term()}` | Deletes files first via FileSystem |
+| `erase_many(hashes)` | `d.erase` × N | `{:ok, ok_hashes, error_hashes}` | |
+| `erase_many_with_data(hashes)` | per-hash `erase_with_data` | `{:ok, ok_hashes, error_hashes}` | |
+| `pause(hash)` | `d.pause` | `:ok \| {:error, term()}` | |
+| `resume(hash)` | `d.resume` | `:ok \| {:error, term()}` | |
+| `load_url(url, opts \\ [])` | `load.start` | `:ok \| {:error, term()}` | opts: `:label`, `:directory` |
+| `load_raw(binary, opts \\ [])` | `load.raw_start` | `:ok \| {:error, term()}` | opts: `:label`, `:directory` |
+| `set_label(hash, label)` | `d.custom1.set` | `:ok \| {:error, term()}` | |
+| `remove_label(hash)` | `d.custom1.set` (empty) | `:ok \| {:error, term()}` | |
+| `rename_label(old, new)` | `d.custom1.set` × N | `{:ok, count} \| {:error, {ok, fail}}` | Reads ETS, no full RPC scan |
+| `get_all_labels()` | — | `[String.t()]` | ETS only, no RPC |
+| `list_files(hash)` | `f.multicall` | `{:ok, [TorrentFile.t()]}` | |
+| `set_file_priority(hash, index, priority)` | `f.priority.set` | `:ok \| {:error, term()}` | |
+| `list_peers(hash)` | `p.multicall` | `{:ok, [Peer.t()]}` | |
+| `list_trackers(hash)` | `t.multicall` | `{:ok, [Tracker.t()]}` | |
+| `global_up_rate()` | `throttle.global_up.rate` | `{:ok, non_neg_integer()}` | |
+| `global_down_rate()` | `throttle.global_down.rate` | `{:ok, non_neg_integer()}` | |
+| `system_pid()` | `system.pid` | `{:ok, term()} \| {:error, term()}` | |
+
+### 7.4 FileSystem module
+
+**Module:** `Taniwha.FileSystem` (`lib/taniwha/file_system.ex`)
+
+**Role:** Path-traversal-safe filesystem helpers. Used only by `Commands.erase_with_data/1` and the folder picker LiveComponent.
+
+- `safe_delete(path, base_dir)` — Deletes `path` only if it is strictly inside `base_dir`. Resolves `..` components before the prefix check. Returns detailed error tuples to aid volume-mount debugging. The path is not allowed to equal `base_dir` itself.
+- `list_directories(path, base_dir)` — Lists immediate subdirectories as `%{name, path, has_children}` maps. Symlinks are skipped (via `File.lstat/1`). Restricted to within `base_dir`. Listing `base_dir` itself is allowed.
+- `default_download_dir()` — Returns `Application.get_env(:taniwha, :downloads_dir)`, populated from `TANIWHA_DOWNLOADS_DIR` at runtime.
+
+### 7.5 LabelStore GenServer
+
+**Module:** `Taniwha.LabelStore` (`lib/taniwha/label_store.ex`)
+
+**Role:** Taniwha-side colour metadata for labels. Labels are plain strings in rtorrent (`d.custom1`); colour is stored here.
+
+- Maintains a 6-entry palette (pink, indigo, purple, green, blue, amber); auto-assigns the next colour when a new label is first seen. After the palette is exhausted assignment wraps around.
+- Persists to `<data_dir>/labels.json` atomically (write to `.tmp` then rename). Labels are not sensitive — no encryption required.
+- Supervised child in `Taniwha.Application`, must start before `TaniwhaWeb.Endpoint`.
+- Key functions: `auto_assign/1`, `set_color/5`, `delete/1`, `get_all/0`, `palette/0`.
+
+### 7.6 Supporting structs and utilities
+
+- **`Taniwha.Peer`** (`lib/taniwha/peer.ex`) — struct with `address`, `port`, `client_version`, `down_rate`, `up_rate`, `completed_percent`
+- **`Taniwha.Tracker`** (`lib/taniwha/tracker.ex`) — struct with `url`, `is_enabled`, `scrape_complete`, `scrape_incomplete`, `normal_interval`
+- **`Taniwha.Validator`** (`lib/taniwha/validator.ex`) — `validate_url/1` — accepts magnet links and HTTP/HTTPS URLs; rejects everything else
+- **`Taniwha.CommandsBehaviour`** (`lib/taniwha/commands_behaviour.ex`) — behaviour definition for Mox-based testing
 
 ---
 
@@ -277,7 +318,7 @@ A GenServer that runs on a configurable interval (default: 2000ms).
 4. Write changes to ETS
 5. Broadcast diffs over PubSub
 
-**Diff logic:** A torrent is "updated" if any of these fields changed: `up_rate`, `down_rate`, `completed_bytes`, `state`, `is_active`, `is_hash_checking`, `peers_connected`, `ratio`, `complete`.
+**Diff logic:** A torrent is "updated" if any of these fields changed: `upload_rate`, `download_rate`, `completed_bytes`, `state`, `is_active`, `is_hash_checking`, `peers_connected`, `ratio`, `complete`, `label`.
 
 **PubSub topics:**
 - `"torrents:list"` — receives `{:torrent_diffs, [{:added | :updated, Torrent.t()} | {:removed, hash}]}`
@@ -331,22 +372,35 @@ Clients connect to the socket with a JWT token parameter. The socket verifies th
 
 | View | Route | Description |
 |---|---|---|
-| `DashboardLive` | `/` | Torrent list, global stats, search/filter, actions |
-| `TorrentDetailLive` | `/torrents/:hash` | Files, peers, trackers, speed graph |
-| `AddTorrentLive` | `/add` | Magnet URL input + .torrent file upload |
-| `SettingsLive` | `/settings` | API key display, connection config |
+| `DashboardLive` | `/` | Torrent list with search, status/label/tracker filters, sortable columns, context menu, bulk selection, detail panel, confirm dialogs |
+| `TorrentDetailLive` | `/torrents/:hash` | Full-page detail view — files, peers, trackers, speed history |
+| `AddTorrentLive` | `/add` | Thin shell; delegates to `AddTorrentComponent` |
+| `SettingsLive` | `/settings` | Connection config, label colour management |
+| `LoginLive` | `/login` | Session login (passkey or API key) |
+| `SetupLive` | `/setup` | First-run setup wizard |
 
-LiveView subscribes to the same PubSub topics as Channels, so both stay in sync via the same diff mechanism.
+**LiveComponents (embedded, no route):**
+- `AddTorrentComponent` — modal with URL/magnet + file-upload tabs, label selector, folder picker
+- `LabelManagerComponent` — modal for renaming and deleting labels
+
+LiveView subscribes to the same PubSub topics as Channels, so both stay in sync via the same diff mechanism. Templates are inline (`render/1`) — no separate `.html.heex` files in `live/`.
 
 ---
 
 ## 10. Authentication
 
-**Module:** `Taniwha.Auth`
+The auth system supports two paths:
 
-For v1, a single API key is configured at startup via environment variable. Clients exchange the API key for a short-lived JWT (1 hour TTL) via the REST endpoint. The JWT is then used for both REST requests (Authorization header) and WebSocket connections (token parameter).
+1. **LiveView (session-based)** — users log in at `/login` and receive a secure session cookie. The `TaniwhaWeb.Plugs.AuthenticateSession` plug protects browser routes.
+2. **API + WebSocket (JWT-based)** — clients exchange credentials for a JWT via `POST /api/v1/auth/token`. The JWT is used in the `Authorization` header (REST) or as a socket param (WebSocket).
 
-Uses Guardian for JWT encoding/decoding/verification.
+**Modules:**
+
+- `Taniwha.Auth` (`lib/taniwha/auth.ex`) — Guardian callbacks, JWT encode/decode/verify
+- `Taniwha.Auth.CredentialStore` (`lib/taniwha/auth/credential_store.ex`) — GenServer that stores a hashed API key and, optionally, registered WebAuthn passkeys. Persists to `<data_dir>/credentials.json`. Must start before `TaniwhaWeb.Endpoint`.
+- `Taniwha.Auth.Encryption` (`lib/taniwha/auth/encryption.ex`) — AES-256-GCM helpers for encrypting sensitive stored values
+- `Taniwha.Auth.WebAuthn` (`lib/taniwha/auth/webauthn.ex`) — wraps the Wax library for passkey registration and authentication ceremonies
+- `TaniwhaWeb.Plugs.AuthenticateSession` (`lib/taniwha_web/plugs/authenticate_session.ex`) — session-based auth plug for LiveView browser routes
 
 ---
 
@@ -372,8 +426,10 @@ Uses Guardian for JWT encoding/decoding/verification.
 | `d.timestamp.started` | hash | integer | Unix timestamp |
 | `d.timestamp.finished` | hash | integer | Unix timestamp |
 | `d.base_path` | hash | string | Full path to download |
-| `load.start` | "", url | 0 | Add torrent by URL and start |
-| `load.raw_start` | "", binary | 0 | Add .torrent file content |
+| `d.custom1` | hash | string | Label (de facto standard, compatible with ruTorrent) |
+| `d.custom1.set` | hash, string | 0 | Set label; pass `""` to clear |
+| `load.start` | "", url [, cmd...] | 0 | Add torrent by URL and start |
+| `load.raw_start` | "", binary [, cmd...] | 0 | Add .torrent file content |
 | `f.multicall` | hash, "", fields... | nested list | Per-file data |
 | `f.path=` | (via f.multicall) | string | File path within torrent |
 | `f.size_bytes=` | (via f.multicall) | integer | File size |
@@ -391,6 +447,7 @@ Uses Guardian for JWT encoding/decoding/verification.
 - `f.multicall` field names must end with `=` (e.g., `f.path=`)
 - `f.priority.set` takes a combined hash:file-index key (e.g., `"ABCD1234:f0"`)
 - rtorrent doesn't support pipelining — each command needs its own socket connection, making `system.multicall` critical for performance
+- Post-load commands are passed as additional string arguments to `load.start` / `load.raw_start` in the form `"d.custom1.set=<label>"` or `"d.directory_base.set=<path>"`. rtorrent executes them after the torrent is loaded.
 
 ---
 
@@ -438,45 +495,75 @@ taniwha/
 │   ├── taniwha/
 │   │   ├── application.ex             # Supervision tree
 │   │   ├── auth.ex                    # Guardian + JWT logic
+│   │   ├── auth/
+│   │   │   ├── credential_store.ex    # Passkey + API key GenServer
+│   │   │   ├── encryption.ex          # AES-256-GCM helpers
+│   │   │   ├── webauthn.ex            # Wax passkey ceremonies
+│   │   │   └── wax_behaviour.ex       # Wax behaviour (Mox)
 │   │   ├── commands.ex                # High-level rtorrent commands
+│   │   ├── commands_behaviour.ex      # Behaviour definition (Mox)
+│   │   ├── file_system.ex             # Path-traversal-safe FS helpers
+│   │   ├── label_store.ex             # Label colour GenServer
+│   │   ├── peer.ex                    # Peer struct
+│   │   ├── rate_limiter.ex            # ETS-backed sliding-window rate limiter
 │   │   ├── torrent.ex                 # Torrent struct + helpers
 │   │   ├── torrent_file.ex            # TorrentFile struct
+│   │   ├── tracker.ex                 # Tracker struct
+│   │   ├── validator.ex               # URL/magnet validation
 │   │   ├── scgi/
 │   │   │   ├── connection.ex          # Behaviour definition
 │   │   │   ├── unix_connection.ex     # Unix socket implementation
 │   │   │   ├── tcp_connection.ex      # TCP implementation
-│   │   │   └── protocol.ex           # SCGI framing encode/decode
+│   │   │   ├── protocol.ex            # SCGI framing encode/decode
+│   │   │   └── socket.ex              # Shared socket helpers
 │   │   ├── xmlrpc.ex                  # XML-RPC codec
 │   │   ├── rpc/
-│   │   │   └── client.ex             # GenServer RPC client
-│   │   └── state/
-│   │       ├── store.ex              # ETS wrapper GenServer
-│   │       └── poller.ex             # Periodic diff poller
+│   │   │   ├── client.ex              # GenServer RPC client
+│   │   │   └── client_behaviour.ex    # RPC client behaviour (Mox)
+│   │   ├── state/
+│   │   │   ├── store.ex               # ETS wrapper GenServer
+│   │   │   └── poller.ex              # Periodic diff poller
+│   │   └── telemetry/
+│   │       └── metrics.ex             # Telemetry metric definitions
 │   └── taniwha_web/
 │       ├── endpoint.ex
 │       ├── router.ex
+│       ├── user_auth.ex               # Session auth helpers
 │       ├── user_socket.ex
 │       ├── channels/
 │       │   └── torrent_channel.ex
 │       ├── controllers/
-│       │   ├── auth_controller.ex
-│       │   ├── auth_json.ex
-│       │   ├── torrent_controller.ex
-│       │   └── torrent_json.ex
+│       │   ├── health_controller.ex
+│       │   ├── session_controller.ex
+│       │   └── api/
+│       │       ├── auth_controller.ex
+│       │       ├── auth_json.ex
+│       │       ├── torrent_controller.ex
+│       │       └── torrent_json.ex
+│       ├── helpers/
+│       │   └── format_helpers.ex      # Pure formatting helpers
 │       ├── plugs/
-│       │   └── authenticate_token.ex
+│       │   ├── authenticate_token.ex  # JWT auth plug (API)
+│       │   └── authenticate_session.ex # Session auth plug (LiveView)
 │       ├── live/
 │       │   ├── dashboard_live.ex
-│       │   ├── dashboard_live.html.heex
 │       │   ├── torrent_detail_live.ex
-│       │   ├── torrent_detail_live.html.heex
-│       │   ├── add_torrent_live.ex
-│       │   ├── add_torrent_live.html.heex
+│       │   ├── add_torrent_live.ex    # Thin shell → AddTorrentComponent
+│       │   ├── add_torrent_component.ex # Modal LiveComponent
+│       │   ├── label_manager_component.ex # Label rename/delete LiveComponent
 │       │   ├── settings_live.ex
-│       │   └── settings_live.html.heex
+│       │   ├── login_live.ex
+│       │   └── setup_live.ex
 │       └── components/
 │           ├── core_components.ex
-│           ├── torrent_components.ex
+│           ├── folder_picker.ex       # Reusable folder tree component
+│           ├── torrent_components.ex  # Top-level re-exports
+│           ├── torrent_components/
+│           │   ├── detail_components.ex
+│           │   ├── dialogs.ex
+│           │   ├── layout_components.ex
+│           │   ├── status_components.ex
+│           │   └── table_components.ex
 │           └── layouts/
 │               ├── root.html.heex
 │               └── app.html.heex
@@ -522,13 +609,13 @@ taniwha/
 ```elixir
 # config/config.exs
 config :taniwha,
-  rtorrent_transport: {:unix, "/var/run/rtorrent/rpc.socket"},
+  scgi_transport: {:unix, "/var/run/rtorrent/rpc.socket"},
   poll_interval: 2_000,
   rpc_timeout: 5_000
 
 # config/runtime.exs
 config :taniwha,
-  rtorrent_transport:
+  scgi_transport:
     if System.get_env("RTORRENT_SOCKET") do
       {:unix, System.get_env("RTORRENT_SOCKET")}
     else
@@ -536,7 +623,9 @@ config :taniwha,
        System.get_env("RTORRENT_HOST", "127.0.0.1"),
        String.to_integer(System.get_env("RTORRENT_PORT", "5000"))}
     end,
-  api_key: System.get_env("TANIWHA_API_KEY")
+  api_key: System.get_env("TANIWHA_API_KEY"),
+  downloads_dir: System.get_env("TANIWHA_DOWNLOADS_DIR"),
+  data_dir: System.get_env("TANIWHA_DATA_DIR", "/data/taniwha")
 ```
 
 **Environment variables:**
@@ -547,6 +636,8 @@ config :taniwha,
 | `RTORRENT_HOST` | no | `127.0.0.1` | rtorrent TCP host (used when no socket path) |
 | `RTORRENT_PORT` | no | `5000` | rtorrent TCP port |
 | `TANIWHA_API_KEY` | yes (prod) | — | API key for JWT exchange |
+| `TANIWHA_DOWNLOADS_DIR` | no | — | Enables "delete files" feature; safe-delete boundary |
+| `TANIWHA_DATA_DIR` | no | `/data/taniwha` | Directory for `credentials.json` and `labels.json` |
 | `SECRET_KEY_BASE` | yes (prod) | — | Phoenix secret |
 | `PHX_HOST` | yes (prod) | — | Public hostname |
 | `PORT` | no | `4000` | HTTP listen port |
