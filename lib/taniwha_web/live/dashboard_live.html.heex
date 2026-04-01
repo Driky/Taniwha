@@ -45,6 +45,7 @@
       visible_count={visible_count}
       selected_count={selected_count}
       total_count={@total_count}
+      downloads_dir_configured?={@downloads_dir_configured?}
     />
 
     <%!-- Table + detail panel: share vertical space --%>
@@ -57,6 +58,7 @@
         sort_dir={@sort_dir}
         selected_hashes={@selected_hashes}
         selected_hash={@selected_hash}
+        downloads_dir_configured?={@downloads_dir_configured?}
       />
 
       <%!-- Detail panel slides up from bottom --%>

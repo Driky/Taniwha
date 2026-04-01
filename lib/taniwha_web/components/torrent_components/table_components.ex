@@ -40,6 +40,7 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
   attr :visible_count, :integer, required: true
   attr :selected_count, :integer, default: 0
   attr :total_count, :integer, default: 0
+  attr :downloads_dir_configured?, :boolean, default: false
 
   def action_bar(assigns) do
     ~H"""
@@ -152,11 +153,22 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
           <button
             type="button"
             role="menuitem"
-            phx-click={
-              Phoenix.LiveView.JS.push("bulk_remove_with_data")
-              |> Phoenix.LiveView.JS.hide(to: "#remove-dropdown")
+            disabled={not @downloads_dir_configured?}
+            title={
+              unless @downloads_dir_configured?,
+                do: "Set TANIWHA_DOWNLOADS_DIR to enable this option"
             }
-            class="block w-full text-left px-4 py-2 text-[11px] hover:bg-red-50 cursor-pointer rounded-b-lg"
+            phx-click={
+              if @downloads_dir_configured? do
+                Phoenix.LiveView.JS.push("bulk_remove_with_data")
+                |> Phoenix.LiveView.JS.hide(to: "#remove-dropdown")
+              end
+            }
+            class={[
+              "block w-full text-left px-4 py-2 text-[11px] rounded-b-lg",
+              @downloads_dir_configured? && "hover:bg-red-50 cursor-pointer",
+              not @downloads_dir_configured? && "opacity-40 cursor-not-allowed"
+            ]}
             style="color: var(--taniwha-destructive, #ef4444)"
           >
             Remove torrent and delete files
@@ -531,6 +543,7 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
   attr :sort_dir, :atom, required: true
   attr :selected_hashes, :any, required: true
   attr :selected_hash, :any, default: nil
+  attr :downloads_dir_configured?, :boolean, default: false
 
   def torrent_table(assigns) do
     ~H"""
@@ -539,7 +552,11 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         <thead class="sticky top-0 z-10">
           <.table_header sort_by={@sort_by} sort_dir={@sort_dir} />
         </thead>
-        <tbody phx-hook=".ContextMenu" id="torrent-tbody">
+        <tbody
+          phx-hook=".ContextMenu"
+          id="torrent-tbody"
+          data-delete-files-enabled={to_string(@downloads_dir_configured?)}
+        >
           <%!-- Empty state: no torrents at all --%>
           <tr :if={@torrents == [] and @all_torrents_empty?}>
             <td
@@ -584,21 +601,26 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
       const MENU_WIDTH = 208;
       const ITEM_HEIGHT = 28;
 
-      const MENU_ITEMS = [
-        { action: "start",            label: "Start",        destructive: false },
-        { action: "pause",            label: "Pause",        destructive: false },
-        { action: "stop",             label: "Stop",         destructive: false },
-        { separator: true },
-        { action: "set_label_prompt", label: "Set label…",   destructive: false },
-        { action: "remove_label",     label: "Remove label", destructive: false },
-        { separator: true },
-        { action: "copy_hash",        label: "Copy hash",    client: true, destructive: false },
-        { separator: true },
-        { action: "erase",           label: "Remove torrent",                  destructive: true },
-        { action: "erase_with_data", label: "Remove torrent and delete files", destructive: true },
-      ];
+      function buildMenuItems(deleteFilesEnabled) {
+        const items = [
+          { action: "start",            label: "Start",        destructive: false },
+          { action: "pause",            label: "Pause",        destructive: false },
+          { action: "stop",             label: "Stop",         destructive: false },
+          { separator: true },
+          { action: "set_label_prompt", label: "Set label…",   destructive: false },
+          { action: "remove_label",     label: "Remove label", destructive: false },
+          { separator: true },
+          { action: "copy_hash",        label: "Copy hash",    client: true, destructive: false },
+          { separator: true },
+          { action: "erase",           label: "Remove torrent",                  destructive: true },
+        ];
+        if (deleteFilesEnabled) {
+          items.push({ action: "erase_with_data", label: "Remove torrent and delete files", destructive: true });
+        }
+        return items;
+      }
 
-      function buildMenu(selected) {
+      function buildMenu(selected, menuItems) {
         const multiSelect = selected.size > 1;
         const menu = document.createElement("div");
         menu.setAttribute("role", "menu");
@@ -630,7 +652,7 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
           menu.appendChild(header);
         }
 
-        MENU_ITEMS.forEach((item) => {
+        menuItems.forEach((item) => {
           if (item.separator) {
             const sep = document.createElement("div");
             sep.setAttribute("role", "separator");
@@ -746,12 +768,14 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
         _openMenu(x, y) {
           this._closeMenu();
 
-          const { menu, focusable } = buildMenu(this._selected);
+          const deleteFilesEnabled = this.el.dataset.deleteFilesEnabled === "true";
+          const menuItems = buildMenuItems(deleteFilesEnabled);
+          const { menu, focusable } = buildMenu(this._selected, menuItems);
 
           // Position with viewport clamping
           const vw = window.innerWidth;
           const vh = window.innerHeight;
-          const estimatedH = MENU_ITEMS.length * ITEM_HEIGHT + 8;
+          const estimatedH = menuItems.length * ITEM_HEIGHT + 8;
           const left = x + MENU_WIDTH > vw ? vw - MENU_WIDTH - 8 : x;
           const top  = y + estimatedH  > vh ? vh - estimatedH - 8 : y;
           menu.style.left = left + "px";

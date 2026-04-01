@@ -56,6 +56,7 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign(:confirm_action, nil)
       |> assign(:show_add_modal, false)
       |> assign(:connection_status, :connected)
+      |> assign(:downloads_dir_configured?, Application.get_env(:taniwha, :downloads_dir) != nil)
       |> assign_global_stats(torrents)
       |> assign(:status_counts, status_counts(torrents))
 
@@ -386,7 +387,7 @@ defmodule TaniwhaWeb.DashboardLive do
             socket =
               socket
               |> assign(:confirm_action, nil)
-              |> put_flash(:error, "Failed to remove: #{inspect(reason)}")
+              |> put_flash(:error, format_erase_error(reason))
 
             {:noreply, socket}
         end
@@ -777,6 +778,18 @@ defmodule TaniwhaWeb.DashboardLive do
   defp parse_tab("peers"), do: :peers
   defp parse_tab("trackers"), do: :trackers
   defp parse_tab(_), do: :general
+
+  @spec format_erase_error(term()) :: String.t()
+  defp format_erase_error(:downloads_dir_not_configured),
+    do: "File deletion is not configured. Set the TANIWHA_DOWNLOADS_DIR environment variable."
+
+  defp format_erase_error(:no_base_path),
+    do: "Torrent has no base path — it may not have been started yet."
+
+  defp format_erase_error(:path_outside_downloads_dir),
+    do: "Torrent path is outside the configured downloads directory."
+
+  defp format_erase_error(reason), do: "Failed to remove: #{inspect(reason)}"
 
   @spec find_base_path([Torrent.t()], String.t()) :: String.t() | nil
   defp find_base_path(torrents, hash) do
