@@ -1,0 +1,13 @@
+{
+  "_note": "Folder picker overlay — mockup section 7.1e",
+  "figmaNode": "https://www.figma.com/design/hp8ISSdpaxXF9wiSTYsaOx/?node-id=0:0",
+  "component": "TaniwhaWeb.FolderPicker.folder_picker/1",
+  "language": "heex",
+  "props": {
+    "root": "String.t() | nil",
+    "selected": "String.t() | nil",
+    "expanded": "MapSet.t()",
+    "children": "map()"
+  },
+  "example": "<.folder_picker id=\"folder-picker\" root=\"/downloads\" selected=\"/downloads/movies\" expanded={MapSet.new([\"/downloads\"])} children={%{\"/downloads\" => [%{name: \"movies\", path: \"/downloads/movies\", has_children: false}]}} loading={MapSet.new()} myself={@myself} />"
+}

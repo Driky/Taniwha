@@ -800,8 +800,15 @@ defmodule TaniwhaWeb.DashboardLive do
   defp format_erase_error(reason), do: "Failed to remove: #{inspect(reason)}"
 
   @spec maybe_add_directory(keyword(), String.t() | nil) :: keyword()
-  defp maybe_add_directory(opts, nil), do: opts
-  defp maybe_add_directory(opts, dir), do: Keyword.put(opts, :directory, dir)
+  defp maybe_add_directory(opts, dir) do
+    default = Taniwha.FileSystem.default_download_dir()
+
+    if is_nil(dir) or dir == "" or dir == default do
+      opts
+    else
+      Keyword.put(opts, :directory, dir)
+    end
+  end
 
   @spec find_base_path([Torrent.t()], String.t()) :: String.t() | nil
   defp find_base_path(torrents, hash) do

@@ -11,11 +11,16 @@ defmodule TaniwhaWeb.AddTorrentComponent do
   use TaniwhaWeb, :live_component
 
   import TaniwhaWeb.FormatHelpers, only: [format_add_error: 1]
+  import TaniwhaWeb.FolderPicker, only: [folder_picker: 1]
+
+  alias Taniwha.FileSystem
 
   @commands Application.compile_env(:taniwha, :commands, Taniwha.Commands)
 
   @impl true
   def mount(socket) do
+    base = FileSystem.default_download_dir()
+
     {:ok,
      socket
      |> assign(:active_tab, :url)
@@ -24,11 +29,13 @@ defmodule TaniwhaWeb.AddTorrentComponent do
      |> assign(:error, nil)
      |> assign(:selected_label, nil)
      |> assign(:label_groups, [])
-     |> assign(:download_dir, Taniwha.FileSystem.default_download_dir())
-     |> assign(:dir_browser_open, false)
-     |> assign(:dir_browser_path, nil)
-     |> assign(:dir_browser_entries, [])
-     |> assign(:dir_browser_parent, nil)}
+     |> assign(:download_dir, base)
+     |> assign(:folder_picker_open, false)
+     |> assign(:folder_picker_root, base)
+     |> assign(:folder_picker_selected, base)
+     |> assign(:folder_picker_expanded, MapSet.new())
+     |> assign(:folder_picker_children, %{})
+     |> assign(:folder_picker_loading, MapSet.new())}
   end
 
   @impl true
@@ -52,50 +59,69 @@ defmodule TaniwhaWeb.AddTorrentComponent do
     {:noreply, assign(socket, :selected_label, selected)}
   end
 
-  def handle_event("open_dir_browser", _params, socket) do
-    base = Taniwha.FileSystem.default_download_dir()
+  def handle_event("open_folder_picker", _params, socket) do
+    base = FileSystem.default_download_dir()
 
     if base do
-      {:ok, entries} = Taniwha.FileSystem.list_directories(base, base)
+      {:ok, entries} = FileSystem.list_directories(base, base)
+      current = socket.assigns.download_dir || base
 
       {:noreply,
        socket
-       |> assign(:dir_browser_open, true)
-       |> assign(:dir_browser_path, base)
-       |> assign(:dir_browser_entries, entries)
-       |> assign(:dir_browser_parent, nil)}
+       |> assign(:folder_picker_open, true)
+       |> assign(:folder_picker_root, base)
+       |> assign(:folder_picker_selected, current)
+       |> assign(:folder_picker_expanded, MapSet.new([base]))
+       |> assign(:folder_picker_children, %{base => entries})
+       |> assign(:folder_picker_loading, MapSet.new())}
     else
       {:noreply, socket}
     end
   end
 
-  def handle_event("browse_to", %{"path" => path}, socket) do
-    base = Taniwha.FileSystem.default_download_dir()
+  def handle_event("toggle_folder", %{"path" => path}, socket) do
+    expanded = socket.assigns.folder_picker_expanded
+    base = socket.assigns.folder_picker_root
 
-    case Taniwha.FileSystem.list_directories(path, base) do
-      {:ok, entries} ->
-        parent = if path == base, do: nil, else: Path.dirname(path)
+    if MapSet.member?(expanded, path) do
+      {:noreply, assign(socket, :folder_picker_expanded, MapSet.delete(expanded, path))}
+    else
+      loading = MapSet.put(socket.assigns.folder_picker_loading, path)
+      socket = assign(socket, :folder_picker_loading, loading)
 
-        {:noreply,
-         socket
-         |> assign(:dir_browser_path, path)
-         |> assign(:dir_browser_entries, entries)
-         |> assign(:dir_browser_parent, parent)}
+      case FileSystem.list_directories(path, base) do
+        {:ok, entries} ->
+          {:noreply,
+           socket
+           |> assign(
+             :folder_picker_children,
+             Map.put(socket.assigns.folder_picker_children, path, entries)
+           )
+           |> assign(:folder_picker_expanded, MapSet.put(expanded, path))
+           |> assign(
+             :folder_picker_loading,
+             MapSet.delete(socket.assigns.folder_picker_loading, path)
+           )}
 
-      {:error, _} ->
-        {:noreply, socket}
+        {:error, _} ->
+          {:noreply, assign(socket, :folder_picker_loading, MapSet.delete(loading, path))}
+      end
     end
   end
 
-  def handle_event("select_dir", %{"path" => path}, socket) do
-    {:noreply,
-     socket
-     |> assign(:download_dir, path)
-     |> assign(:dir_browser_open, false)}
+  def handle_event("select_folder_node", %{"path" => path}, socket) do
+    {:noreply, assign(socket, :folder_picker_selected, path)}
   end
 
-  def handle_event("close_dir_browser", _params, socket) do
-    {:noreply, assign(socket, :dir_browser_open, false)}
+  def handle_event("confirm_folder", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:download_dir, socket.assigns.folder_picker_selected)
+     |> assign(:folder_picker_open, false)}
+  end
+
+  def handle_event("close_folder_picker", _params, socket) do
+    {:noreply, assign(socket, :folder_picker_open, false)}
   end
 
   def handle_event("submit_url", %{"url" => url}, socket) do
@@ -287,6 +313,32 @@ defmodule TaniwhaWeb.AddTorrentComponent do
                   <% end %>
                 </div>
               </div>
+              <%!-- Download directory picker --%>
+              <div :if={@folder_picker_root} class="mt-3">
+                <label
+                  for={"#{@id}-url-dir-input"}
+                  class="block text-[11px] text-gray-500 dark:text-gray-400 mb-[6px]"
+                >
+                  Download directory
+                </label>
+                <div class="flex gap-[6px] items-center">
+                  <input
+                    id={"#{@id}-url-dir-input"}
+                    type="text"
+                    readonly
+                    value={@download_dir || ""}
+                    class="flex-1 h-[30px] px-[10px] text-[11px] font-mono border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none cursor-default"
+                  />
+                  <button
+                    type="button"
+                    phx-click="open_folder_picker"
+                    phx-target={@myself}
+                    class="h-[30px] px-[10px] text-[11px] rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                  >
+                    Browse
+                  </button>
+                </div>
+              </div>
             </div>
 
             <%!-- File upload panel --%>
@@ -297,6 +349,32 @@ defmodule TaniwhaWeb.AddTorrentComponent do
               aria-labelledby={"#{@id}-tab-file"}
               class="p-5"
             >
+              <%!-- Download directory picker --%>
+              <div :if={@folder_picker_root} class="mb-3">
+                <label
+                  for={"#{@id}-file-dir-input"}
+                  class="block text-[11px] text-gray-500 dark:text-gray-400 mb-[6px]"
+                >
+                  Download directory
+                </label>
+                <div class="flex gap-[6px] items-center">
+                  <input
+                    id={"#{@id}-file-dir-input"}
+                    type="text"
+                    readonly
+                    value={@download_dir || ""}
+                    class="flex-1 h-[30px] px-[10px] text-[11px] font-mono border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none cursor-default"
+                  />
+                  <button
+                    type="button"
+                    phx-click="open_folder_picker"
+                    phx-target={@myself}
+                    class="h-[30px] px-[10px] text-[11px] rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                  >
+                    Browse
+                  </button>
+                </div>
+              </div>
               <form
                 phx-submit="submit_file"
                 phx-change="validate"
@@ -387,6 +465,17 @@ defmodule TaniwhaWeb.AddTorrentComponent do
           </div>
         </.focus_wrap>
       </div>
+      <%!-- Folder picker overlay --%>
+      <.folder_picker
+        :if={@folder_picker_open}
+        id={"#{@id}-folder-picker"}
+        root={@folder_picker_root}
+        selected={@folder_picker_selected}
+        expanded={@folder_picker_expanded}
+        children={@folder_picker_children}
+        loading={@folder_picker_loading}
+        myself={@myself}
+      />
     </div>
     """
   end
@@ -396,8 +485,15 @@ defmodule TaniwhaWeb.AddTorrentComponent do
   defp label_opt(label), do: [label: label]
 
   @spec maybe_add_directory(keyword(), String.t() | nil) :: keyword()
-  defp maybe_add_directory(opts, nil), do: opts
-  defp maybe_add_directory(opts, dir), do: Keyword.put(opts, :directory, dir)
+  defp maybe_add_directory(opts, dir) do
+    default = FileSystem.default_download_dir()
+
+    if is_nil(dir) or dir == "" or dir == default do
+      opts
+    else
+      Keyword.put(opts, :directory, dir)
+    end
+  end
 
   @spec upload_error_to_string(atom()) :: String.t()
   defp upload_error_to_string(:too_large), do: "File is too large (max 10 MB)."
