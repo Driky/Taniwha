@@ -41,6 +41,13 @@ if downloads_dir = System.get_env("TANIWHA_DOWNLOADS_DIR") do
   config :taniwha, downloads_dir: downloads_dir
 end
 
+# Optional: path for the throttle settings JSON file.
+# Defaults to priv/throttle_settings.json.
+# Mount the file (or its parent directory) as a Docker volume for persistence.
+if throttle_path = System.get_env("TANIWHA_THROTTLE_PATH") do
+  config :taniwha, throttle_settings_path: throttle_path
+end
+
 if config_env() == :prod do
   # ---------------------------------------------------------------------------
   # OpenTelemetry — vendor-agnostic tracing via OTLP (production only).

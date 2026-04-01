@@ -16,7 +16,8 @@ config :taniwha,
   generators: [timestamp_type: :utc_datetime],
   scgi_connection: Taniwha.SCGI.UnixConnection,
   scgi_transport: {:unix, "/var/run/rtorrent.sock"},
-  scgi_timeout: 5_000
+  scgi_timeout: 5_000,
+  throttle_settings_path: "priv/throttle_settings.json"
 
 # Configure the endpoint
 config :taniwha, TaniwhaWeb.Endpoint,

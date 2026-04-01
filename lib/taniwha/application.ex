@@ -29,6 +29,9 @@ defmodule Taniwha.Application do
       Taniwha.RPC.Client,
       Taniwha.State.Store,
       Taniwha.State.Poller,
+      # ThrottleStore must start after RPC.Client (startup apply calls Commands → RPC)
+      # and before TaniwhaWeb.Endpoint (so limits are available when first LiveView renders).
+      Taniwha.ThrottleStore,
       TaniwhaWeb.Endpoint
     ]
 

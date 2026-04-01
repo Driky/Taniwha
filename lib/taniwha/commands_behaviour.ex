@@ -33,4 +33,8 @@ defmodule Taniwha.CommandsBehaviour do
               {:ok, non_neg_integer()} | {:error, {non_neg_integer(), non_neg_integer()}}
   @callback get_all_labels() :: [String.t()]
   @callback system_pid() :: {:ok, term()} | {:error, term()}
+  @callback get_download_limit() :: {:ok, non_neg_integer()} | {:error, term()}
+  @callback get_upload_limit() :: {:ok, non_neg_integer()} | {:error, term()}
+  @callback set_download_limit(non_neg_integer()) :: :ok | {:error, term()}
+  @callback set_upload_limit(non_neg_integer()) :: :ok | {:error, term()}
 end

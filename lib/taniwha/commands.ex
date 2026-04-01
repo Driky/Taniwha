@@ -486,6 +486,58 @@ defmodule Taniwha.Commands do
     end
   end
 
+  @doc "Returns the configured download speed limit in bytes/s (0 = unlimited)."
+  @impl Taniwha.CommandsBehaviour
+  @spec get_download_limit() :: {:ok, non_neg_integer()} | {:error, term()}
+  def get_download_limit do
+    Tracer.with_span "taniwha.commands.get_download_limit",
+                     %{attributes: %{"command.name": "get_download_limit"}} do
+      @rpc_client.call("throttle.global_down.max_rate", [])
+    end
+  end
+
+  @doc "Returns the configured upload speed limit in bytes/s (0 = unlimited)."
+  @impl Taniwha.CommandsBehaviour
+  @spec get_upload_limit() :: {:ok, non_neg_integer()} | {:error, term()}
+  def get_upload_limit do
+    Tracer.with_span "taniwha.commands.get_upload_limit",
+                     %{attributes: %{"command.name": "get_upload_limit"}} do
+      @rpc_client.call("throttle.global_up.max_rate", [])
+    end
+  end
+
+  @doc "Sets the global download speed limit in bytes/s. Pass `0` to remove the limit."
+  @impl Taniwha.CommandsBehaviour
+  @spec set_download_limit(non_neg_integer()) :: :ok | {:error, term()}
+  def set_download_limit(bytes_per_sec) do
+    Tracer.with_span "taniwha.commands.set_download_limit",
+                     %{attributes: %{"command.name": "set_download_limit"}} do
+      Logger.info("Command executed", command: "set_download_limit", bytes_per_sec: bytes_per_sec)
+
+      @rpc_client.call("throttle.global_down.max_rate.set", [
+        "",
+        Integer.to_string(bytes_per_sec)
+      ])
+      |> ok_on_zero()
+    end
+  end
+
+  @doc "Sets the global upload speed limit in bytes/s. Pass `0` to remove the limit."
+  @impl Taniwha.CommandsBehaviour
+  @spec set_upload_limit(non_neg_integer()) :: :ok | {:error, term()}
+  def set_upload_limit(bytes_per_sec) do
+    Tracer.with_span "taniwha.commands.set_upload_limit",
+                     %{attributes: %{"command.name": "set_upload_limit"}} do
+      Logger.info("Command executed", command: "set_upload_limit", bytes_per_sec: bytes_per_sec)
+
+      @rpc_client.call("throttle.global_up.max_rate.set", [
+        "",
+        Integer.to_string(bytes_per_sec)
+      ])
+      |> ok_on_zero()
+    end
+  end
+
   @doc "Returns the current global download rate in bytes per second."
   @spec global_down_rate() :: {:ok, non_neg_integer()} | {:error, term()}
   def global_down_rate do

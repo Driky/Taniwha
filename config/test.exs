@@ -35,6 +35,9 @@ config :taniwha,
 
 config :taniwha, api_key: "test-api-key-for-tests"
 
+# Use a temp file for throttle persistence so tests don't write to priv/.
+config :taniwha, throttle_settings_path: System.tmp_dir!() <> "/taniwha_throttle_test.json"
+
 # Use system temp dir so CredentialStore doesn't try to create /data/taniwha
 # (which is read-only in CI and local test environments).
 config :taniwha, data_dir: System.tmp_dir!()

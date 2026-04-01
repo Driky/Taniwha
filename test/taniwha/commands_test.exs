@@ -498,6 +498,61 @@ defmodule Taniwha.CommandsTest do
   # Batch — system_pid/0
   # ---------------------------------------------------------------------------
 
+  # ---------------------------------------------------------------------------
+  # Batch — throttle limits
+  # ---------------------------------------------------------------------------
+
+  describe "throttle_limits" do
+    test "get_download_limit/0 calls throttle.global_down.max_rate and returns {:ok, integer}" do
+      expect(Taniwha.RPC.MockClient, :call, fn "throttle.global_down.max_rate", [] ->
+        {:ok, 5_242_880}
+      end)
+
+      assert Commands.get_download_limit() == {:ok, 5_242_880}
+    end
+
+    test "get_upload_limit/0 calls throttle.global_up.max_rate and returns {:ok, integer}" do
+      expect(Taniwha.RPC.MockClient, :call, fn "throttle.global_up.max_rate", [] ->
+        {:ok, 1_048_576}
+      end)
+
+      assert Commands.get_upload_limit() == {:ok, 1_048_576}
+    end
+
+    test "set_download_limit/1 calls throttle.global_down.max_rate.set with [\"\", value_as_string]" do
+      expect(Taniwha.RPC.MockClient, :call, fn "throttle.global_down.max_rate.set",
+                                               ["", "5242880"] ->
+        {:ok, 0}
+      end)
+
+      assert Commands.set_download_limit(5_242_880) == :ok
+    end
+
+    test "set_upload_limit/1 with 0 sends [\"\", \"0\"] (unlimited)" do
+      expect(Taniwha.RPC.MockClient, :call, fn "throttle.global_up.max_rate.set", ["", "0"] ->
+        {:ok, 0}
+      end)
+
+      assert Commands.set_upload_limit(0) == :ok
+    end
+
+    test "set_download_limit/1 returns {:error, reason} on RPC failure" do
+      expect(Taniwha.RPC.MockClient, :call, fn "throttle.global_down.max_rate.set", _ ->
+        {:error, :timeout}
+      end)
+
+      assert Commands.set_download_limit(5_242_880) == {:error, :timeout}
+    end
+
+    test "set_upload_limit/1 returns {:error, reason} on RPC failure" do
+      expect(Taniwha.RPC.MockClient, :call, fn "throttle.global_up.max_rate.set", _ ->
+        {:error, :econnrefused}
+      end)
+
+      assert Commands.set_upload_limit(1_048_576) == {:error, :econnrefused}
+    end
+  end
+
   describe "system_pid/0" do
     test "returns the rtorrent process ID on success" do
       expect(Taniwha.RPC.MockClient, :call, fn "system.pid", [] -> {:ok, 12_345} end)

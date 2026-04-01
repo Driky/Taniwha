@@ -56,11 +56,12 @@ Taniwha.Application
 ├── Taniwha.RPC.Client             # SCGI/XML-RPC command dispatch (GenServer)
 ├── Taniwha.State.Store            # ETS table owner (GenServer)
 ├── Taniwha.State.Poller           # Periodic polling + diff engine (GenServer)
+├── Taniwha.ThrottleStore          # Bandwidth limit cache + JSON persistence (GenServer)
 └── TaniwhaWeb.Endpoint            # Phoenix endpoint (Bandit HTTP server)
     └── TaniwhaWeb.UserSocket      # WebSocket entry point
 ```
 
-**Startup order matters:** `Taniwha.RateLimiter` must be up before `TaniwhaWeb.Endpoint` (the first HTTP request must never arrive before the ETS table is ready). `Taniwha.Auth.CredentialStore` must start before `TaniwhaWeb.Endpoint` so auth routes are operational from the first HTTP request. `Taniwha.LabelStore` must start before `TaniwhaWeb.Endpoint` so label colours are available when the first LiveView renders. Store must start before Poller (ETS table must exist). RPC.Client must start before Poller (Poller calls RPC). The order in the supervisor child list enforces this naturally via the `one_for_one` strategy.
+**Startup order matters:** `Taniwha.RateLimiter` must be up before `TaniwhaWeb.Endpoint` (the first HTTP request must never arrive before the ETS table is ready). `Taniwha.Auth.CredentialStore` must start before `TaniwhaWeb.Endpoint` so auth routes are operational from the first HTTP request. `Taniwha.LabelStore` must start before `TaniwhaWeb.Endpoint` so label colours are available when the first LiveView renders. Store must start before Poller (ETS table must exist). RPC.Client must start before Poller (Poller calls RPC). `Taniwha.ThrottleStore` starts after `RPC.Client` (startup apply calls Commands → RPC) and before `TaniwhaWeb.Endpoint` (limits must be available when the first LiveView renders). The order in the supervisor child list enforces this naturally via the `one_for_one` strategy.
 
 ---
 
@@ -255,6 +256,10 @@ end
 | `list_trackers(hash)` | `t.multicall` | `{:ok, [Tracker.t()]}` | |
 | `global_up_rate()` | `throttle.global_up.rate` | `{:ok, non_neg_integer()}` | |
 | `global_down_rate()` | `throttle.global_down.rate` | `{:ok, non_neg_integer()}` | |
+| `get_download_limit()` | `throttle.global_down.max_rate` | `{:ok, non_neg_integer()}` | 0 = unlimited |
+| `get_upload_limit()` | `throttle.global_up.max_rate` | `{:ok, non_neg_integer()}` | 0 = unlimited |
+| `set_download_limit(bytes)` | `throttle.global_down.max_rate.set` | `:ok \| {:error, term()}` | args: `["", "bytes_as_string"]` |
+| `set_upload_limit(bytes)` | `throttle.global_up.max_rate.set` | `:ok \| {:error, term()}` | args: `["", "bytes_as_string"]` |
 | `system_pid()` | `system.pid` | `{:ok, term()} \| {:error, term()}` | |
 
 ### 7.4 FileSystem module
@@ -439,8 +444,12 @@ The auth system supports two paths:
 | `f.priority.set` | hash:fN, priority | 0 | Set file priority |
 | `system.multicall` | array of {method, params} | batched results | Critical for performance |
 | `system.listMethods` | (none) | list of strings | Discover all commands |
-| `throttle.global_up.rate` | (none) | integer | Global upload speed |
-| `throttle.global_down.rate` | (none) | integer | Global download speed |
+| `throttle.global_up.rate` | (none) | integer | Current global upload speed (bytes/s) |
+| `throttle.global_down.rate` | (none) | integer | Current global download speed (bytes/s) |
+| `throttle.global_up.max_rate` | (none) | integer | Configured upload limit (0 = unlimited) |
+| `throttle.global_down.max_rate` | (none) | integer | Configured download limit (0 = unlimited) |
+| `throttle.global_up.max_rate.set` | "", limit_as_string | 0 | Set upload limit; empty string = global dispatch |
+| `throttle.global_down.max_rate.set` | "", limit_as_string | 0 | Set download limit; empty string = global dispatch |
 
 **Important notes:**
 - `d.ratio` returns the ratio multiplied by 1000 (e.g., 1500 = 1.5x ratio)
