@@ -177,7 +177,7 @@ defmodule Taniwha.Commands do
   Possible errors:
     * `{:error, :downloads_dir_not_configured}` — no downloads_dir in config
     * `{:error, :no_base_path}` — torrent has no base path (not started yet)
-    * `{:error, :path_outside_downloads_dir}` — base_path escapes downloads_dir
+    * `{:error, {:path_outside_downloads_dir, base_path, downloads_dir}}` — base_path escapes downloads_dir
     * `{:error, posix}` — filesystem error from `File.rm_rf/1`
     * `{:error, term}` — RPC error from rtorrent
   """

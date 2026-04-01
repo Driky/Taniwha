@@ -49,16 +49,30 @@ defmodule Taniwha.FileSystemTest do
     test "rejects path with .. traversal that escapes base_dir", %{base_dir: base_dir} do
       # e.g. /data/downloads/../../../etc/passwd
       traversal = Path.join([base_dir, "..", "..", "etc", "passwd"])
-      assert {:error, :path_outside_downloads_dir} = FileSystem.safe_delete(traversal, base_dir)
+
+      assert {:error, {:path_outside_downloads_dir, resolved, configured}} =
+               FileSystem.safe_delete(traversal, base_dir)
+
+      assert is_binary(resolved)
+      assert configured == Path.expand(base_dir)
     end
 
     test "rejects path equal to base_dir (never delete the root)", %{base_dir: base_dir} do
-      assert {:error, :path_outside_downloads_dir} = FileSystem.safe_delete(base_dir, base_dir)
+      assert {:error, {:path_outside_downloads_dir, resolved, configured}} =
+               FileSystem.safe_delete(base_dir, base_dir)
+
+      assert resolved == Path.expand(base_dir)
+      assert configured == Path.expand(base_dir)
     end
 
     test "rejects path outside base_dir entirely", %{base_dir: base_dir} do
       other = Path.join(System.tmp_dir!(), "completely_other_file.txt")
-      assert {:error, :path_outside_downloads_dir} = FileSystem.safe_delete(other, base_dir)
+
+      assert {:error, {:path_outside_downloads_dir, resolved, configured}} =
+               FileSystem.safe_delete(other, base_dir)
+
+      assert resolved == Path.expand(other)
+      assert configured == Path.expand(base_dir)
     end
 
     test "rejects path that shares prefix but is sibling of base_dir" do
@@ -71,7 +85,8 @@ defmodule Taniwha.FileSystemTest do
       File.write!(target, "x")
       on_exit(fn -> File.rm_rf!(sibling) end)
 
-      assert {:error, :path_outside_downloads_dir} = FileSystem.safe_delete(target, base)
+      assert {:error, {:path_outside_downloads_dir, _resolved, _configured}} =
+               FileSystem.safe_delete(target, base)
     end
   end
 

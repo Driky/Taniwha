@@ -786,8 +786,10 @@ defmodule TaniwhaWeb.DashboardLive do
   defp format_erase_error(:no_base_path),
     do: "Torrent has no base path — it may not have been started yet."
 
-  defp format_erase_error(:path_outside_downloads_dir),
-    do: "Torrent path is outside the configured downloads directory."
+  defp format_erase_error({:path_outside_downloads_dir, torrent_path, configured_dir}),
+    do:
+      "Torrent path is outside the configured downloads directory. " <>
+        "Torrent path: #{torrent_path}. Configured directory: #{configured_dir}."
 
   defp format_erase_error(reason), do: "Failed to remove: #{inspect(reason)}"
 

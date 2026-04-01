@@ -85,7 +85,8 @@ defmodule Taniwha.CommandsRemoveTest do
         end)
 
         # d.erase is NOT expected — unexpected call would fail the test
-        assert {:error, :path_outside_downloads_dir} = Commands.erase_with_data("abc123")
+        assert {:error, {:path_outside_downloads_dir, _path, _dir}} =
+                 Commands.erase_with_data("abc123")
       end)
     end
 
