@@ -52,6 +52,10 @@ defmodule TaniwhaWeb.AddTorrentComponent do
     {:noreply, assign(socket, active_tab: :file, error: nil)}
   end
 
+  def handle_event("update_url", %{"url" => url}, socket) do
+    {:noreply, assign(socket, :url, url)}
+  end
+
   def handle_event("select_label", %{"label" => label}, socket) do
     selected =
       if socket.assigns.selected_label == label, do: nil, else: label
@@ -259,7 +263,12 @@ defmodule TaniwhaWeb.AddTorrentComponent do
               aria-labelledby={"#{@id}-tab-url"}
               class="p-5"
             >
-              <form phx-submit="submit_url" phx-target={@myself} id={"#{@id}-url-form"}>
+              <form
+                phx-submit="submit_url"
+                phx-change="update_url"
+                phx-target={@myself}
+                id={"#{@id}-url-form"}
+              >
                 <label for={"#{@id}-url-input"} class="block text-[11px] text-gray-500 mb-[6px]">
                   Magnet link or .torrent URL
                 </label>
