@@ -169,15 +169,21 @@ defmodule Taniwha.Commands do
   Erases a torrent from rtorrent **and** deletes its downloaded files.
 
   Requires `config :taniwha, downloads_dir: "/path/to/downloads"` (set via the
-  `TANIWHA_DOWNLOADS_DIR` environment variable). The files are deleted first via
-  `Taniwha.FileSystem.safe_delete/2` — if that fails, the torrent record is
-  preserved in rtorrent. `d.erase` is only called once file deletion succeeds,
-  keeping rtorrent state and the filesystem consistent.
+  `TANIWHA_DOWNLOADS_DIR` environment variable). Each file is deleted individually
+  via `f.multicall` + `Taniwha.FileSystem.safe_delete/2` — if any deletion fails,
+  the torrent record is preserved in rtorrent. `d.erase` is only called once all
+  file deletions succeed, keeping rtorrent state and the filesystem consistent.
+
+  This approach is safe for all torrent shapes:
+    * Single-file: deletes the one file
+    * Multi-file with sub-directory: deletes the files; the empty sub-directory remains
+    * Flat multi-file (files directly in the save folder): deletes only the torrent's
+      files, leaving the parent directory and any sibling files untouched
 
   Possible errors:
     * `{:error, :downloads_dir_not_configured}` — no downloads_dir in config
-    * `{:error, :no_base_path}` — torrent has no base path (not started yet)
-    * `{:error, {:path_outside_downloads_dir, base_path, downloads_dir}}` — base_path escapes downloads_dir
+    * `{:error, :no_base_path}` — torrent directory is empty (may not have been started yet)
+    * `{:error, {:path_outside_downloads_dir, path, downloads_dir}}` — a file path escapes downloads_dir
     * `{:error, posix}` — filesystem error from `File.rm_rf/1`
     * `{:error, term}` — RPC error from rtorrent
   """
@@ -193,8 +199,9 @@ defmodule Taniwha.Commands do
           {:error, :downloads_dir_not_configured}
 
         downloads_dir ->
-          with {:ok, base_path} <- fetch_base_path(hash),
-               :ok <- Taniwha.FileSystem.safe_delete(base_path, downloads_dir) do
+          with {:ok, directory} <- fetch_directory(hash),
+               {:ok, rel_paths} <- fetch_file_rel_paths(hash),
+               :ok <- delete_files(rel_paths, directory, downloads_dir) do
             run_lifecycle("d.erase", hash)
           end
       end
@@ -586,13 +593,33 @@ defmodule Taniwha.Commands do
     @rpc_client.call(method, [hash]) |> ok_on_zero()
   end
 
-  @spec fetch_base_path(String.t()) :: {:ok, String.t()} | {:error, :no_base_path | term()}
-  defp fetch_base_path(hash) do
-    case @rpc_client.call("d.base_path", [hash]) do
+  @spec fetch_directory(String.t()) :: {:ok, String.t()} | {:error, :no_base_path | term()}
+  defp fetch_directory(hash) do
+    case @rpc_client.call("d.directory", [hash]) do
       {:ok, ""} -> {:error, :no_base_path}
-      {:ok, path} -> {:ok, path}
+      {:ok, dir} -> {:ok, dir}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  @spec fetch_file_rel_paths(String.t()) :: {:ok, [String.t()]} | {:error, term()}
+  defp fetch_file_rel_paths(hash) do
+    case @rpc_client.call("f.multicall", [hash, "" | ["f.path="]]) do
+      {:ok, files} -> {:ok, Enum.map(files, fn [path] -> path end)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec delete_files([String.t()], String.t(), String.t()) :: :ok | {:error, term()}
+  defp delete_files(rel_paths, directory, downloads_dir) do
+    Enum.reduce_while(rel_paths, :ok, fn rel_path, :ok ->
+      abs_path = Path.join(directory, rel_path)
+
+      case Taniwha.FileSystem.safe_delete(abs_path, downloads_dir) do
+        :ok -> {:cont, :ok}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
   end
 
   @spec run_many([String.t()], (String.t() -> :ok | {:error, term()})) ::

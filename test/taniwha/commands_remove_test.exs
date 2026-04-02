@@ -32,12 +32,14 @@ defmodule Taniwha.CommandsRemoveTest do
   # ---------------------------------------------------------------------------
 
   describe "erase_with_data/1 — happy path" do
-    test "fetches base_path, deletes within downloads_dir, then erases" do
+    test "fetches directory + file list, deletes within downloads_dir, then erases" do
       with_downloads_dir(fn dir ->
-        torrent_path = Path.join(dir, "my_torrent")
+        expect(Taniwha.RPC.MockClient, :call, fn "d.directory", ["abc123"] ->
+          {:ok, dir}
+        end)
 
-        expect(Taniwha.RPC.MockClient, :call, fn "d.base_path", ["abc123"] ->
-          {:ok, torrent_path}
+        expect(Taniwha.RPC.MockClient, :call, fn "f.multicall", ["abc123", "" | ["f.path="]] ->
+          {:ok, [["my_torrent_file.mkv"]]}
         end)
 
         expect(Taniwha.RPC.MockClient, :call, fn "d.erase", ["abc123"] ->
@@ -60,9 +62,9 @@ defmodule Taniwha.CommandsRemoveTest do
       assert {:error, :downloads_dir_not_configured} = Commands.erase_with_data("abc123")
     end
 
-    test "returns error when base_path is empty string" do
+    test "returns error when directory is empty string" do
       with_downloads_dir(fn _dir ->
-        expect(Taniwha.RPC.MockClient, :call, fn "d.base_path", ["abc123"] ->
+        expect(Taniwha.RPC.MockClient, :call, fn "d.directory", ["abc123"] ->
           {:ok, ""}
         end)
 
@@ -77,11 +79,15 @@ defmodule Taniwha.CommandsRemoveTest do
   # ---------------------------------------------------------------------------
 
   describe "erase_with_data/1 — path validation" do
-    test "returns error when path outside downloads_dir, does NOT call d.erase" do
+    test "returns error when file path is outside downloads_dir, does NOT call d.erase" do
       with_downloads_dir(fn _dir ->
-        expect(Taniwha.RPC.MockClient, :call, fn "d.base_path", ["abc123"] ->
-          # Path clearly outside any reasonable downloads_dir
-          {:ok, "/totally/different/path/file.txt"}
+        expect(Taniwha.RPC.MockClient, :call, fn "d.directory", ["abc123"] ->
+          # Directory clearly outside any reasonable downloads_dir
+          {:ok, "/totally/different/path"}
+        end)
+
+        expect(Taniwha.RPC.MockClient, :call, fn "f.multicall", ["abc123", "" | ["f.path="]] ->
+          {:ok, [["file.txt"]]}
         end)
 
         # d.erase is NOT expected — unexpected call would fail the test
@@ -90,15 +96,20 @@ defmodule Taniwha.CommandsRemoveTest do
       end)
     end
 
-    test "d.erase is only called AFTER successful safe_delete" do
-      # Verify ordering: base_path fetch, then safe_delete (implicit), then erase
+    test "d.erase is only called AFTER successful file deletion" do
+      # Verify ordering: directory fetch, file list, safe_delete (implicit), then erase
       with_downloads_dir(fn dir ->
-        torrent_path = Path.join(dir, "ordered_torrent")
         call_order = :ets.new(:call_order, [:bag, :public])
 
-        expect(Taniwha.RPC.MockClient, :call, fn "d.base_path", ["hash_order"] ->
-          :ets.insert(call_order, {:step, :base_path})
-          {:ok, torrent_path}
+        expect(Taniwha.RPC.MockClient, :call, fn "d.directory", ["hash_order"] ->
+          :ets.insert(call_order, {:step, :directory})
+          {:ok, dir}
+        end)
+
+        expect(Taniwha.RPC.MockClient, :call, fn "f.multicall",
+                                                 ["hash_order", "" | ["f.path="]] ->
+          :ets.insert(call_order, {:step, :multicall})
+          {:ok, [["ordered_file.mkv"]]}
         end)
 
         expect(Taniwha.RPC.MockClient, :call, fn "d.erase", ["hash_order"] ->
@@ -109,14 +120,103 @@ defmodule Taniwha.CommandsRemoveTest do
         assert :ok = Commands.erase_with_data("hash_order")
 
         steps = :ets.tab2list(call_order) |> Enum.map(&elem(&1, 1))
-        assert steps == [:base_path, :erase]
+        assert steps == [:directory, :multicall, :erase]
         :ets.delete(call_order)
       end)
     end
   end
 
   # ---------------------------------------------------------------------------
-  # erase_many/1 — Batch 4
+  # erase_with_data/1 — Batch 4: flat multi-file regression (the bug)
+  # ---------------------------------------------------------------------------
+
+  describe "erase_with_data/1 — flat multi-file torrent (regression)" do
+    test "deletes individual files, leaves parent directory intact" do
+      with_downloads_dir(fn dir ->
+        # Files placed directly in dir — no sub-folder (flat multi-file torrent)
+        file1 = Path.join(dir, "episode.s01e01.mkv")
+        file2 = Path.join(dir, "episode.s01e02.mkv")
+        File.write!(file1, "data")
+        File.write!(file2, "data")
+
+        expect(Taniwha.RPC.MockClient, :call, fn "d.directory", ["flat"] ->
+          {:ok, dir}
+        end)
+
+        expect(Taniwha.RPC.MockClient, :call, fn "f.multicall", ["flat", "" | ["f.path="]] ->
+          {:ok, [["episode.s01e01.mkv"], ["episode.s01e02.mkv"]]}
+        end)
+
+        expect(Taniwha.RPC.MockClient, :call, fn "d.erase", ["flat"] -> {:ok, 0} end)
+
+        assert :ok = Commands.erase_with_data("flat")
+        refute File.exists?(file1)
+        refute File.exists?(file2)
+        # Parent directory must NOT be deleted
+        assert File.dir?(dir)
+      end)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # erase_with_data/1 — Batch 5: single-file and sub-directory shapes
+  # ---------------------------------------------------------------------------
+
+  describe "erase_with_data/1 — torrent shapes" do
+    test "single-file torrent: deletes only the one file" do
+      with_downloads_dir(fn dir ->
+        movie = Path.join(dir, "movie.mkv")
+        File.write!(movie, "data")
+        other = Path.join(dir, "other.mkv")
+        File.write!(other, "data")
+
+        expect(Taniwha.RPC.MockClient, :call, fn "d.directory", ["single"] ->
+          {:ok, dir}
+        end)
+
+        expect(Taniwha.RPC.MockClient, :call, fn "f.multicall", ["single", "" | ["f.path="]] ->
+          {:ok, [["movie.mkv"]]}
+        end)
+
+        expect(Taniwha.RPC.MockClient, :call, fn "d.erase", ["single"] -> {:ok, 0} end)
+
+        assert :ok = Commands.erase_with_data("single")
+        refute File.exists?(movie)
+        # sibling file untouched
+        assert File.exists?(other)
+      end)
+    end
+
+    test "multi-file with sub-dir: deletes files, empty sub-dir remains" do
+      with_downloads_dir(fn dir ->
+        show_dir = Path.join(dir, "MyShow")
+        File.mkdir_p!(show_dir)
+        ep1 = Path.join(show_dir, "ep1.mkv")
+        ep2 = Path.join(show_dir, "ep2.mkv")
+        File.write!(ep1, "data")
+        File.write!(ep2, "data")
+
+        expect(Taniwha.RPC.MockClient, :call, fn "d.directory", ["subdir"] ->
+          {:ok, dir}
+        end)
+
+        expect(Taniwha.RPC.MockClient, :call, fn "f.multicall", ["subdir", "" | ["f.path="]] ->
+          {:ok, [["MyShow/ep1.mkv"], ["MyShow/ep2.mkv"]]}
+        end)
+
+        expect(Taniwha.RPC.MockClient, :call, fn "d.erase", ["subdir"] -> {:ok, 0} end)
+
+        assert :ok = Commands.erase_with_data("subdir")
+        refute File.exists?(ep1)
+        refute File.exists?(ep2)
+        # Empty sub-dir remains (we don't prune directories)
+        assert File.dir?(show_dir)
+      end)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # erase_many/1 — Batch 6
   # ---------------------------------------------------------------------------
 
   describe "erase_many/1" do
@@ -141,18 +241,26 @@ defmodule Taniwha.CommandsRemoveTest do
   end
 
   # ---------------------------------------------------------------------------
-  # erase_many_with_data/1 — Batch 5
+  # erase_many_with_data/1 — Batch 7
   # ---------------------------------------------------------------------------
 
   describe "erase_many_with_data/1" do
     test "calls erase_with_data for each hash, returns ok/error split" do
       with_downloads_dir(fn dir ->
-        path1 = Path.join(dir, "torrent1")
-        path2 = Path.join(dir, "torrent2")
+        expect(Taniwha.RPC.MockClient, :call, fn "d.directory", ["h1"] -> {:ok, dir} end)
 
-        expect(Taniwha.RPC.MockClient, :call, fn "d.base_path", ["h1"] -> {:ok, path1} end)
+        expect(Taniwha.RPC.MockClient, :call, fn "f.multicall", ["h1", "" | ["f.path="]] ->
+          {:ok, [["torrent1.mkv"]]}
+        end)
+
         expect(Taniwha.RPC.MockClient, :call, fn "d.erase", ["h1"] -> {:ok, 0} end)
-        expect(Taniwha.RPC.MockClient, :call, fn "d.base_path", ["h2"] -> {:ok, path2} end)
+
+        expect(Taniwha.RPC.MockClient, :call, fn "d.directory", ["h2"] -> {:ok, dir} end)
+
+        expect(Taniwha.RPC.MockClient, :call, fn "f.multicall", ["h2", "" | ["f.path="]] ->
+          {:ok, [["torrent2.mkv"]]}
+        end)
+
         expect(Taniwha.RPC.MockClient, :call, fn "d.erase", ["h2"] -> {:ok, 0} end)
 
         assert {:ok, ok, []} = Commands.erase_many_with_data(["h1", "h2"])
