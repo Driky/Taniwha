@@ -133,7 +133,7 @@ defmodule Taniwha.TorrentTest do
     # Field order: name, size_bytes, completed_bytes, up.rate, down.rate,
     #              ratio, state, is_active, complete, is_hash_checking,
     #              peers_connected, timestamp.started, timestamp.finished, base_path,
-    #              custom1 (label), tracker_url
+    #              custom1 (label)
     @values [
       "Ubuntu 22.04",
       1_000_000,
@@ -149,7 +149,6 @@ defmodule Taniwha.TorrentTest do
       1_700_000_000,
       0,
       "/downloads/ubuntu",
-      "",
       ""
     ]
 
@@ -204,35 +203,37 @@ defmodule Taniwha.TorrentTest do
       assert t.files == nil
     end
 
-    test "sets tracker_host to nil when tracker_url is empty", %{torrent: t} do
+    test "sets tracker_host to nil (populated separately via t.multicall)", %{torrent: t} do
       assert t.tracker_host == nil
-    end
-
-    test "extracts hostname from https tracker_url" do
-      values = List.replace_at(@values, 15, "https://tracker.example.com/announce")
-      torrent = Torrent.from_rpc_values(@hash, values)
-      assert torrent.tracker_host == "tracker.example.com"
-    end
-
-    test "extracts hostname from udp tracker_url" do
-      values = List.replace_at(@values, 15, "udp://opentracker.org:1337/announce")
-      torrent = Torrent.from_rpc_values(@hash, values)
-      assert torrent.tracker_host == "opentracker.org"
-    end
-
-    test "sets tracker_host to nil when tracker_url has no host" do
-      values = List.replace_at(@values, 15, "not-a-url")
-      torrent = Torrent.from_rpc_values(@hash, values)
-      assert torrent.tracker_host == nil
     end
   end
 
   describe "rpc_fields/0" do
-    test "returns a list of 16 strings" do
+    test "returns a list of 15 strings" do
       fields = Torrent.rpc_fields()
       assert is_list(fields)
-      assert length(fields) == 16
+      assert length(fields) == 15
       assert Enum.all?(fields, &is_binary/1)
+    end
+  end
+
+  describe "tracker_host_from_url/1" do
+    test "returns nil for empty string" do
+      assert Torrent.tracker_host_from_url("") == nil
+    end
+
+    test "extracts hostname from https URL" do
+      assert Torrent.tracker_host_from_url("https://tracker.example.com/announce") ==
+               "tracker.example.com"
+    end
+
+    test "extracts hostname from udp URL" do
+      assert Torrent.tracker_host_from_url("udp://opentracker.org:1337/announce") ==
+               "opentracker.org"
+    end
+
+    test "returns nil for URL with no recognisable host" do
+      assert Torrent.tracker_host_from_url("not-a-url") == nil
     end
   end
 end

@@ -28,8 +28,7 @@ defmodule Taniwha.CommandsTest do
       ts_started: 1_609_459_200,
       ts_finished: 0,
       base_path: "/downloads",
-      label: "",
-      tracker_url: ""
+      label: ""
     }
 
     m = Map.merge(defaults, overrides)
@@ -49,8 +48,7 @@ defmodule Taniwha.CommandsTest do
       m.ts_started,
       m.ts_finished,
       m.base_path,
-      m.label,
-      m.tracker_url
+      m.label
     ]
   end
 
@@ -470,6 +468,12 @@ defmodule Taniwha.CommandsTest do
         {:ok, all_results}
       end)
 
+      # tracker multicall — no trackers for either hash
+      expect(Taniwha.RPC.MockClient, :multicall, fn tracker_calls ->
+        assert length(tracker_calls) == 2
+        {:ok, [[[]], [[]]]}
+      end)
+
       {:ok, torrents} = Commands.get_all_torrents()
       assert length(torrents) == 2
       assert Enum.at(torrents, 0).name == "Torrent 1"
@@ -495,21 +499,36 @@ defmodule Taniwha.CommandsTest do
       assert Commands.get_all_torrents() == {:error, :timeout}
     end
 
-    test "tolerates multicall fault response for unknown fields (e.g. tracker_url)" do
-      fault = %{"faultCode" => -506, "faultString" => "Method 'd.tracker_url' not defined"}
+    test "populates tracker_host from t.multicall response" do
+      hash = "abc123"
 
-      # Start with normal wrapped values, then replace index 15 (tracker_url) with bare fault map
-      values =
-        torrent_rpc_values()
-        |> Enum.map(&[&1])
-        |> List.replace_at(15, fault)
+      expect(Taniwha.RPC.MockClient, :call, fn "download_list", [""] -> {:ok, [hash]} end)
 
-      Taniwha.RPC.MockClient
-      |> expect(:call, fn "download_list", _ -> {:ok, ["abc123"]} end)
-      |> expect(:multicall, fn _calls -> {:ok, values} end)
+      expect(Taniwha.RPC.MockClient, :multicall, fn _calls ->
+        {:ok, wrap_multicall(torrent_rpc_values())}
+      end)
 
-      assert {:ok, [torrent]} = Commands.get_all_torrents("")
-      assert torrent.hash == "abc123"
+      # t.multicall returns [["url"]] per tracker row; system.multicall wraps in [v]
+      expect(Taniwha.RPC.MockClient, :multicall, fn [{"t.multicall", [^hash, "", "t.url="]}] ->
+        {:ok, [[[["udp://tracker.example.com:1337/announce"]]]]}
+      end)
+
+      {:ok, [torrent]} = Commands.get_all_torrents()
+      assert torrent.tracker_host == "tracker.example.com"
+    end
+
+    test "returns torrents with nil tracker_host when tracker multicall fails" do
+      hash = "abc123"
+
+      expect(Taniwha.RPC.MockClient, :call, fn "download_list", [""] -> {:ok, [hash]} end)
+
+      expect(Taniwha.RPC.MockClient, :multicall, fn _calls ->
+        {:ok, wrap_multicall(torrent_rpc_values())}
+      end)
+
+      expect(Taniwha.RPC.MockClient, :multicall, fn _ -> {:error, :timeout} end)
+
+      {:ok, [torrent]} = Commands.get_all_torrents()
       assert torrent.tracker_host == nil
     end
   end

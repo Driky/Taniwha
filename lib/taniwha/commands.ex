@@ -113,7 +113,18 @@ defmodule Taniwha.Commands do
                      %{attributes: %{"command.name": "get_all_torrents"}} do
       with {:ok, hashes} <- list_hashes(view),
            {:ok, results} <- fetch_all_torrent_data(hashes) do
-        {:ok, build_torrents(hashes, results)}
+        base_torrents = build_torrents(hashes, results)
+
+        case fetch_tracker_hosts(hashes) do
+          {:ok, tracker_hosts} ->
+            {:ok,
+             Enum.map(base_torrents, fn t ->
+               %{t | tracker_host: Map.get(tracker_hosts, t.hash)}
+             end)}
+
+          {:error, _} ->
+            {:ok, base_torrents}
+        end
       end
     end
   end
@@ -634,6 +645,29 @@ defmodule Taniwha.Commands do
   @spec ok_on_zero({:ok, 0} | {:ok, term()} | {:error, term()}) :: :ok | {:error, term()}
   defp ok_on_zero({:ok, 0}), do: :ok
   defp ok_on_zero(other), do: other
+
+  @spec fetch_tracker_hosts([String.t()]) ::
+          {:ok, %{String.t() => String.t() | nil}} | {:error, term()}
+  defp fetch_tracker_hosts([]), do: {:ok, %{}}
+
+  defp fetch_tracker_hosts(hashes) do
+    calls = Enum.map(hashes, fn hash -> {"t.multicall", [hash, "", "t.url="]} end)
+
+    with {:ok, results} <- @rpc_client.multicall(calls) do
+      tracker_map =
+        hashes
+        |> Enum.zip(results)
+        |> Map.new(fn
+          {hash, [[[first_url | _] | _]]} ->
+            {hash, Torrent.tracker_host_from_url(first_url)}
+
+          {hash, _} ->
+            {hash, nil}
+        end)
+
+      {:ok, tracker_map}
+    end
+  end
 
   @spec fetch_all_torrent_data([String.t()]) :: {:ok, [term()]} | {:error, term()}
   defp fetch_all_torrent_data([]), do: {:ok, []}

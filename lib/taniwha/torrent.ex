@@ -66,8 +66,7 @@ defmodule Taniwha.Torrent do
     "d.timestamp.started",
     "d.timestamp.finished",
     "d.base_path",
-    "d.custom1",
-    "d.tracker_url"
+    "d.custom1"
   ]
 
   @diff_fields ~w(upload_rate download_rate completed_bytes state is_active is_hash_checking peers_connected ratio complete label)a
@@ -163,8 +162,7 @@ defmodule Taniwha.Torrent do
         ts_started,
         ts_finished,
         base_path,
-        label,
-        tracker_url
+        label
       ]) do
     %__MODULE__{
       hash: hash,
@@ -183,7 +181,7 @@ defmodule Taniwha.Torrent do
       finished_at: decode_timestamp(ts_finished),
       base_path: decode_base_path(base_path),
       label: decode_label(label),
-      tracker_host: decode_tracker_host(tracker_url)
+      tracker_host: nil
     }
   end
 
@@ -203,10 +201,16 @@ defmodule Taniwha.Torrent do
   defp decode_label(""), do: nil
   defp decode_label(label), do: label
 
-  @spec decode_tracker_host(String.t()) :: String.t() | nil
-  defp decode_tracker_host(""), do: nil
+  @doc """
+  Extracts the hostname from a tracker URL string.
 
-  defp decode_tracker_host(url) do
+  Returns `nil` for empty strings or URLs without a recognisable host component.
+  Supports `https://`, `udp://`, and other schemes understood by `:uri_string`.
+  """
+  @spec tracker_host_from_url(String.t()) :: String.t() | nil
+  def tracker_host_from_url(""), do: nil
+
+  def tracker_host_from_url(url) do
     case :uri_string.parse(url) do
       %{host: host} when is_binary(host) and host != "" -> host
       _ -> nil

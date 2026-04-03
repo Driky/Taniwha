@@ -86,8 +86,6 @@ defmodule Taniwha.CommandsOtelTest do
         # d.base_path
         ["/downloads"],
         # d.custom1 (label)
-        [""],
-        # d.tracker_url
         [""]
       ]
 
