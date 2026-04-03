@@ -201,12 +201,13 @@ defmodule Taniwha.Torrent do
     finished_at: DateTime.t() | nil,
     base_path: String.t() | nil,
     label: String.t() | nil,
+    tracker_host: String.t() | nil,
     files: list() | nil
   }
 end
 ```
 
-**`label`** is read from `d.custom1` (the de facto standard field used by ruTorrent). `diff_fields/0` includes `label` so label changes trigger PubSub broadcasts. **`files`** is typed as `list() | nil` because files are lazily loaded and not constrained to `TorrentFile.t()` at the struct level.
+**`label`** is read from `d.custom1` (the de facto standard field used by ruTorrent). `diff_fields/0` includes `label` so label changes trigger PubSub broadcasts. **`tracker_host`** is the hostname extracted from `d.tracker_url` via `:uri_string.parse/1` (e.g. `"udp://opentracker.org:1337/announce"` → `"opentracker.org"`). It is a static field (not in `diff_fields/0`) — it does not change for a running torrent. **`files`** is typed as `list() | nil` because files are lazily loaded and not constrained to `TorrentFile.t()` at the struct level.
 
 ### 7.2 TorrentFile struct
 
@@ -323,7 +324,7 @@ A GenServer that runs on a configurable interval (default: 2000ms).
 4. Write changes to ETS
 5. Broadcast diffs over PubSub
 
-**Diff logic:** A torrent is "updated" if any of these fields changed: `upload_rate`, `download_rate`, `completed_bytes`, `state`, `is_active`, `is_hash_checking`, `peers_connected`, `ratio`, `complete`, `label`.
+**Diff logic:** A torrent is "updated" if any of these fields changed: `upload_rate`, `download_rate`, `completed_bytes`, `state`, `is_active`, `is_hash_checking`, `peers_connected`, `ratio`, `complete`, `label`. Static fields (`name`, `base_path`, `tracker_host`) are intentionally excluded to avoid noisy broadcasts.
 
 **PubSub topics:**
 - `"torrents:list"` — receives `{:torrent_diffs, [{:added | :updated, Torrent.t()} | {:removed, hash}]}`
@@ -397,7 +398,7 @@ Clients connect to the socket with a JWT token parameter. The socket verifies th
 
 | View | Route | Description |
 |---|---|---|
-| `DashboardLive` | `/` | Torrent list with search, status/label/tracker filters, sortable columns, context menu, bulk selection, detail panel, confirm dialogs |
+| `DashboardLive` | `/` | Torrent list with search, multi-select sidebar filters (status/labels/trackers), sortable columns, context menu, bulk selection, detail panel, confirm dialogs |
 | `TorrentDetailLive` | `/torrents/:hash` | Full-page detail view — files, peers, trackers, speed history |
 | `AddTorrentLive` | `/add` | Thin shell; delegates to `AddTorrentComponent` |
 | `SettingsLive` | `/settings` | Connection config, label colour management |
@@ -409,6 +410,16 @@ Clients connect to the socket with a JWT token parameter. The socket verifies th
 - `LabelManagerComponent` — modal for renaming and deleting labels
 
 LiveView subscribes to the same PubSub topics as Channels, so both stay in sync via the same diff mechanism. Templates are inline (`render/1`) — no separate `.html.heex` files in `live/`.
+
+**Dashboard sidebar filter system:**
+
+The sidebar supports multi-select filtering across all three sections (Status, Labels, Trackers). Each section's filter state is a `MapSet` — empty set means "show all". Filters within a section use OR logic; filters across sections are ANDed.
+
+- Filter assigns: `filter :: MapSet.t(atom())`, `label_filter :: MapSet.t(String.t())`, `tracker_filter :: MapSet.t(String.t())`
+- `tracker_groups/1` computes `[{hostname, count}]` from `torrent.tracker_host` fields (recomputed on `torrent_diffs` PubSub events)
+- Client event: `sidebar_filter` with `%{"section" => "status"|"labels"|"trackers", "values" => [...]}`
+- The `SidebarFilter` colocated hook (attached to the `<nav>`) handles collapse toggle (localStorage persistence), plain click, ctrl+click (additive toggle), and shift+click (range select) before pushing `sidebar_filter` to the server
+- Collapsible sections start expanded; collapsed state is persisted per-section in `localStorage["taniwha-sidebar-collapse"]`
 
 ---
 
@@ -453,6 +464,7 @@ The auth system supports two paths:
 | `d.base_path` | hash | string | Full path to download |
 | `d.custom1` | hash | string | Label (de facto standard, compatible with ruTorrent) |
 | `d.custom1.set` | hash, string | 0 | Set label; pass `""` to clear |
+| `d.tracker_url` | hash | string | Primary tracker announce URL (empty string if none) |
 | `load.start` | "", url [, cmd...] | 0 | Add torrent by URL and start |
 | `load.raw_start` | "", binary [, cmd...] | 0 | Add .torrent file content |
 | `f.multicall` | hash, "", fields... | nested list | Per-file data |
