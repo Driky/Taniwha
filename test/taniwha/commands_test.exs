@@ -28,7 +28,8 @@ defmodule Taniwha.CommandsTest do
       ts_started: 1_609_459_200,
       ts_finished: 0,
       base_path: "/downloads",
-      label: ""
+      label: "",
+      tracker_url: ""
     }
 
     m = Map.merge(defaults, overrides)
@@ -48,7 +49,8 @@ defmodule Taniwha.CommandsTest do
       m.ts_started,
       m.ts_finished,
       m.base_path,
-      m.label
+      m.label,
+      m.tracker_url
     ]
   end
 

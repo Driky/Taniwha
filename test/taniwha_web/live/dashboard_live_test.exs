@@ -152,11 +152,11 @@ defmodule TaniwhaWeb.DashboardLiveTest do
   end
 
   # ---------------------------------------------------------------------------
-  # Batch 4 — Filter tabs
+  # Batch 4 — Sidebar filters (sidebar_filter event)
   # ---------------------------------------------------------------------------
 
-  describe "filter tabs" do
-    test ":all shows all torrents", %{conn: conn} do
+  describe "sidebar status filter" do
+    test "empty values shows all torrents", %{conn: conn} do
       downloading = %{
         Fixtures.torrent_fixture("h1")
         | state: :started,
@@ -176,16 +176,13 @@ defmodule TaniwhaWeb.DashboardLiveTest do
 
       {:ok, lv, _html} = live(conn, ~p"/")
 
-      html =
-        lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=all]")
-        |> render_click()
+      html = render_click(lv, "sidebar_filter", %{"section" => "status", "values" => []})
 
       assert html =~ downloading.name
       assert html =~ stopped.name
     end
 
-    test ":downloading shows only downloading torrents", %{conn: conn} do
+    test "downloading value shows only downloading torrents", %{conn: conn} do
       dl = %{
         Fixtures.torrent_fixture("h1")
         | state: :started,
@@ -207,15 +204,16 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       html =
-        lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=downloading]")
-        |> render_click()
+        render_click(lv, "sidebar_filter", %{
+          "section" => "status",
+          "values" => ["downloading"]
+        })
 
       assert html =~ "Active DL"
       refute html =~ "Stopped One"
     end
 
-    test ":seeding shows only seeding torrents", %{conn: conn} do
+    test "seeding value shows only seeding torrents", %{conn: conn} do
       seeding = %{
         Fixtures.torrent_fixture("h1")
         | state: :started,
@@ -237,15 +235,13 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       html =
-        lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=seeding]")
-        |> render_click()
+        render_click(lv, "sidebar_filter", %{"section" => "status", "values" => ["seeding"]})
 
       assert html =~ "Seeder"
       refute html =~ "Stopper"
     end
 
-    test ":stopped shows only stopped torrents", %{conn: conn} do
+    test "stopped value shows only stopped torrents", %{conn: conn} do
       downloading = %{
         Fixtures.torrent_fixture("h1")
         | state: :started,
@@ -267,12 +263,163 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       html =
-        lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=stopped]")
-        |> render_click()
+        render_click(lv, "sidebar_filter", %{"section" => "status", "values" => ["stopped"]})
 
       refute html =~ "Downloader"
       assert html =~ "Stopper"
+    end
+
+    test "multiple values applies OR logic", %{conn: conn} do
+      dl = %{
+        Fixtures.torrent_fixture("h1")
+        | state: :started,
+          is_active: true,
+          complete: false,
+          name: "Downloader"
+      }
+
+      stopped = %{
+        Fixtures.torrent_fixture("h2")
+        | state: :stopped,
+          is_active: false,
+          name: "Stopper"
+      }
+
+      seeding = %{
+        Fixtures.torrent_fixture("h3")
+        | state: :started,
+          is_active: true,
+          complete: true,
+          name: "Seeder"
+      }
+
+      Store.put_torrent(dl)
+      Store.put_torrent(stopped)
+      Store.put_torrent(seeding)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      html =
+        render_click(lv, "sidebar_filter", %{
+          "section" => "status",
+          "values" => ["downloading", "stopped"]
+        })
+
+      assert html =~ "Downloader"
+      assert html =~ "Stopper"
+      refute html =~ "Seeder"
+    end
+  end
+
+  describe "sidebar label filter" do
+    test "label value shows only torrents with that label", %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "movies", name: "Movie Torrent"}
+      t2 = %{Fixtures.torrent_fixture("h2") | label: "music", name: "Music Torrent"}
+      Store.put_torrent(t1)
+      Store.put_torrent(t2)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      html =
+        render_click(lv, "sidebar_filter", %{"section" => "labels", "values" => ["movies"]})
+
+      assert html =~ "Movie Torrent"
+      refute html =~ "Music Torrent"
+    end
+
+    test "empty label values shows all torrents", %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "movies", name: "Movie Torrent"}
+      t2 = %{Fixtures.torrent_fixture("h2") | label: "music", name: "Music Torrent"}
+      Store.put_torrent(t1)
+      Store.put_torrent(t2)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      render_click(lv, "sidebar_filter", %{"section" => "labels", "values" => ["movies"]})
+      html = render_click(lv, "sidebar_filter", %{"section" => "labels", "values" => []})
+
+      assert html =~ "Movie Torrent"
+      assert html =~ "Music Torrent"
+    end
+  end
+
+  describe "sidebar tracker filter" do
+    test "tracker value shows only torrents with that tracker host", %{conn: conn} do
+      t1 = %{
+        Fixtures.torrent_fixture("h1")
+        | tracker_host: "tracker.example.com",
+          name: "Example Torrent"
+      }
+
+      t2 = %{
+        Fixtures.torrent_fixture("h2")
+        | tracker_host: "other.tracker.net",
+          name: "Other Torrent"
+      }
+
+      Store.put_torrent(t1)
+      Store.put_torrent(t2)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      html =
+        render_click(lv, "sidebar_filter", %{
+          "section" => "trackers",
+          "values" => ["tracker.example.com"]
+        })
+
+      assert html =~ "Example Torrent"
+      refute html =~ "Other Torrent"
+    end
+
+    test "empty tracker values shows all torrents", %{conn: conn} do
+      t1 = %{
+        Fixtures.torrent_fixture("h1")
+        | tracker_host: "tracker.example.com",
+          name: "Example Torrent"
+      }
+
+      t2 = %{
+        Fixtures.torrent_fixture("h2")
+        | tracker_host: "other.tracker.net",
+          name: "Other Torrent"
+      }
+
+      Store.put_torrent(t1)
+      Store.put_torrent(t2)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      html = render_click(lv, "sidebar_filter", %{"section" => "trackers", "values" => []})
+
+      assert html =~ "Example Torrent"
+      assert html =~ "Other Torrent"
+    end
+  end
+
+  describe "tracker_groups" do
+    test "computed on mount from torrent tracker_host fields", %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | tracker_host: "tracker.example.com"}
+      t2 = %{Fixtures.torrent_fixture("h2") | tracker_host: "tracker.example.com"}
+      t3 = %{Fixtures.torrent_fixture("h3") | tracker_host: "other.net"}
+      Store.put_torrent(t1)
+      Store.put_torrent(t2)
+      Store.put_torrent(t3)
+
+      {:ok, _lv, html} = live(conn, ~p"/")
+
+      assert html =~ "tracker.example.com"
+      assert html =~ "other.net"
+    end
+
+    test "updated when torrents diff", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      new_torrent = %{Fixtures.torrent_fixture("newhash") | tracker_host: "new.tracker.io"}
+      send(lv.pid, {:torrent_diffs, [{:added, new_torrent}]})
+
+      html = render(lv)
+      assert html =~ "new.tracker.io"
     end
   end
 
@@ -879,9 +1026,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       html =
-        lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=Movies]")
-        |> render_click()
+        render_click(lv, "sidebar_filter", %{"section" => "labels", "values" => ["Movies"]})
 
       assert html =~ "Movie Torrent"
       refute html =~ "Linux ISO"
@@ -911,15 +1056,14 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       # First filter by label
-      lv
-      |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=Movies]")
-      |> render_click()
+      render_click(lv, "sidebar_filter", %{"section" => "labels", "values" => ["Movies"]})
 
       # Then filter by status (downloading only)
       html =
-        lv
-        |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=downloading]")
-        |> render_click()
+        render_click(lv, "sidebar_filter", %{
+          "section" => "status",
+          "values" => ["downloading"]
+        })
 
       assert html =~ "Movie DL"
       refute html =~ "Movie Seeder"
@@ -940,7 +1084,7 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       assert html =~ "Linux"
     end
 
-    test "filter_label all resets to show all torrents", %{conn: conn} do
+    test "label filter all resets to show all torrents", %{conn: conn} do
       t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies", name: "Movie Torrent"}
       t2 = %{Fixtures.torrent_fixture("h2") | label: "Linux", name: "Linux ISO"}
       Enum.each([t1, t2], &Store.put_torrent/1)
@@ -948,12 +1092,10 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       {:ok, lv, _html} = live(conn, ~p"/")
 
       # Filter to Movies
-      lv
-      |> element("nav[aria-label=\"Torrent filters\"] button[phx-value-filter=Movies]")
-      |> render_click()
+      render_click(lv, "sidebar_filter", %{"section" => "labels", "values" => ["Movies"]})
 
-      # Reset to all — click the All status button (which also triggers filter reset)
-      html = render_click(lv, "filter_label", %{"filter" => "all"})
+      # Reset to all via empty values
+      html = render_click(lv, "sidebar_filter", %{"section" => "labels", "values" => []})
 
       assert html =~ "Movie Torrent"
       assert html =~ "Linux ISO"

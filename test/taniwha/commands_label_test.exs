@@ -9,7 +9,7 @@ defmodule Taniwha.CommandsLabelTest do
 
   setup :verify_on_exit!
 
-  # Raw RPC values in Torrent.rpc_fields/0 order, including label as last field.
+  # Raw RPC values in Torrent.rpc_fields/0 order, including label and tracker_url.
   defp torrent_rpc_values(overrides \\ %{}) do
     defaults = %{
       name: "My Torrent",
@@ -26,7 +26,8 @@ defmodule Taniwha.CommandsLabelTest do
       ts_started: 1_609_459_200,
       ts_finished: 0,
       base_path: "/downloads",
-      label: ""
+      label: "",
+      tracker_url: ""
     }
 
     m = Map.merge(defaults, overrides)
@@ -46,7 +47,8 @@ defmodule Taniwha.CommandsLabelTest do
       m.ts_started,
       m.ts_finished,
       m.base_path,
-      m.label
+      m.label,
+      m.tracker_url
     ]
   end
 

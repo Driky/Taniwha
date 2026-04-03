@@ -188,8 +188,8 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
     test "renders a nav element with aria-label" do
       html =
         render_component(&sidebar/1,
-          filter: :all,
-          tracker_filter: :all,
+          filter: MapSet.new(),
+          tracker_filter: MapSet.new(),
           status_counts: base_counts()
         )
 
@@ -200,8 +200,8 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
     test "renders Status section header" do
       html =
         render_component(&sidebar/1,
-          filter: :all,
-          tracker_filter: :all,
+          filter: MapSet.new(),
+          tracker_filter: MapSet.new(),
           status_counts: base_counts()
         )
 
@@ -211,8 +211,8 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
     test "renders all five status filter items" do
       html =
         render_component(&sidebar/1,
-          filter: :all,
-          tracker_filter: :all,
+          filter: MapSet.new(),
+          tracker_filter: MapSet.new(),
           status_counts: base_counts()
         )
 
@@ -226,8 +226,8 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
     test "active filter item has aria-pressed=true" do
       html =
         render_component(&sidebar/1,
-          filter: :downloading,
-          tracker_filter: :all,
+          filter: MapSet.new([:downloading]),
+          tracker_filter: MapSet.new(),
           status_counts: base_counts()
         )
 
@@ -237,8 +237,8 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
     test "inactive filter items have aria-pressed=false" do
       html =
         render_component(&sidebar/1,
-          filter: :downloading,
-          tracker_filter: :all,
+          filter: MapSet.new([:downloading]),
+          tracker_filter: MapSet.new(),
           status_counts: base_counts()
         )
 
@@ -248,8 +248,8 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
     test "count badges show correct numbers" do
       html =
         render_component(&sidebar/1,
-          filter: :all,
-          tracker_filter: :all,
+          filter: MapSet.new(),
+          tracker_filter: MapSet.new(),
           status_counts: base_counts()
         )
 
@@ -261,8 +261,8 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
     test "renders Trackers section header" do
       html =
         render_component(&sidebar/1,
-          filter: :all,
-          tracker_filter: :all,
+          filter: MapSet.new(),
+          tracker_filter: MapSet.new(),
           status_counts: base_counts()
         )
 
@@ -274,8 +274,8 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
 
       html =
         render_component(&sidebar/1,
-          filter: :all,
-          tracker_filter: :all,
+          filter: MapSet.new(),
+          tracker_filter: MapSet.new(),
           status_counts: base_counts(),
           tracker_groups: groups
         )
@@ -287,8 +287,8 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
     test "renders Labels section header" do
       html =
         render_component(&sidebar/1,
-          filter: :all,
-          tracker_filter: :all,
+          filter: MapSet.new(),
+          tracker_filter: MapSet.new(),
           status_counts: base_counts()
         )
 
@@ -298,8 +298,8 @@ defmodule TaniwhaWeb.TorrentComponentsTest do
     test "shows empty labels placeholder text" do
       html =
         render_component(&sidebar/1,
-          filter: :all,
-          tracker_filter: :all,
+          filter: MapSet.new(),
+          tracker_filter: MapSet.new(),
           status_counts: base_counts()
         )
 

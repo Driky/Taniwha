@@ -707,6 +707,7 @@ defmodule TaniwhaWeb.TorrentComponents.TableComponents do
             const hash = row.dataset.hash;
 
             if (e.shiftKey && this._anchor) {
+              e.preventDefault(); // prevent browser text selection during range select
               // Range select: walk DOM order between anchor and current row
               const rows = Array.from(this.el.querySelectorAll("tr[data-hash]"));
               const anchorIdx = rows.findIndex((r) => r.dataset.hash === this._anchor);

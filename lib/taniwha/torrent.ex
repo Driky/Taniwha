@@ -26,6 +26,7 @@ defmodule Taniwha.Torrent do
           finished_at: DateTime.t() | nil,
           base_path: String.t() | nil,
           label: String.t() | nil,
+          tracker_host: String.t() | nil,
           files: list() | nil
         }
 
@@ -46,6 +47,7 @@ defmodule Taniwha.Torrent do
     finished_at: nil,
     base_path: nil,
     label: nil,
+    tracker_host: nil,
     files: nil
   ]
 
@@ -64,7 +66,8 @@ defmodule Taniwha.Torrent do
     "d.timestamp.started",
     "d.timestamp.finished",
     "d.base_path",
-    "d.custom1"
+    "d.custom1",
+    "d.tracker_url"
   ]
 
   @diff_fields ~w(upload_rate download_rate completed_bytes state is_active is_hash_checking peers_connected ratio complete label)a
@@ -160,7 +163,8 @@ defmodule Taniwha.Torrent do
         ts_started,
         ts_finished,
         base_path,
-        label
+        label,
+        tracker_url
       ]) do
     %__MODULE__{
       hash: hash,
@@ -178,7 +182,8 @@ defmodule Taniwha.Torrent do
       started_at: decode_timestamp(ts_started),
       finished_at: decode_timestamp(ts_finished),
       base_path: decode_base_path(base_path),
-      label: decode_label(label)
+      label: decode_label(label),
+      tracker_host: decode_tracker_host(tracker_url)
     }
   end
 
@@ -197,4 +202,14 @@ defmodule Taniwha.Torrent do
   @spec decode_label(String.t()) :: String.t() | nil
   defp decode_label(""), do: nil
   defp decode_label(label), do: label
+
+  @spec decode_tracker_host(String.t()) :: String.t() | nil
+  defp decode_tracker_host(""), do: nil
+
+  defp decode_tracker_host(url) do
+    case :uri_string.parse(url) do
+      %{host: host} when is_binary(host) and host != "" -> host
+      _ -> nil
+    end
+  end
 end

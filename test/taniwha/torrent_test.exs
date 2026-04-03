@@ -133,7 +133,7 @@ defmodule Taniwha.TorrentTest do
     # Field order: name, size_bytes, completed_bytes, up.rate, down.rate,
     #              ratio, state, is_active, complete, is_hash_checking,
     #              peers_connected, timestamp.started, timestamp.finished, base_path,
-    #              custom1 (label)
+    #              custom1 (label), tracker_url
     @values [
       "Ubuntu 22.04",
       1_000_000,
@@ -149,6 +149,7 @@ defmodule Taniwha.TorrentTest do
       1_700_000_000,
       0,
       "/downloads/ubuntu",
+      "",
       ""
     ]
 
@@ -202,13 +203,35 @@ defmodule Taniwha.TorrentTest do
     test "sets files to nil (files not populated in from_rpc_values)", %{torrent: t} do
       assert t.files == nil
     end
+
+    test "sets tracker_host to nil when tracker_url is empty", %{torrent: t} do
+      assert t.tracker_host == nil
+    end
+
+    test "extracts hostname from https tracker_url" do
+      values = List.replace_at(@values, 15, "https://tracker.example.com/announce")
+      torrent = Torrent.from_rpc_values(@hash, values)
+      assert torrent.tracker_host == "tracker.example.com"
+    end
+
+    test "extracts hostname from udp tracker_url" do
+      values = List.replace_at(@values, 15, "udp://opentracker.org:1337/announce")
+      torrent = Torrent.from_rpc_values(@hash, values)
+      assert torrent.tracker_host == "opentracker.org"
+    end
+
+    test "sets tracker_host to nil when tracker_url has no host" do
+      values = List.replace_at(@values, 15, "not-a-url")
+      torrent = Torrent.from_rpc_values(@hash, values)
+      assert torrent.tracker_host == nil
+    end
   end
 
   describe "rpc_fields/0" do
-    test "returns a list of 15 strings" do
+    test "returns a list of 16 strings" do
       fields = Torrent.rpc_fields()
       assert is_list(fields)
-      assert length(fields) == 15
+      assert length(fields) == 16
       assert Enum.all?(fields, &is_binary/1)
     end
   end

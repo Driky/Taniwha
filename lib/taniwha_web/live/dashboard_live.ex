@@ -41,10 +41,10 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign(:search, "")
       |> assign(:sort_by, :name)
       |> assign(:sort_dir, :asc)
-      |> assign(:filter, :all)
-      |> assign(:tracker_filter, :all)
-      |> assign(:tracker_groups, [])
-      |> assign(:label_filter, :all)
+      |> assign(:filter, MapSet.new())
+      |> assign(:tracker_filter, MapSet.new())
+      |> assign(:tracker_groups, tracker_groups(torrents))
+      |> assign(:label_filter, MapSet.new())
       |> assign(:label_groups, label_groups(torrents))
       |> assign(:show_label_manager, false)
       |> assign(:selected_hashes, MapSet.new())
@@ -80,7 +80,12 @@ defmodule TaniwhaWeb.DashboardLive do
         Enum.map(ts, fn t -> if t.hash == torrent.hash, do: torrent, else: t end)
       end)
 
-    {:noreply, assign(socket, :label_groups, label_groups(socket.assigns.torrents))}
+    torrents = socket.assigns.torrents
+
+    {:noreply,
+     socket
+     |> assign(:label_groups, label_groups(torrents))
+     |> assign(:tracker_groups, tracker_groups(torrents))}
   end
 
   def handle_info({:torrent_diffs, diffs}, socket) do
@@ -93,6 +98,7 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign_global_stats(torrents)
       |> assign(:status_counts, status_counts(torrents))
       |> assign(:label_groups, label_groups(torrents))
+      |> assign(:tracker_groups, tracker_groups(torrents))
       |> maybe_close_detail_panel(removed_hashes)
 
     {:noreply, socket}
@@ -146,9 +152,7 @@ defmodule TaniwhaWeb.DashboardLive do
   end
 
   def handle_info({:label_deleted, label}, socket) do
-    label_filter =
-      if socket.assigns.label_filter == label, do: :all, else: socket.assigns.label_filter
-
+    label_filter = MapSet.delete(socket.assigns.label_filter, label)
     label_groups = Enum.reject(socket.assigns.label_groups, fn {n, _} -> n == label end)
 
     {:noreply,
@@ -157,7 +161,11 @@ defmodule TaniwhaWeb.DashboardLive do
 
   def handle_info({:label_renamed, old_name, new_name}, socket) do
     label_filter =
-      if socket.assigns.label_filter == old_name, do: :all, else: socket.assigns.label_filter
+      if MapSet.member?(socket.assigns.label_filter, old_name) do
+        socket.assigns.label_filter |> MapSet.delete(old_name) |> MapSet.put(new_name)
+      else
+        socket.assigns.label_filter
+      end
 
     label_groups =
       socket.assigns.label_groups
@@ -242,16 +250,17 @@ defmodule TaniwhaWeb.DashboardLive do
     {:noreply, assign(socket, :search, v)}
   end
 
-  def handle_event("filter", %{"filter" => v}, socket) do
-    {:noreply, assign(socket, :filter, parse_filter(v))}
+  def handle_event("sidebar_filter", %{"section" => "status", "values" => values}, socket) do
+    filter = values |> Enum.map(&parse_filter/1) |> MapSet.new()
+    {:noreply, assign(socket, :filter, filter)}
   end
 
-  def handle_event("filter_tracker", %{"filter" => domain}, socket) do
-    {:noreply, assign(socket, :tracker_filter, parse_tracker_filter(domain))}
+  def handle_event("sidebar_filter", %{"section" => "labels", "values" => values}, socket) do
+    {:noreply, assign(socket, :label_filter, MapSet.new(values))}
   end
 
-  def handle_event("filter_label", %{"filter" => v}, socket) do
-    {:noreply, assign(socket, :label_filter, parse_label_filter(v))}
+  def handle_event("sidebar_filter", %{"section" => "trackers", "values" => values}, socket) do
+    {:noreply, assign(socket, :tracker_filter, MapSet.new(values))}
   end
 
   def handle_event("show_label_manager", _params, socket) do
@@ -554,9 +563,9 @@ defmodule TaniwhaWeb.DashboardLive do
   @spec visible_torrents(
           [Torrent.t()],
           String.t(),
-          atom(),
-          atom() | String.t(),
-          atom() | String.t(),
+          MapSet.t(),
+          MapSet.t(),
+          MapSet.t(),
           atom(),
           atom()
         ) :: [Torrent.t()]
@@ -576,6 +585,16 @@ defmodule TaniwhaWeb.DashboardLive do
     |> Enum.reject(&is_nil(&1.label))
     |> Enum.group_by(& &1.label)
     |> Enum.map(fn {label, ts} -> {label, length(ts)} end)
+    |> Enum.sort_by(&elem(&1, 0))
+  end
+
+  @doc false
+  @spec tracker_groups([Torrent.t()]) :: [{String.t(), non_neg_integer()}]
+  def tracker_groups(torrents) do
+    torrents
+    |> Enum.reject(&is_nil(&1.tracker_host))
+    |> Enum.group_by(& &1.tracker_host)
+    |> Enum.map(fn {host, ts} -> {host, length(ts)} end)
     |> Enum.sort_by(&elem(&1, 0))
   end
 
@@ -630,11 +649,11 @@ defmodule TaniwhaWeb.DashboardLive do
     |> assign(:total_count, total)
   end
 
-  @spec filter_by_status([Torrent.t()], atom()) :: [Torrent.t()]
-  defp filter_by_status(torrents, :all), do: torrents
-
-  defp filter_by_status(torrents, status) do
-    Enum.filter(torrents, fn t -> Torrent.status(t) == status end)
+  @spec filter_by_status([Torrent.t()], MapSet.t()) :: [Torrent.t()]
+  defp filter_by_status(torrents, statuses) do
+    if Enum.empty?(statuses),
+      do: torrents,
+      else: Enum.filter(torrents, &MapSet.member?(statuses, Torrent.status(&1)))
   end
 
   @spec filter_by_search([Torrent.t()], String.t()) :: [Torrent.t()]
@@ -662,29 +681,27 @@ defmodule TaniwhaWeb.DashboardLive do
   defp sort_key(:ratio), do: & &1.ratio
   defp sort_key(:status), do: &Torrent.status/1
 
-  @spec filter_by_tracker([Torrent.t()], atom() | String.t()) :: [Torrent.t()]
-  # TODO: implement when Torrent struct exposes tracker URLs
-  defp filter_by_tracker(torrents, :all), do: torrents
-  defp filter_by_tracker(torrents, _domain), do: torrents
+  @spec filter_by_tracker([Torrent.t()], MapSet.t()) :: [Torrent.t()]
+  defp filter_by_tracker(torrents, hosts) do
+    if Enum.empty?(hosts),
+      do: torrents,
+      else: Enum.filter(torrents, &MapSet.member?(hosts, &1.tracker_host))
+  end
 
-  @spec filter_by_label([Torrent.t()], atom() | String.t()) :: [Torrent.t()]
-  defp filter_by_label(torrents, :all), do: torrents
-  defp filter_by_label(torrents, label), do: Enum.filter(torrents, &(&1.label == label))
+  @spec filter_by_label([Torrent.t()], MapSet.t()) :: [Torrent.t()]
+  defp filter_by_label(torrents, labels) do
+    if Enum.empty?(labels),
+      do: torrents,
+      else: Enum.filter(torrents, &MapSet.member?(labels, &1.label))
+  end
 
   @spec parse_filter(String.t()) :: atom()
-  defp parse_filter("all"), do: :all
   defp parse_filter("downloading"), do: :downloading
   defp parse_filter("seeding"), do: :seeding
   defp parse_filter("stopped"), do: :stopped
-  defp parse_filter(_), do: :all
-
-  @spec parse_tracker_filter(String.t()) :: :all | String.t()
-  defp parse_tracker_filter("all"), do: :all
-  defp parse_tracker_filter(domain), do: domain
-
-  @spec parse_label_filter(String.t()) :: :all | String.t()
-  defp parse_label_filter("all"), do: :all
-  defp parse_label_filter(label), do: label
+  defp parse_filter("checking"), do: :checking
+  defp parse_filter("paused"), do: :paused
+  defp parse_filter(_), do: :unknown
 
   @spec parse_sort_column(String.t()) :: atom()
   defp parse_sort_column("name"), do: :name

@@ -9,6 +9,8 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
   import TaniwhaWeb.TorrentComponents.ThrottleComponents, only: [throttle_context_menu: 1]
   import TaniwhaWeb.FormatHelpers, only: [format_speed: 1]
 
+  alias Phoenix.LiveView.ColocatedHook
+
   # ---------------------------------------------------------------------------
   # topbar/1
   # ---------------------------------------------------------------------------
@@ -286,137 +288,276 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
         tracker_groups={@tracker_groups}
       />
   """
-  attr :filter, :atom, required: true
+  attr :filter, :any, required: true
   attr :tracker_filter, :any, required: true
   attr :status_counts, :map, required: true
   attr :tracker_groups, :list, default: []
-  attr :label_filter, :any, default: :all
+  attr :label_filter, :any, default: nil
   attr :label_groups, :list, default: []
 
   def sidebar(assigns) do
     ~H"""
     <nav
+      id="sidebar-nav"
       aria-label="Torrent filters"
+      phx-hook=".SidebarFilter"
       class="flex flex-col shrink-0 border-r overflow-y-auto"
       style="width: var(--taniwha-sidebar-w); background: var(--taniwha-sidebar-bg); border-color: var(--taniwha-sidebar-border)"
     >
       <%!-- Status section --%>
-      <div class="pt-2">
-        <p
-          class="px-3 pb-1 text-[10px] font-semibold tracking-[0.08em] uppercase"
+      <div class="pt-2" data-filter-section="status">
+        <button
+          type="button"
+          data-collapse-toggle
+          class="flex items-center justify-between w-full px-3 pb-1 pt-0"
           style="color: var(--taniwha-sidebar-section)"
         >
-          Status
-        </p>
-
-        <.sidebar_filter_item
-          label="All"
-          value="all"
-          active?={@filter == :all}
-          count={Map.get(@status_counts, :all, 0)}
-          dot_color={status_dot_color(:all)}
-          event="filter"
-        />
-        <.sidebar_filter_item
-          label="Downloading"
-          value="downloading"
-          active?={@filter == :downloading}
-          count={Map.get(@status_counts, :downloading, 0)}
-          dot_color={status_dot_color(:downloading)}
-          event="filter"
-        />
-        <.sidebar_filter_item
-          label="Seeding"
-          value="seeding"
-          active?={@filter == :seeding}
-          count={Map.get(@status_counts, :seeding, 0)}
-          dot_color={status_dot_color(:seeding)}
-          event="filter"
-        />
-        <.sidebar_filter_item
-          label="Stopped"
-          value="stopped"
-          active?={@filter == :stopped}
-          count={Map.get(@status_counts, :stopped, 0)}
-          dot_color={status_dot_color(:stopped)}
-          event="filter"
-        />
-        <.sidebar_filter_item
-          label="Checking"
-          value="checking"
-          active?={@filter == :checking}
-          count={Map.get(@status_counts, :checking, 0)}
-          dot_color={status_dot_color(:checking)}
-          event="filter"
-        />
-      </div>
-
-      <%!-- Divider --%>
-      <div class="mx-3 my-1 border-t" style="border-color: var(--taniwha-sidebar-border)" />
-
-      <%!-- Trackers section --%>
-      <%!-- TODO: populate once Torrent struct exposes tracker URLs --%>
-      <div>
-        <p
-          class="px-3 pb-1 text-[10px] font-semibold tracking-[0.08em] uppercase"
-          style="color: var(--taniwha-sidebar-section)"
-        >
-          Trackers
-        </p>
-
-        <.sidebar_filter_item
-          :for={{domain, count} <- @tracker_groups}
-          label={domain}
-          value={domain}
-          active?={@tracker_filter == domain}
-          count={count}
-          event="filter_tracker"
-        />
+          <span class="text-[10px] font-semibold tracking-[0.08em] uppercase">Status</span>
+          <svg
+            data-collapse-icon
+            class="w-3 h-3 transition-transform duration-150"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div data-section-content>
+          <.sidebar_filter_item
+            label="All"
+            value="all"
+            active?={Enum.empty?(@filter)}
+            count={Map.get(@status_counts, :all, 0)}
+            dot_color={status_dot_color(:all)}
+          />
+          <.sidebar_filter_item
+            label="Downloading"
+            value="downloading"
+            active?={MapSet.member?(@filter, :downloading)}
+            count={Map.get(@status_counts, :downloading, 0)}
+            dot_color={status_dot_color(:downloading)}
+          />
+          <.sidebar_filter_item
+            label="Seeding"
+            value="seeding"
+            active?={MapSet.member?(@filter, :seeding)}
+            count={Map.get(@status_counts, :seeding, 0)}
+            dot_color={status_dot_color(:seeding)}
+          />
+          <.sidebar_filter_item
+            label="Stopped"
+            value="stopped"
+            active?={MapSet.member?(@filter, :stopped)}
+            count={Map.get(@status_counts, :stopped, 0)}
+            dot_color={status_dot_color(:stopped)}
+          />
+          <.sidebar_filter_item
+            label="Checking"
+            value="checking"
+            active?={MapSet.member?(@filter, :checking)}
+            count={Map.get(@status_counts, :checking, 0)}
+            dot_color={status_dot_color(:checking)}
+          />
+        </div>
       </div>
 
       <%!-- Divider --%>
       <div class="mx-3 my-1 border-t" style="border-color: var(--taniwha-sidebar-border)" />
 
       <%!-- Labels section --%>
-      <div>
-        <p
-          class="px-3 pb-1 text-[10px] font-semibold tracking-[0.08em] uppercase"
-          style="color: var(--taniwha-sidebar-section)"
-        >
-          Labels
-        </p>
-
-        <%= if @label_groups == [] do %>
-          <p
-            class="px-3 py-1 text-[10px] italic"
-            style="color: var(--taniwha-sidebar-section)"
-          >
-            No labels yet
-          </p>
-        <% else %>
-          <.sidebar_filter_item
-            :for={{label, count} <- @label_groups}
-            label={label}
-            value={label}
-            active?={@label_filter == label}
-            count={count}
-            dot_color={label_dot_color(label)}
-            event="filter_label"
-          />
-          <%!-- Divider above Manage labels --%>
-          <div class="mx-3 mt-1 border-t" style="border-color: var(--taniwha-sidebar-border)" />
-        <% end %>
-
+      <div data-filter-section="labels">
         <button
           type="button"
-          phx-click="show_label_manager"
-          class="flex items-center w-full px-3 h-[27px] text-[10px] text-left"
+          data-collapse-toggle
+          class="flex items-center justify-between w-full px-3 pb-1 pt-0"
           style="color: var(--taniwha-sidebar-section)"
         >
-          Manage labels
+          <span class="text-[10px] font-semibold tracking-[0.08em] uppercase">Labels</span>
+          <svg
+            data-collapse-icon
+            class="w-3 h-3 transition-transform duration-150"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
         </button>
+        <div data-section-content>
+          <%= if @label_groups == [] do %>
+            <p
+              class="px-3 py-1 text-[10px] italic"
+              style="color: var(--taniwha-sidebar-section)"
+            >
+              No labels yet
+            </p>
+          <% else %>
+            <.sidebar_filter_item
+              label="All"
+              value="all"
+              active?={Enum.empty?(@label_filter || MapSet.new())}
+              count={Enum.reduce(@label_groups, 0, fn {_, c}, acc -> acc + c end)}
+            />
+            <.sidebar_filter_item
+              :for={{label, count} <- @label_groups}
+              label={label}
+              value={label}
+              active?={MapSet.member?(@label_filter || MapSet.new(), label)}
+              count={count}
+              dot_color={label_dot_color(label)}
+            />
+            <%!-- Divider above Manage labels --%>
+            <div class="mx-3 mt-1 border-t" style="border-color: var(--taniwha-sidebar-border)" />
+          <% end %>
+
+          <button
+            type="button"
+            phx-click="show_label_manager"
+            class="flex items-center w-full px-3 h-[27px] text-[10px] text-left"
+            style="color: var(--taniwha-sidebar-section)"
+          >
+            Manage labels
+          </button>
+        </div>
+      </div>
+
+      <%!-- Divider --%>
+      <div class="mx-3 my-1 border-t" style="border-color: var(--taniwha-sidebar-border)" />
+
+      <%!-- Trackers section --%>
+      <div data-filter-section="trackers">
+        <button
+          type="button"
+          data-collapse-toggle
+          class="flex items-center justify-between w-full px-3 pb-1 pt-0"
+          style="color: var(--taniwha-sidebar-section)"
+        >
+          <span class="text-[10px] font-semibold tracking-[0.08em] uppercase">Trackers</span>
+          <svg
+            data-collapse-icon
+            class="w-3 h-3 transition-transform duration-150"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div data-section-content>
+          <%= if @tracker_groups != [] do %>
+            <.sidebar_filter_item
+              label="All"
+              value="all"
+              active?={Enum.empty?(@tracker_filter)}
+              count={Enum.reduce(@tracker_groups, 0, fn {_, c}, acc -> acc + c end)}
+            />
+            <.sidebar_filter_item
+              :for={{domain, count} <- @tracker_groups}
+              label={domain}
+              value={domain}
+              active?={MapSet.member?(@tracker_filter, domain)}
+              count={count}
+            />
+          <% end %>
+        </div>
       </div>
     </nav>
+
+    <script :type={ColocatedHook} name=".SidebarFilter">
+      export default {
+        _anchors: {},
+
+        mounted() {
+          const stored = (() => {
+            try { return JSON.parse(localStorage.getItem("taniwha-sidebar-collapse") || "{}") }
+            catch { return {} }
+          })()
+
+          this.el.querySelectorAll("[data-filter-section]").forEach(section => {
+            const name = section.dataset.filterSection
+            const content = section.querySelector("[data-section-content]")
+            const icon = section.querySelector("[data-collapse-icon]")
+            if (stored[name] && content) {
+              content.classList.add("hidden")
+              if (icon) icon.style.transform = "rotate(-90deg)"
+            }
+          })
+
+          this._onClick = (e) => {
+            // Collapse toggle
+            const toggleBtn = e.target.closest("[data-collapse-toggle]")
+            if (toggleBtn) {
+              const section = toggleBtn.closest("[data-filter-section]")
+              if (!section) return
+              const content = section.querySelector("[data-section-content]")
+              const icon = section.querySelector("[data-collapse-icon]")
+              if (!content) return
+              const isHidden = content.classList.toggle("hidden")
+              if (icon) icon.style.transform = isHidden ? "rotate(-90deg)" : ""
+              const name = section.dataset.filterSection
+              const stored = (() => {
+                try { return JSON.parse(localStorage.getItem("taniwha-sidebar-collapse") || "{}") }
+                catch { return {} }
+              })()
+              stored[name] = isHidden
+              localStorage.setItem("taniwha-sidebar-collapse", JSON.stringify(stored))
+              return
+            }
+
+            // Filter click
+            const btn = e.target.closest("[data-filter-value]")
+            if (!btn) return
+            const sectionEl = btn.closest("[data-filter-section]")
+            if (!sectionEl) return
+            const section = sectionEl.dataset.filterSection
+            const value = btn.dataset.filterValue
+
+            const itemBtns = Array.from(
+              sectionEl.querySelectorAll("[data-filter-value]:not([data-filter-value=all])")
+            )
+            const currentSelected = new Set(
+              itemBtns
+                .filter(b => b.getAttribute("aria-pressed") === "true")
+                .map(b => b.dataset.filterValue)
+            )
+
+            let newSelected
+            if (value === "all") {
+              newSelected = new Set()
+              this._anchors[section] = null
+            } else if (e.shiftKey && this._anchors[section]) {
+              const anchor = this._anchors[section]
+              const anchorIdx = itemBtns.findIndex(b => b.dataset.filterValue === anchor)
+              const currentIdx = itemBtns.findIndex(b => b.dataset.filterValue === value)
+              const [lo, hi] = anchorIdx < currentIdx
+                ? [anchorIdx, currentIdx]
+                : [currentIdx, anchorIdx]
+              newSelected = new Set(itemBtns.slice(lo, hi + 1).map(b => b.dataset.filterValue))
+            } else if (e.ctrlKey || e.metaKey) {
+              newSelected = new Set(currentSelected)
+              if (newSelected.has(value)) newSelected.delete(value)
+              else newSelected.add(value)
+              this._anchors[section] = value
+            } else {
+              newSelected = new Set([value])
+              this._anchors[section] = value
+            }
+
+            this.pushEvent("sidebar_filter", { section, values: [...newSelected] })
+          }
+
+          this.el.addEventListener("click", this._onClick)
+        },
+
+        destroyed() {
+          this.el.removeEventListener("click", this._onClick)
+        }
+      }
+    </script>
     """
   end
 
@@ -424,15 +565,13 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
   attr :value, :string, required: true
   attr :active?, :boolean, required: true
   attr :count, :integer, required: true
-  attr :event, :string, required: true
   attr :dot_color, :string, default: nil
 
   defp sidebar_filter_item(assigns) do
     ~H"""
     <button
       type="button"
-      phx-click={@event}
-      phx-value-filter={@value}
+      data-filter-value={@value}
       aria-pressed={to_string(@active?)}
       class="flex items-center gap-2 w-full px-3 h-[27px] text-[11px] text-left"
       style={sidebar_item_style(@active?)}
