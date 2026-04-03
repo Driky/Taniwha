@@ -646,7 +646,10 @@ defmodule Taniwha.Commands do
   @spec build_torrents([String.t()], [term()]) :: [Torrent.t()]
   defp build_torrents(hashes, results) do
     results
-    |> Enum.map(fn [v] -> v end)
+    |> Enum.map(fn
+      [v] -> v
+      %{"faultCode" => _, "faultString" => _} -> ""
+    end)
     |> Enum.chunk_every(@torrent_fields_count)
     |> Enum.zip(hashes)
     |> Enum.map(fn {values, hash} -> Torrent.from_rpc_values(hash, values) end)

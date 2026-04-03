@@ -494,6 +494,24 @@ defmodule Taniwha.CommandsTest do
       expect(Taniwha.RPC.MockClient, :multicall, fn _ -> {:error, :timeout} end)
       assert Commands.get_all_torrents() == {:error, :timeout}
     end
+
+    test "tolerates multicall fault response for unknown fields (e.g. tracker_url)" do
+      fault = %{"faultCode" => -506, "faultString" => "Method 'd.tracker_url' not defined"}
+
+      # Start with normal wrapped values, then replace index 15 (tracker_url) with bare fault map
+      values =
+        torrent_rpc_values()
+        |> Enum.map(&[&1])
+        |> List.replace_at(15, fault)
+
+      Taniwha.RPC.MockClient
+      |> expect(:call, fn "download_list", _ -> {:ok, ["abc123"]} end)
+      |> expect(:multicall, fn _calls -> {:ok, values} end)
+
+      assert {:ok, [torrent]} = Commands.get_all_torrents("")
+      assert torrent.hash == "abc123"
+      assert torrent.tracker_host == nil
+    end
   end
 
   # ---------------------------------------------------------------------------
