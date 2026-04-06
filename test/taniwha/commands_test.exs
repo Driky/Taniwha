@@ -606,4 +606,134 @@ defmodule Taniwha.CommandsTest do
       assert Commands.system_pid() == {:error, :connection_refused}
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Batch N — load_urls/2
+  # ---------------------------------------------------------------------------
+
+  describe "load_urls/2" do
+    test "returns {:ok, count} when all URLs succeed" do
+      url_a = "magnet:?xt=urn:btih:aaaaaa"
+      url_b = "magnet:?xt=urn:btih:bbbbbb"
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.start", ["", ^url_a] -> {:ok, 0} end)
+      expect(Taniwha.RPC.MockClient, :call, fn "load.start", ["", ^url_b] -> {:ok, 0} end)
+
+      assert Commands.load_urls([url_a, url_b]) == {:ok, 2}
+    end
+
+    test "returns {:error, failures} listing failed URLs, still attempts all" do
+      url_a = "magnet:?xt=urn:btih:aaaaaa"
+      url_b = "magnet:?xt=urn:btih:bbbbbb"
+      url_c = "magnet:?xt=urn:btih:cccccc"
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.start", ["", ^url_a] -> {:ok, 0} end)
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.start", ["", ^url_b] ->
+        {:error, :timeout}
+      end)
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.start", ["", ^url_c] -> {:ok, 0} end)
+
+      assert Commands.load_urls([url_a, url_b, url_c]) == {:error, [{url_b, :timeout}]}
+    end
+
+    test "returns {:error, failures} when all URLs fail" do
+      url_a = "magnet:?xt=urn:btih:aaaaaa"
+      url_b = "magnet:?xt=urn:btih:bbbbbb"
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.start", ["", ^url_a] ->
+        {:error, :econnrefused}
+      end)
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.start", ["", ^url_b] ->
+        {:error, :timeout}
+      end)
+
+      assert Commands.load_urls([url_a, url_b]) ==
+               {:error, [{url_a, :econnrefused}, {url_b, :timeout}]}
+    end
+
+    test "passes opts to each load_url call" do
+      url = "magnet:?xt=urn:btih:aaaaaa"
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.start", ["", ^url, "d.custom1.set=Action"] ->
+        {:ok, 0}
+      end)
+
+      assert Commands.load_urls([url], label: "Action") == {:ok, 1}
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Batch N+1 — load_raws/2
+  # ---------------------------------------------------------------------------
+
+  describe "load_raws/2" do
+    test "returns {:ok, count} when all binaries succeed" do
+      bin_a = <<1, 2, 3>>
+      bin_b = <<4, 5, 6>>
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.raw_start", ["", {:base64, ^bin_a}] ->
+        {:ok, 0}
+      end)
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.raw_start", ["", {:base64, ^bin_b}] ->
+        {:ok, 0}
+      end)
+
+      assert Commands.load_raws([bin_a, bin_b]) == {:ok, 2}
+    end
+
+    test "returns {:error, failures} with 0-based index when some binaries fail" do
+      bin_a = <<1, 2, 3>>
+      bin_b = <<4, 5, 6>>
+      bin_c = <<7, 8, 9>>
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.raw_start", ["", {:base64, ^bin_a}] ->
+        {:ok, 0}
+      end)
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.raw_start", ["", {:base64, ^bin_b}] ->
+        {:error, :timeout}
+      end)
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.raw_start", ["", {:base64, ^bin_c}] ->
+        {:ok, 0}
+      end)
+
+      assert Commands.load_raws([bin_a, bin_b, bin_c]) == {:error, [{1, :timeout}]}
+    end
+
+    test "returns {:error, failures} when all binaries fail" do
+      bin_a = <<1>>
+      bin_b = <<2>>
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.raw_start", ["", {:base64, ^bin_a}] ->
+        {:error, :econnrefused}
+      end)
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.raw_start", ["", {:base64, ^bin_b}] ->
+        {:error, :timeout}
+      end)
+
+      assert Commands.load_raws([bin_a, bin_b]) ==
+               {:error, [{0, :econnrefused}, {1, :timeout}]}
+    end
+
+    test "passes opts to each load_raw call" do
+      bin = <<1, 2, 3>>
+
+      expect(Taniwha.RPC.MockClient, :call, fn "load.raw_start",
+                                               [
+                                                 "",
+                                                 {:base64, ^bin},
+                                                 "d.custom1.set=Action"
+                                               ] ->
+        {:ok, 0}
+      end)
+
+      assert Commands.load_raws([bin], label: "Action") == {:ok, 1}
+    end
+  end
 end

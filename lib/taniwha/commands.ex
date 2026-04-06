@@ -303,6 +303,53 @@ defmodule Taniwha.Commands do
     end
   end
 
+  @doc """
+  Loads and starts multiple torrents from a list of magnet links or .torrent URLs.
+
+  Calls `load_url/2` for each URL in order. All items are attempted regardless
+  of individual failures. Returns `{:ok, count}` when every URL succeeds, or
+  `{:error, failures}` where `failures` is a list of `{url, reason}` tuples for
+  the URLs that could not be loaded. Shared options (`:label`, `:directory`) are
+  applied to every item in the batch.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec load_urls([String.t()], keyword()) ::
+          {:ok, non_neg_integer()} | {:error, [{String.t(), term()}]}
+  def load_urls(urls, opts \\ []) do
+    failures =
+      for url <- urls,
+          {:error, reason} <- [load_url(url, opts)],
+          do: {url, reason}
+
+    if failures == [], do: {:ok, length(urls)}, else: {:error, failures}
+  end
+
+  @doc """
+  Loads and starts multiple torrents from a list of raw `.torrent` binaries.
+
+  Calls `load_raw/2` for each binary in order. All items are attempted regardless
+  of individual failures. Returns `{:ok, count}` when every binary succeeds, or
+  `{:error, failures}` where `failures` is a list of `{index, reason}` tuples
+  (0-based) for the binaries that could not be loaded. Shared options
+  (`:label`, `:directory`) are applied to every item in the batch.
+  """
+  @impl Taniwha.CommandsBehaviour
+  @spec load_raws([binary()], keyword()) ::
+          {:ok, non_neg_integer()} | {:error, [{non_neg_integer(), term()}]}
+  def load_raws(binaries, opts \\ []) do
+    failures =
+      binaries
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {bin, idx} ->
+        case load_raw(bin, opts) do
+          :ok -> []
+          {:error, reason} -> [{idx, reason}]
+        end
+      end)
+
+    if failures == [], do: {:ok, length(binaries)}, else: {:error, failures}
+  end
+
   # ---------------------------------------------------------------------------
   # Label commands
   # ---------------------------------------------------------------------------

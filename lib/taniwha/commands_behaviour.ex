@@ -26,7 +26,11 @@ defmodule Taniwha.CommandsBehaviour do
   @callback list_peers(String.t()) :: {:ok, [Peer.t()]} | {:error, term()}
   @callback list_trackers(String.t()) :: {:ok, [Tracker.t()]} | {:error, term()}
   @callback load_url(String.t(), keyword()) :: :ok | {:error, term()}
+  @callback load_urls([String.t()], keyword()) ::
+              {:ok, non_neg_integer()} | {:error, [{String.t(), term()}]}
   @callback load_raw(binary(), keyword()) :: :ok | {:error, term()}
+  @callback load_raws([binary()], keyword()) ::
+              {:ok, non_neg_integer()} | {:error, [{non_neg_integer(), term()}]}
   @callback set_label(String.t(), String.t()) :: :ok | {:error, term()}
   @callback remove_label(String.t()) :: :ok | {:error, term()}
   @callback rename_label(String.t(), String.t()) ::
