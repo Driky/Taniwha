@@ -36,7 +36,9 @@
       "Bash(jq -r .response[0].text)",
       "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha/assets/js -type f -name *.js)",
       "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha -type f -name *.figma.* -o -name *figma.config*)",
-      "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha -name *.js -path */phoenix-colocated/*)"
+      "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha -name *.js -path */phoenix-colocated/*)",
+      "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha -name .colocated* -o -path *hooks* -type f)",
+      "Bash(find /Users/cedricchatelain/workspace/projects/perso/taniwha/_build/dev/phoenix-colocated -name *.js)"
     ]
   }
 }
