@@ -174,4 +174,45 @@ defmodule TaniwhaWeb.LabelManagementTest do
       refute html =~ ~r/phx-value-label="Movies"/
     end
   end
+
+  # ── Batch B6: set-mode label selection ───────────────────────────────────
+
+  describe "label manager — set mode" do
+    test "clicking a label row in :set mode assigns label to target hashes and closes modal",
+         %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies"}
+      Store.put_torrent(t1)
+      expect(MockCommands, :set_label, fn "abc123", "Movies" -> :ok end)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      render_click(lv, "context_menu_action", %{
+        "action" => "set_label_prompt",
+        "hashes" => ["abc123"]
+      })
+
+      lv
+      |> element(
+        "[id=label-manager-modal] button[phx-click=select_label][phx-value-label=Movies]"
+      )
+      |> render_click()
+
+      html = render(lv)
+      refute html =~ "label-manager-modal"
+    end
+
+    test "in :manage mode, label rows have no select_label handler and have edit/delete buttons",
+         %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies"}
+      Store.put_torrent(t1)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+      lv |> element("button[phx-click=show_label_manager]") |> render_click()
+
+      html = render(lv)
+      refute html =~ ~r/phx-click="select_label"/
+      assert html =~ ~r/phx-click="start_edit"/
+      assert html =~ ~r/phx-click="delete_label"/
+    end
+  end
 end

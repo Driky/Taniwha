@@ -416,7 +416,7 @@ defmodule TaniwhaWeb.TorrentComponents.LayoutComponents do
           <button
             type="button"
             phx-click="show_label_manager"
-            class="flex items-center w-full px-3 h-[27px] text-[10px] text-left"
+            class="flex items-center w-full px-3 h-[27px] text-[10px] text-left cursor-pointer"
             style="color: var(--taniwha-sidebar-section)"
           >
             Manage labels

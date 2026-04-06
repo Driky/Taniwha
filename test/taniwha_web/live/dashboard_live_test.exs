@@ -1192,6 +1192,63 @@ defmodule TaniwhaWeb.DashboardLiveTest do
       # Mox verify_on_exit! confirms remove_label was called exactly once
       assert render(lv)
     end
+
+    test "set_label_prompt with hashes opens modal in :set mode (label rows are clickable)",
+         %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies"}
+      Store.put_torrent(t1)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      render_click(lv, "context_menu_action", %{
+        "action" => "set_label_prompt",
+        "hashes" => ["h1"]
+      })
+
+      html = render(lv)
+      assert html =~ "label-manager-modal"
+      assert html =~ ~r/phx-click="select_label"/
+    end
+
+    test "set_label_for_hashes message calls Commands.set_label per hash and hides modal",
+         %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies"}
+      Store.put_torrent(t1)
+      expect(MockCommands, :set_label, fn "h1", "Movies" -> :ok end)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      render_click(lv, "context_menu_action", %{
+        "action" => "set_label_prompt",
+        "hashes" => ["h1"]
+      })
+
+      send(lv.pid, {:set_label_for_hashes, "Movies", ["h1"]})
+
+      html = render(lv)
+      refute html =~ "label-manager-modal"
+    end
+
+    test "closing the modal in set mode resets label_target_hashes", %{conn: conn} do
+      t1 = %{Fixtures.torrent_fixture("h1") | label: "Movies"}
+      Store.put_torrent(t1)
+
+      {:ok, lv, _html} = live(conn, ~p"/")
+
+      render_click(lv, "context_menu_action", %{
+        "action" => "set_label_prompt",
+        "hashes" => ["h1"]
+      })
+
+      # Close without selecting
+      lv
+      |> element("[id=label-manager-modal] button[aria-label='Close label manager']")
+      |> render_click()
+
+      # Re-open via sidebar: should be in :manage mode (no select_label buttons)
+      html = lv |> element("button[phx-click=show_label_manager]") |> render_click()
+      refute html =~ ~r/phx-click="select_label"/
+    end
   end
 
   # ---------------------------------------------------------------------------

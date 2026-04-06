@@ -47,6 +47,8 @@ defmodule TaniwhaWeb.DashboardLive do
       |> assign(:label_filter, MapSet.new())
       |> assign(:label_groups, label_groups(torrents))
       |> assign(:show_label_manager, false)
+      |> assign(:label_manager_mode, :manage)
+      |> assign(:label_target_hashes, [])
       |> assign(:selected_hashes, MapSet.new())
       |> assign(:selected_hash, nil)
       |> assign(:active_tab, :general)
@@ -135,7 +137,19 @@ defmodule TaniwhaWeb.DashboardLive do
   end
 
   def handle_info({:hide_label_manager}, socket) do
-    {:noreply, assign(socket, :show_label_manager, false)}
+    {:noreply,
+     socket
+     |> assign(:show_label_manager, false)
+     |> assign(:label_target_hashes, [])}
+  end
+
+  def handle_info({:set_label_for_hashes, label, hashes}, socket) do
+    Enum.each(hashes, &@commands.set_label(&1, label))
+
+    {:noreply,
+     socket
+     |> assign(:show_label_manager, false)
+     |> assign(:label_target_hashes, [])}
   end
 
   def handle_info({:label_created, name}, socket) do
@@ -229,8 +243,24 @@ defmodule TaniwhaWeb.DashboardLive do
     {:noreply, assign(socket, :confirm_action, {:bulk_erase_with_data, hashes, paths})}
   end
 
+  def handle_event(
+        "context_menu_action",
+        %{"action" => "set_label_prompt", "hashes" => hashes},
+        socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:show_label_manager, true)
+     |> assign(:label_manager_mode, :set)
+     |> assign(:label_target_hashes, hashes)}
+  end
+
   def handle_event("context_menu_action", %{"action" => "set_label_prompt"}, socket) do
-    {:noreply, assign(socket, :show_label_manager, true)}
+    {:noreply,
+     socket
+     |> assign(:show_label_manager, true)
+     |> assign(:label_manager_mode, :set)
+     |> assign(:label_target_hashes, [])}
   end
 
   def handle_event(
@@ -264,11 +294,18 @@ defmodule TaniwhaWeb.DashboardLive do
   end
 
   def handle_event("show_label_manager", _params, socket) do
-    {:noreply, assign(socket, :show_label_manager, true)}
+    {:noreply,
+     socket
+     |> assign(:show_label_manager, true)
+     |> assign(:label_manager_mode, :manage)
+     |> assign(:label_target_hashes, [])}
   end
 
   def handle_event("hide_label_manager", _params, socket) do
-    {:noreply, assign(socket, :show_label_manager, false)}
+    {:noreply,
+     socket
+     |> assign(:show_label_manager, false)
+     |> assign(:label_target_hashes, [])}
   end
 
   def handle_event("sort", %{"by" => col}, socket) do

@@ -48,6 +48,12 @@ defmodule TaniwhaWeb.LabelManagerComponent do
     {:noreply, socket}
   end
 
+  def handle_event("select_label", %{"label" => label}, socket) do
+    send(self(), {:set_label_for_hashes, label, socket.assigns.target_hashes})
+    send(self(), {:hide_label_manager})
+    {:noreply, socket}
+  end
+
   def handle_event("create_label", %{"label_name" => name, "color" => color}, socket) do
     name = String.trim(name)
 
@@ -115,8 +121,12 @@ defmodule TaniwhaWeb.LabelManagerComponent do
         {name, count, dot, bg, text}
       end)
 
-    assigns = assign(assigns, :display_labels, display_labels)
-    assigns = assign(assigns, :palette, @palette)
+    assigns =
+      assigns
+      |> assign(:display_labels, display_labels)
+      |> assign(:palette, @palette)
+      |> assign_new(:mode, fn -> :manage end)
+      |> assign_new(:target_hashes, fn -> [] end)
 
     ~H"""
     <div id={@id} class="fixed inset-0 z-50">
@@ -219,40 +229,70 @@ defmodule TaniwhaWeb.LabelManagerComponent do
                       </button>
                     </form>
                   <% else %>
-                    <%!-- Normal row --%>
-                    <div class="flex items-center gap-2 px-4 py-[6px]">
-                      <span
-                        class="size-2 rounded-full shrink-0"
-                        style={"background-color: #{dot}"}
-                        aria-hidden="true"
-                      />
-                      <span class="flex-1 text-[12px] text-gray-900 dark:text-gray-100">
-                        {name}
-                      </span>
-                      <span class="text-[11px] mr-2" style="color: var(--taniwha-sidebar-section)">
-                        {count}
-                      </span>
+                    <%= if @mode == :set do %>
+                      <%!-- Set-mode row: entire row is clickable --%>
                       <button
                         type="button"
-                        phx-click="start_edit"
+                        phx-click="select_label"
                         phx-target={@myself}
                         phx-value-label={name}
-                        aria-label={"Edit label #{name}"}
-                        class="flex items-center justify-center size-[22px] border border-gray-200 dark:border-gray-600 rounded-[4px] bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                        aria-label={"Assign label #{name}"}
+                        class="flex items-center gap-2 px-4 py-[6px] w-full cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 text-left"
                       >
-                        <.icon name="hero-pencil-micro" class="size-3 text-gray-500" />
+                        <span
+                          class="size-2 rounded-full shrink-0"
+                          style={"background-color: #{dot}"}
+                          aria-hidden="true"
+                        />
+                        <span class="flex-1 text-[12px] text-gray-900 dark:text-gray-100">
+                          {name}
+                        </span>
+                        <span
+                          class="text-[11px] mr-2"
+                          style="color: var(--taniwha-sidebar-section)"
+                        >
+                          {count}
+                        </span>
                       </button>
-                      <button
-                        type="button"
-                        phx-click="delete_label"
-                        phx-target={@myself}
-                        phx-value-label={name}
-                        aria-label={"Delete label #{name}"}
-                        class="flex items-center justify-center size-[22px] border border-gray-200 dark:border-gray-600 rounded-[4px] bg-white dark:bg-gray-800 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
-                      >
-                        <.icon name="hero-trash-micro" class="size-3 text-red-500" />
-                      </button>
-                    </div>
+                    <% else %>
+                      <%!-- Manage-mode row: edit/delete actions --%>
+                      <div class="flex items-center gap-2 px-4 py-[6px]">
+                        <span
+                          class="size-2 rounded-full shrink-0"
+                          style={"background-color: #{dot}"}
+                          aria-hidden="true"
+                        />
+                        <span class="flex-1 text-[12px] text-gray-900 dark:text-gray-100">
+                          {name}
+                        </span>
+                        <span
+                          class="text-[11px] mr-2"
+                          style="color: var(--taniwha-sidebar-section)"
+                        >
+                          {count}
+                        </span>
+                        <button
+                          type="button"
+                          phx-click="start_edit"
+                          phx-target={@myself}
+                          phx-value-label={name}
+                          aria-label={"Edit label #{name}"}
+                          class="flex items-center justify-center size-[22px] border border-gray-200 dark:border-gray-600 rounded-[4px] bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                        >
+                          <.icon name="hero-pencil-micro" class="size-3 text-gray-500" />
+                        </button>
+                        <button
+                          type="button"
+                          phx-click="delete_label"
+                          phx-target={@myself}
+                          phx-value-label={name}
+                          aria-label={"Delete label #{name}"}
+                          class="flex items-center justify-center size-[22px] border border-gray-200 dark:border-gray-600 rounded-[4px] bg-white dark:bg-gray-800 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                          <.icon name="hero-trash-micro" class="size-3 text-red-500" />
+                        </button>
+                      </div>
+                    <% end %>
                   <% end %>
                 <% end %>
               <% end %>
