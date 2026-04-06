@@ -24,7 +24,7 @@ defmodule TaniwhaWeb.AddTorrentComponent do
     {:ok,
      socket
      |> assign(:active_tab, :url)
-     |> assign(:url, "")
+     |> assign(:urls, [""])
      |> assign(:loading, false)
      |> assign(:error, nil)
      |> assign(:selected_label, nil)
@@ -49,11 +49,35 @@ defmodule TaniwhaWeb.AddTorrentComponent do
   end
 
   def handle_event("switch_tab", %{"tab" => "file"}, socket) do
-    {:noreply, assign(socket, active_tab: :file, error: nil)}
+    {:noreply, assign(socket, active_tab: :file, error: nil, urls: [""])}
   end
 
-  def handle_event("update_url", %{"url" => url}, socket) do
-    {:noreply, assign(socket, :url, url)}
+  def handle_event("update_url", %{"url" => urls_map}, socket) when is_map(urls_map) do
+    urls =
+      urls_map
+      |> Enum.sort_by(fn {k, _} -> String.to_integer(k) end)
+      |> Enum.map(fn {_, v} -> v end)
+
+    {:noreply, assign(socket, :urls, urls)}
+  end
+
+  def handle_event("add_url_field", _params, socket) do
+    if length(socket.assigns.urls) >= 20 do
+      {:noreply, socket}
+    else
+      {:noreply, assign(socket, :urls, socket.assigns.urls ++ [""])}
+    end
+  end
+
+  def handle_event("remove_url_field", %{"index" => idx_str}, socket) do
+    idx = String.to_integer(idx_str)
+
+    if idx == 0 do
+      {:noreply, socket}
+    else
+      urls = List.delete_at(socket.assigns.urls, idx)
+      {:noreply, assign(socket, :urls, urls)}
+    end
   end
 
   def handle_event("select_label", %{"label" => label}, socket) do
@@ -125,14 +149,22 @@ defmodule TaniwhaWeb.AddTorrentComponent do
     {:noreply, assign(socket, :folder_picker_open, false)}
   end
 
-  def handle_event("submit_url", %{"url" => url}, socket) do
-    url = String.trim(url)
+  def handle_event("submit_url", %{"url" => urls_input}, socket) do
+    urls =
+      urls_input
+      |> Enum.sort_by(fn {k, _} -> String.to_integer(k) end)
+      |> Enum.map(fn {_, v} -> String.trim(v) end)
+      |> Enum.reject(&(&1 == ""))
 
-    case Taniwha.Validator.validate_url(url) do
-      {:error, :invalid_url} ->
+    if urls == [] do
+      {:noreply, assign(socket, :error, "Please enter a valid magnet link or HTTP/HTTPS URL.")}
+    else
+      invalid =
+        Enum.find(urls, fn u -> Taniwha.Validator.validate_url(u) == {:error, :invalid_url} end)
+
+      if invalid do
         {:noreply, assign(socket, :error, "Please enter a valid magnet link or HTTP/HTTPS URL.")}
-
-      :ok ->
+      else
         socket = assign(socket, :loading, true)
 
         opts =
@@ -140,17 +172,22 @@ defmodule TaniwhaWeb.AddTorrentComponent do
           |> label_opt()
           |> maybe_add_directory(socket.assigns.download_dir)
 
-        case @commands.load_url(url, opts) do
-          :ok ->
+        case @commands.load_urls(urls, opts) do
+          {:ok, _count} ->
             send(self(), {:add_torrent_success})
             {:noreply, socket}
 
-          {:error, reason} ->
+          {:error, failures} ->
+            failed_urls = MapSet.new(failures, fn {url, _} -> url end)
+            remaining = Enum.filter(urls, &MapSet.member?(failed_urls, &1))
+
             {:noreply,
              socket
              |> assign(:loading, false)
-             |> assign(:error, format_add_error(reason))}
+             |> assign(:urls, if(remaining == [], do: [""], else: remaining))
+             |> assign(:error, failures)}
         end
+      end
     end
   end
 
@@ -249,7 +286,18 @@ defmodule TaniwhaWeb.AddTorrentComponent do
               role="alert"
               class="mx-5 mt-4 px-3 py-2 text-[11px] text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 rounded-lg"
             >
-              {@error}
+              <%= if is_list(@error) do %>
+                <p class="font-medium mb-1">Failed to add {length(@error)} item(s):</p>
+                <ul class="list-disc list-inside space-y-0.5">
+                  <%= for {item, reason} <- @error do %>
+                    <% short =
+                      if String.length(item) > 40, do: String.slice(item, 0, 37) <> "…", else: item %>
+                    <li>{short}: {format_add_error(reason)}</li>
+                  <% end %>
+                </ul>
+              <% else %>
+                {@error}
+              <% end %>
             </div>
 
             <%!-- URL panel --%>
@@ -264,22 +312,56 @@ defmodule TaniwhaWeb.AddTorrentComponent do
                 phx-submit="submit_url"
                 phx-change="update_url"
                 phx-target={@myself}
+                phx-hook="FocusNewUrlField"
                 id={"#{@id}-url-form"}
               >
-                <label for={"#{@id}-url-input"} class="block text-[11px] text-gray-500 mb-[6px]">
+                <p class="block text-[11px] text-gray-500 mb-[6px]">
                   Magnet link or .torrent URL
-                </label>
-                <input
-                  id={"#{@id}-url-input"}
-                  type="text"
-                  name="url"
-                  value={@url}
-                  placeholder="magnet:?xt=urn:btih:…"
-                  autocomplete="off"
-                  spellcheck="false"
-                  class="w-full px-3 py-2 text-[12px] font-mono border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p class="mt-[6px] text-[10px] text-gray-400">
+                </p>
+                <%= for {url_val, idx} <- Enum.with_index(@urls) do %>
+                  <div class="flex items-center gap-[6px] mb-2">
+                    <input
+                      id={"#{@id}-url-input-#{idx}"}
+                      type="text"
+                      name={"url[#{idx}]"}
+                      value={url_val}
+                      placeholder="magnet:?xt=urn:btih:…"
+                      autocomplete="off"
+                      spellcheck="false"
+                      aria-label={"Magnet link #{idx + 1}"}
+                      class="flex-1 px-3 py-2 text-[12px] font-mono border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      phx-click="add_url_field"
+                      phx-target={@myself}
+                      disabled={length(@urls) >= 20}
+                      aria-label="Add another link"
+                      class={[
+                        "size-6 flex items-center justify-center rounded-md border text-[14px] font-medium shrink-0",
+                        length(@urls) >= 20 &&
+                          "border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed",
+                        length(@urls) < 20 &&
+                          "border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                      ]}
+                    >
+                      +
+                    </button>
+                    <%= if idx > 0 do %>
+                      <button
+                        type="button"
+                        phx-click="remove_url_field"
+                        phx-value-index={idx}
+                        phx-target={@myself}
+                        aria-label={"Remove link #{idx + 1}"}
+                        class="size-6 flex items-center justify-center rounded-md border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-[14px] font-medium shrink-0"
+                      >
+                        −
+                      </button>
+                    <% end %>
+                  </div>
+                <% end %>
+                <p class="mt-[2px] text-[10px] text-gray-400">
                   Paste a magnet link or direct link to a .torrent file.
                 </p>
                 <%!-- Hidden submit so Enter key works --%>
@@ -438,7 +520,11 @@ defmodule TaniwhaWeb.AddTorrentComponent do
                 type="button"
                 phx-click={JS.dispatch("submit", to: "##{@id}-url-form")}
                 disabled={@loading}
-                aria-label="Add torrent from URL"
+                aria-label={
+                  if length(@urls) > 1,
+                    do: "Add #{length(@urls)} torrents",
+                    else: "Add torrent from URL"
+                }
                 class={[
                   "h-8 px-4 text-[12px] font-medium rounded-[7px] bg-blue-600 text-white",
                   @loading && "opacity-50 cursor-not-allowed",
@@ -493,6 +579,6 @@ defmodule TaniwhaWeb.AddTorrentComponent do
   @spec upload_error_to_string(atom()) :: String.t()
   defp upload_error_to_string(:too_large), do: "File is too large (max 10 MB)."
   defp upload_error_to_string(:not_accepted), do: "Only .torrent files are accepted."
-  defp upload_error_to_string(:too_many_files), do: "Only one file at a time."
+  defp upload_error_to_string(:too_many_files), do: "Too many files selected (max 20)."
   defp upload_error_to_string(_), do: "Upload error. Please try again."
 end

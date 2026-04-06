@@ -205,11 +205,27 @@ const ThrottleFocusInput = {
   }
 }
 
+// FocusNewUrlField: moves focus to the newly appended URL input after the DOM
+// updates when the user clicks the "+" button in the Add Torrent modal.
+const FocusNewUrlField = {
+  mounted() {
+    this._urlInputs = () => this.el.querySelectorAll('input[id*="-url-input-"]')
+    this.prevCount = this._urlInputs().length
+  },
+  updated() {
+    const inputs = this._urlInputs()
+    if (inputs.length > this.prevCount) {
+      inputs[inputs.length - 1]?.focus()
+    }
+    this.prevCount = inputs.length
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, UserMenu, PasskeyRegister, PasskeyLogin, ThrottleMenu, ThrottleFocus, ThrottleFocusInput},
+  hooks: {...colocatedHooks, UserMenu, PasskeyRegister, PasskeyLogin, ThrottleMenu, ThrottleFocus, ThrottleFocusInput, FocusNewUrlField},
 })
 
 // Show progress bar on live navigation and form submits

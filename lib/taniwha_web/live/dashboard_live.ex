@@ -9,7 +9,7 @@ defmodule TaniwhaWeb.DashboardLive do
   use TaniwhaWeb, :live_view
 
   use TaniwhaWeb.TorrentComponents
-  import TaniwhaWeb.FormatHelpers, only: [format_add_error: 1, maybe_add_directory: 2]
+  import TaniwhaWeb.FormatHelpers, only: [maybe_add_directory: 2]
 
   alias Taniwha.{State.Store, ThrottleStore, Torrent}
   alias Phoenix.LiveView.AsyncResult
@@ -34,7 +34,7 @@ defmodule TaniwhaWeb.DashboardLive do
       socket
       |> allow_upload(:torrent_file,
         accept: ~w[application/x-bittorrent .torrent],
-        max_entries: 1,
+        max_entries: 20,
         max_file_size: 10_000_000
       )
       |> assign(:torrents, torrents)
@@ -369,32 +369,41 @@ defmodule TaniwhaWeb.DashboardLive do
         d -> d
       end
 
-    results =
+    names = Enum.map(socket.assigns.uploads.torrent_file.entries, & &1.client_name)
+
+    binaries =
       consume_uploaded_entries(socket, :torrent_file, fn %{path: path}, _entry ->
-        File.read(path)
+        File.read!(path)
       end)
 
-    case results do
-      [binary] when is_binary(binary) ->
-        case @commands.load_raw(binary, maybe_add_directory([], dir)) do
-          :ok ->
-            {:noreply,
-             socket
-             |> assign(:show_add_modal, false)
-             |> put_flash(:success, "Torrent added")}
+    if binaries == [] do
+      {:noreply, socket}
+    else
+      opts = maybe_add_directory([], dir)
 
-          {:error, reason} ->
-            send_update(TaniwhaWeb.AddTorrentComponent,
-              id: "add-torrent-modal",
-              error: format_add_error(reason),
-              loading: false
-            )
+      case @commands.load_raws(binaries, opts) do
+        {:ok, count} ->
+          label = if count == 1, do: "Torrent added", else: "#{count} torrents added"
 
-            {:noreply, socket}
-        end
+          {:noreply,
+           socket
+           |> assign(:show_add_modal, false)
+           |> put_flash(:success, label)}
 
-      _ ->
-        {:noreply, socket}
+        {:error, failures} ->
+          named_failures =
+            Enum.map(failures, fn {idx, reason} ->
+              {Enum.at(names, idx, "file #{idx + 1}"), reason}
+            end)
+
+          send_update(TaniwhaWeb.AddTorrentComponent,
+            id: "add-torrent-modal",
+            error: named_failures,
+            loading: false
+          )
+
+          {:noreply, socket}
+      end
     end
   end
 

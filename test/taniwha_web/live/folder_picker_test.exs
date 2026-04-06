@@ -258,15 +258,15 @@ defmodule TaniwhaWeb.FolderPickerTest do
       {:ok, lv: lv}
     end
 
-    test "submitting URL with custom directory passes directory: opt to load_url", %{
+    test "submitting URL with custom directory passes directory: opt to load_urls", %{
       lv: lv,
       sub1: sub1
     } do
       url = "magnet:?xt=urn:btih:abc123"
 
-      expect(Taniwha.MockCommands, :load_url, fn ^url, opts ->
+      expect(Taniwha.MockCommands, :load_urls, fn [^url], opts ->
         assert opts[:directory] == sub1
-        :ok
+        {:ok, 1}
       end)
 
       # Open picker, select sub1, confirm
@@ -280,7 +280,7 @@ defmodule TaniwhaWeb.FolderPickerTest do
 
       lv
       |> element("form[phx-submit=submit_url]")
-      |> render_submit(%{"url" => url})
+      |> render_submit(%{"url" => %{"0" => url}})
     end
 
     test "submitting URL with the default directory does NOT pass directory: opt", %{
@@ -288,40 +288,40 @@ defmodule TaniwhaWeb.FolderPickerTest do
     } do
       url = "magnet:?xt=urn:btih:abc123"
 
-      expect(Taniwha.MockCommands, :load_url, fn ^url, opts ->
+      expect(Taniwha.MockCommands, :load_urls, fn [^url], opts ->
         refute Keyword.has_key?(opts, :directory)
-        :ok
+        {:ok, 1}
       end)
 
       lv
       |> element("form[phx-submit=submit_url]")
-      |> render_submit(%{"url" => url})
+      |> render_submit(%{"url" => %{"0" => url}})
     end
 
     test "submitting URL with blank directory does NOT pass directory: opt", %{lv: lv} do
       url = "magnet:?xt=urn:btih:abc123"
 
-      expect(Taniwha.MockCommands, :load_url, fn ^url, opts ->
+      expect(Taniwha.MockCommands, :load_urls, fn [^url], opts ->
         refute Keyword.has_key?(opts, :directory)
-        :ok
+        {:ok, 1}
       end)
 
       # Manually clear the download_dir via the hidden input (blank)
       lv
       |> element("form[phx-submit=submit_url]")
-      |> render_submit(%{"url" => url})
+      |> render_submit(%{"url" => %{"0" => url}})
     end
 
-    test "file upload with custom directory passes directory: opt to load_raw", %{
+    test "file upload with custom directory passes directory: opt to load_raws", %{
       lv: lv,
       sub1: sub1,
       conn: conn
     } do
       content = "torrent binary"
 
-      expect(Taniwha.MockCommands, :load_raw, fn ^content, opts ->
+      expect(Taniwha.MockCommands, :load_raws, fn [^content], opts ->
         assert opts[:directory] == sub1
-        :ok
+        {:ok, 1}
       end)
 
       # Switch to file tab, open picker, select sub1, confirm
