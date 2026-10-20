@@ -27,12 +27,18 @@ ExecStartPre=-/usr/bin/docker rm taniwha
 # according to the Restart policy below. This is the safe, correct behaviour.
 ExecStartPre=/usr/bin/docker pull ghcr.io/driky/taniwha:latest
 
+# The rtorrent socket's directory is mounted, not the socket file itself.
+# rtorrent unlinks its socket on exit and creates a new one at each start, so
+# a file bind mount would keep pointing at the dead inode after any rtorrent
+# restart. RTORRENT_SOCKET is set here rather than in .env so the path always
+# matches this mount; -e takes precedence over --env-file.
 ExecStart=/usr/bin/docker run \
     --name taniwha \
     --rm \
     --env-file /home/taniwha-deploy/taniwha/.env \
+    -e RTORRENT_SOCKET=/var/run/rtorrent/.rtorrent.sock \
     -p 4000:4000 \
-    -v /var/run/driky/.rtorrent.sock:/var/run/rtorrent/rpc.socket \
+    -v /var/run/driky:/var/run/rtorrent \
     -v /srv/taniwha/data:/data/taniwha \
     -v /home/driky/torrents/rtorrent:/home/driky/torrents/rtorrent \
     ghcr.io/driky/taniwha:latest
