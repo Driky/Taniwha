@@ -16,4 +16,4 @@ pre-commit:
     typographic-dashes:
       run: .lefthook/dash-guard.sh
     mix-precommit:
-      run: mix precommit
+      run: mix format --check-formatted && mix precommit
