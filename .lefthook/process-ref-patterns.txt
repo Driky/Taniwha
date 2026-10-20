@@ -1,0 +1,6 @@
+# Process references banned from committed source (one extended regex per line).
+# Read live by .lefthook/process-ref-guard.sh and .claude/hooks/commit-ref-guard.sh.
+# Add your tracker's key here as \bPREFIX-[0-9]+\b; avoid a generic [A-Z]+-[0-9]+
+# pattern, it matches UTF-8, SHA-256, and ISO-8601.
+\bAC[0-9]+\b
+decision [0-9]
