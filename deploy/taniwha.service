@@ -11,6 +11,11 @@ After=docker.service network-online.target
 Requires=docker.service
 Wants=network-online.target
 
+# After 3 failures within 60 s the unit enters 'failed' state to prevent
+# a broken-image restart storm. Operator must intervene.
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
 [Service]
 Type=simple
 User=taniwha-deploy
@@ -47,11 +52,6 @@ ExecStop=/usr/bin/docker stop taniwha
 
 Restart=on-failure
 RestartSec=10
-
-# After 3 failures within 60 s the unit enters 'failed' state to prevent
-# a broken-image restart storm. Operator must intervene.
-StartLimitIntervalSec=60
-StartLimitBurst=3
 
 [Install]
 WantedBy=multi-user.target
