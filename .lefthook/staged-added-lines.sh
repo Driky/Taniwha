@@ -14,10 +14,12 @@ fi
 [ -z "$diff" ] && exit 0
 
 # Track "+++ b/<file>" and "@@ +N" hunk headers so each added line gets its
-# post-commit line number.
+# post-commit line number. File headers only occur between "diff --git" and
+# the first "@@", so an added line whose content starts with "++ " is not
+# mistaken for one.
 printf '%s\n' "$diff" | awk -v exclude="$exclude" '
-  /^diff --git/ { file=""; skip=1; next }
-  /^\+\+\+ /    { file=substr($0, 5); sub(/^b\//, "", file); skip=(exclude != "" && file ~ exclude); next }
-  /^@@/         { if (match($0, /\+[0-9]+/)) line=substr($0, RSTART+1, RLENGTH-1)+0; next }
-  /^\+/         { if (file != "" && !skip) print file ":" line ": " substr($0, 2); line++; next }
+  /^diff --git/          { file=""; skip=1; header=1; next }
+  header && /^\+\+\+ /   { file=substr($0, 5); sub(/^b\//, "", file); skip=(exclude != "" && file ~ exclude); next }
+  /^@@/                  { header=0; if (match($0, /\+[0-9]+/)) line=substr($0, RSTART+1, RLENGTH-1)+0; next }
+  !header && /^\+/       { if (file != "" && !skip) print file ":" line ": " substr($0, 2); line++; next }
 '
