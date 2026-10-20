@@ -242,7 +242,7 @@ ls -ld /var/run/driky                     # expect drwxr-x--- driky driky
 ls -la /var/run/driky/.rtorrent.sock      # expect srwxrwx--- driky driky
 ```
 
-If rtorrent runs under a different uid, grant uid 1001 access through the directory and socket ownership or group rather than an ACL on the socket file: rtorrent recreates the socket at each start, which drops any ACL set on the old one.
+If rtorrent runs under a different uid, give the container the rtorrent group instead. Add `--group-add <gid>` (the gid that owns `/var/run/driky` and the socket) to the `docker run` line in the unit, and make sure that group can enter the directory (`g+rx`) and connect to the socket (`g+rw`, so rtorrent needs a umask such as `007` that keeps group write when it creates the socket). Do not put an ACL on the socket file: rtorrent recreates the socket at each start, which drops any ACL set on the old one. This server needs none of this, since uid 1001 is `driky`.
 
 ---
 
