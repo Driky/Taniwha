@@ -62,8 +62,20 @@ root=$(git -C "$repodir" rev-parse --show-toplevel 2>/dev/null) || exit 0
 guard="$root/.lefthook/process-ref-guard.sh"
 [ -x "$guard" ] || exit 0
 
+# Detect -a/--all on the commit segment only, with quoted strings removed so a
+# message body cannot trigger it. A short-flag cluster (-am, -va) counts when
+# its "a" comes before any flag that takes an argument (m F C c t u S), since
+# the rest of the cluster is then that argument (-ma is the message "a").
+unquoted=$(printf '%s' "$cmd" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
+unquoted="${unquoted//&&/$'\n'}"
+unquoted="${unquoted//\|\|/$'\n'}"
+unquoted="${unquoted//;/$'\n'}"
+unquoted="${unquoted//\|/$'\n'}"
+commit_seg=$(printf '%s\n' "$unquoted" | grep -m1 -E 'git[[:space:]].*commit' || true)
+all_flag='[[:space:]](-[^-[:space:]mFCctuS]*a|--all([[:space:]]|$))'
+
 include_unstaged=0
-[[ "$cmd" =~ [[:space:]](-a|--all)([[:space:]]|$) ]] && include_unstaged=1
+[[ " $commit_seg" =~ $all_flag ]] && include_unstaged=1
 
 out=$(cd "$root" && INCLUDE_UNSTAGED=$include_unstaged "$guard" 2>&1) && exit 0
 
