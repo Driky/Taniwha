@@ -135,7 +135,7 @@ sudo chmod 600 /home/taniwha-deploy/taniwha/.env
 sudo chown taniwha-deploy:taniwha-deploy /home/taniwha-deploy/taniwha/.env
 ```
 
-Do not set `RTORRENT_SOCKET` in `.env`. The unit passes it with `docker run -e`, which takes precedence over `--env-file`, so the path always matches the socket directory the unit mounts. Installs made with the earlier setup script still have a `RTORRENT_SOCKET=` line in `.env`: delete it. It is harmless because `-e` wins, but it misleads anyone reading the file.
+Do not set `RTORRENT_SOCKET` in `.env`. The unit passes it with `docker run -e`, which takes precedence over `--env-file`, so the path always matches the socket directory the unit mounts. Installs made with the earlier setup script still have a `RTORRENT_SOCKET=` line in `.env`. Delete it only after the updated unit from section 3 is installed and `sudo systemctl daemon-reload` has run. The old unit does not pass `-e RTORRENT_SOCKET`, so removing the line under it makes the app fall back to `/var/run/rtorrent.sock` and every RPC call fails. With the updated unit in place the line is harmless because `-e` wins, but it misleads anyone reading the file.
 
 ---
 
