@@ -7,9 +7,9 @@
 set -uo pipefail
 exclude="${1:-}"
 
-diff=$(git diff --cached -U0 --diff-filter=AM 2>/dev/null || true)
+diff=$(git diff --cached -U0 --diff-filter=d 2>/dev/null || true)
 if [ "${INCLUDE_UNSTAGED:-0}" = "1" ]; then
-  diff+=$'\n'$(git diff -U0 --diff-filter=AM 2>/dev/null || true)
+  diff+=$'\n'$(git diff -U0 --diff-filter=d 2>/dev/null || true)
 fi
 [ -z "$diff" ] && exit 0
 
