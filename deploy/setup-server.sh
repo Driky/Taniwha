@@ -107,10 +107,6 @@ while [[ -z "$PHX_HOST" ]]; do
   read -r PHX_HOST
 done
 
-printf "  RTORRENT_SOCKET [/var/run/rtorrent/rpc.socket]: "
-read -r RTORRENT_SOCKET
-RTORRENT_SOCKET="${RTORRENT_SOCKET:-/var/run/rtorrent/rpc.socket}"
-
 printf "  PORT [4000]: "
 read -r APP_PORT
 APP_PORT="${APP_PORT:-4000}"
@@ -122,8 +118,10 @@ ok "Environment values collected (SECRET_KEY_BASE auto-generated)"
 # Step 6 — Create .env on server via deploy key
 # ---------------------------------------------------------------------------
 info "Step 6/8 — Writing .env on server"
-printf 'SECRET_KEY_BASE=%s\nPHX_HOST=%s\nPORT=%s\nRTORRENT_SOCKET=%s\n\n# OpenTelemetry (optional — leave ENDPOINT empty to disable)\nOTEL_SERVICE_NAME=taniwha\nOTEL_EXPORTER_OTLP_ENDPOINT=\nOTEL_EXPORTER_OTLP_PROTOCOL=http_protobuf\nOTEL_EXPORTER_OTLP_HEADERS=\n' \
-  "$SECRET_KEY_BASE" "$PHX_HOST" "$APP_PORT" "$RTORRENT_SOCKET" \
+# RTORRENT_SOCKET is deliberately absent: taniwha.service sets it to match its
+# socket directory mount.
+printf 'SECRET_KEY_BASE=%s\nPHX_HOST=%s\nPORT=%s\n\n# OpenTelemetry is optional: leave ENDPOINT empty to disable\nOTEL_SERVICE_NAME=taniwha\nOTEL_EXPORTER_OTLP_ENDPOINT=\nOTEL_EXPORTER_OTLP_PROTOCOL=http_protobuf\nOTEL_EXPORTER_OTLP_HEADERS=\n' \
+  "$SECRET_KEY_BASE" "$PHX_HOST" "$APP_PORT" \
   | ssh -i "$DEPLOY_KEY" -p "${PORT}" "taniwha-deploy@${SERVER}" \
       "tee /home/taniwha-deploy/taniwha/.env > /dev/null && chmod 600 /home/taniwha-deploy/taniwha/.env"
 ok ".env written with permissions 600"

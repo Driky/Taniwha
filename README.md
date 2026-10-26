@@ -30,6 +30,9 @@ For production deployment see [`docs/server-setup.md`](docs/server-setup.md).
 # Install dependencies and set up the database (if any)
 mix setup
 
+# Activate the git hooks (lefthook.yml)
+lefthook install
+
 # Start Phoenix with a REPL
 iex -S mix phx.server
 ```

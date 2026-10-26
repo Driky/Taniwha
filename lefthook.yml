@@ -1,0 +1,19 @@
+# Git hooks managed by lefthook (https://lefthook.dev).
+# Activate in a fresh clone with: lefthook install
+# Scripts live in .lefthook/; the process-reference patterns in
+# .lefthook/process-ref-patterns.txt are read live by the guard.
+
+commit-msg:
+  commands:
+    strip-claude-attribution:
+      run: .lefthook/strip-claude-attribution.sh {1}
+
+pre-commit:
+  parallel: true
+  commands:
+    process-references:
+      run: .lefthook/process-ref-guard.sh
+    typographic-dashes:
+      run: .lefthook/dash-guard.sh
+    mix-precommit:
+      run: mix format --check-formatted && mix deps.unlock --check-unused && mix precommit

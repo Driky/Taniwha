@@ -20,7 +20,7 @@ The script will:
 2. Generate `~/.ssh/taniwha_deploy` (skipped if it already exists)
 3. Create the `taniwha-deploy` user and sudoers entry on the server
 4. Install the deploy public key
-5. Prompt you for `PHX_HOST`, `RTORRENT_SOCKET`, and `PORT`, then write `.env`
+5. Prompt you for `PHX_HOST` and `PORT`, then write `.env` (the systemd unit sets `RTORRENT_SOCKET` itself)
 6. Copy and enable the systemd unit
 7. Print all GitHub secrets (`DEPLOY_SSH_KEY`, `DEPLOY_HOST_KEY`, etc.) ready to copy-paste
 
@@ -33,7 +33,7 @@ The manual steps below are kept for reference and troubleshooting.
 - Debian 12 (Bookworm) or Ubuntu 22.04+ VPS
 - Root or sudo access during setup
 - Docker installed (`curl -fsSL https://get.docker.com | sh`)
-- rtorrent already running and exposing a SCGI Unix socket (typically `/var/run/rtorrent/rpc.socket`)
+- rtorrent already running and exposing a SCGI Unix socket at `/var/run/driky/.rtorrent.sock` (the unit mounts `/var/run/driky`; edit `deploy/taniwha.service` if your socket lives elsewhere)
 - A GitHub repository with Actions enabled (CI workflow must pass before CD runs)
 
 ---
@@ -128,13 +128,14 @@ openssl rand -base64 48
 Then create the file on the server, substituting your actual values:
 
 ```bash
-printf 'SECRET_KEY_BASE=REPLACE_WITH_64_CHARACTER_SECRET\nPHX_HOST=your.domain.example.com\nPORT=4000\nRTORRENT_SOCKET=/var/run/rtorrent/rpc.socket\n' | sudo -u taniwha-deploy tee /home/taniwha-deploy/taniwha/.env > /dev/null
+printf 'SECRET_KEY_BASE=REPLACE_WITH_64_CHARACTER_SECRET\nPHX_HOST=your.domain.example.com\nPORT=4000\n' | sudo -u taniwha-deploy tee /home/taniwha-deploy/taniwha/.env > /dev/null
 
 # Restrict permissions — the file contains secrets
 sudo chmod 600 /home/taniwha-deploy/taniwha/.env
 sudo chown taniwha-deploy:taniwha-deploy /home/taniwha-deploy/taniwha/.env
 ```
 
+Do not set `RTORRENT_SOCKET` in `.env`. The unit passes it with `docker run -e`, which takes precedence over `--env-file`, so the path always matches the socket directory the unit mounts. Installs made with the earlier setup script still have a `RTORRENT_SOCKET=` line in `.env`. Delete it only after the updated unit from section 3 is installed and `sudo systemctl daemon-reload` has run. The old unit does not pass `-e RTORRENT_SOCKET`, so removing the line under it makes the app fall back to `/var/run/rtorrent.sock` and every RPC call fails. With the updated unit in place the line is harmless because `-e` wins, but it misleads anyone reading the file.
 
 ---
 
@@ -231,24 +232,17 @@ unreadable — there is no automatic migration. After rotating the key:
 
 ## 5. rtorrent socket permissions
 
-The `taniwha-deploy` user (who runs the Docker daemon client) must be able to read/write the rtorrent socket that is bind-mounted into the container.
+The unit bind mounts the host directory `/var/run/driky` into the container at `/var/run/rtorrent`. It mounts the directory rather than the socket file because rtorrent deletes its socket on exit and creates a new one at each start: a file mount would keep pointing at the deleted socket until Taniwha restarted.
 
-**Option A — group membership** (preferred):
-
-```bash
-# Find the group that owns the socket
-ls -la /var/run/rtorrent/rpc.socket
-
-# Add taniwha-deploy to that group (e.g., "rtorrent")
-sudo usermod -aG rtorrent taniwha-deploy
-# Log out and back in, or: newgrp rtorrent
-```
-
-**Option B — ACL** (if the socket group cannot be changed):
+Inside the container Taniwha runs as `taniwha` (uid/gid 1001), so uid 1001 must be able to enter the directory and read/write the socket. On this server rtorrent runs as `driky`, which is also uid/gid 1001, so no extra permissions are needed. Check with:
 
 ```bash
-sudo setfacl -m u:taniwha-deploy:rw /var/run/rtorrent/rpc.socket
+id driky                                  # expect uid=1001 gid=1001
+ls -ld /var/run/driky                     # expect drwxr-x--- driky driky
+ls -la /var/run/driky/.rtorrent.sock      # expect srwxrwx--- driky driky
 ```
+
+If rtorrent runs under a different uid, give the container the rtorrent group instead. Add `--group-add <gid>` (the gid that owns `/var/run/driky` and the socket) to the `docker run` line in the unit, and make sure that group can enter the directory (`g+rx`) and connect to the socket (`g+rw`, so rtorrent needs a umask such as `007` that keeps group write when it creates the socket). Do not put an ACL on the socket file: rtorrent recreates the socket at each start, which drops any ACL set on the old one. This server needs none of this, since uid 1001 is `driky`.
 
 ---
 
